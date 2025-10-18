@@ -100,9 +100,9 @@ output "infrastructure_summary" {
     cloudwatch_log_group     = module.cloudwatch.log_group_name
     cloudwatch_dashboard_url = module.cloudwatch.dashboard_url
     secrets = {
-      naver_credentials_name     = module.secrets_manager.naver_credentials_secret_name
-      sens_credentials_name      = module.secrets_manager.sens_credentials_secret_name
-      telegram_credentials_name  = module.secrets_manager.telegram_credentials_secret_name
+      naver_credentials_name    = module.secrets_manager.naver_credentials_secret_name
+      sens_credentials_name     = module.secrets_manager.sens_credentials_secret_name
+      telegram_credentials_name = module.secrets_manager.telegram_credentials_secret_name
     }
   }
 }

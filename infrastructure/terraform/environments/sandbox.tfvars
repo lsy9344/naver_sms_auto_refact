@@ -13,12 +13,12 @@ ecr_image_tag_mutability      = "MUTABLE"
 ecr_lifecycle_max_image_count = 3 # Minimal retention for sandbox
 
 # CloudWatch Configuration
-log_retention_days                = 7 # Minimal retention for sandbox
-alarm_email                       = "" # Optional for sandbox
-error_alarm_threshold             = 5  # Lenient for testing
-login_failure_alarm_threshold     = 10
-lambda_function_name              = "naver-sms-automation-sandbox"
-cloudwatch_namespace              = "NaverSMSAutomationSandbox"
+log_retention_days            = 7  # Minimal retention for sandbox
+alarm_email                   = "" # Optional for sandbox
+error_alarm_threshold         = 5  # Lenient for testing
+login_failure_alarm_threshold = 10
+lambda_function_name          = "naver-sms-automation-sandbox"
+cloudwatch_namespace          = "NaverSMSAutomationSandbox"
 
 # IAM Role ARNs
 lambda_role_arn        = "arn:aws:iam::654654307503:role/naver-sms-automation-lambda-role"

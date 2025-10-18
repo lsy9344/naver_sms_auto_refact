@@ -205,8 +205,8 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           metrics = [
-            [var.cloudwatch_namespace, "SMSSentTotal", { stat = "Sum", label = "SMS Sent" }],
-            [".", "SMSFailedTotal", { stat = "Sum", label = "SMS Failed" }]
+            [var.cloudwatch_namespace, "SMSSentTotal"],
+            [".", "SMSFailedTotal"]
           ]
           period = 300
           stat   = "Sum"
@@ -227,9 +227,9 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           metrics = [
-            ["AWS/Lambda", "Errors", { stat = "Sum", label = "Lambda Errors", dimensions = { FunctionName = var.lambda_function_name } }],
-            [var.cloudwatch_namespace, "LoginFailureTotal", { stat = "Sum", label = "Login Failures" }],
-            [".", "SecretsErrorTotal", { stat = "Sum", label = "Secrets Errors" }]
+            ["AWS/Lambda", "Errors", "FunctionName", var.lambda_function_name],
+            [var.cloudwatch_namespace, "LoginFailureTotal"],
+            [".", "SecretsErrorTotal"]
           ]
           period = 300
           stat   = "Sum"
@@ -262,8 +262,8 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           metrics = [
-            ["AWS/Lambda", "Duration", { stat = "p50", label = "Duration p50", dimensions = { FunctionName = var.lambda_function_name } }],
-            [".", "Duration", { stat = "p95", label = "Duration p95", dimensions = { FunctionName = var.lambda_function_name } }]
+            ["AWS/Lambda", "Duration", "FunctionName", var.lambda_function_name, { stat = "p50" }],
+            [".", "Duration", "FunctionName", var.lambda_function_name, { stat = "p95" }]
           ]
           period = 300
           stat   = "Average"
@@ -284,8 +284,8 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           metrics = [
-            ["AWS/Lambda", "Invocations", { stat = "Sum", label = "Total Invocations", dimensions = { FunctionName = var.lambda_function_name } }],
-            [".", "Throttles", { stat = "Sum", label = "Throttles", dimensions = { FunctionName = var.lambda_function_name } }]
+            ["AWS/Lambda", "Invocations", "FunctionName", var.lambda_function_name],
+            [".", "Throttles", "FunctionName", var.lambda_function_name]
           ]
           period = 300
           stat   = "Sum"

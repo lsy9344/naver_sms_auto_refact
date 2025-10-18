@@ -13,12 +13,12 @@ ecr_image_tag_mutability      = "MUTABLE"
 ecr_lifecycle_max_image_count = 10 # Keep more images in staging
 
 # CloudWatch Configuration
-log_retention_days                = 60 # Medium retention for staging
-alarm_email                       = "" # Set to email if needed
-error_alarm_threshold             = 1
-login_failure_alarm_threshold     = 3
-lambda_function_name              = "naver-sms-automation-staging"
-cloudwatch_namespace              = "NaverSMSAutomationStaging"
+log_retention_days            = 60 # Medium retention for staging
+alarm_email                   = "" # Set to email if needed
+error_alarm_threshold         = 1
+login_failure_alarm_threshold = 3
+lambda_function_name          = "naver-sms-automation-staging"
+cloudwatch_namespace          = "NaverSMSAutomationStaging"
 
 # IAM Role ARNs
 lambda_role_arn        = "arn:aws:iam::654654307503:role/naver-sms-automation-lambda-role"

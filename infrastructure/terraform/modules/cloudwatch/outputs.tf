@@ -40,9 +40,9 @@ output "metric_filters" {
 output "alarm_arns" {
   description = "ARNs of CloudWatch alarms"
   value = {
-    lambda_errors    = aws_cloudwatch_metric_alarm.lambda_errors.arn
-    secrets_errors   = aws_cloudwatch_metric_alarm.secrets_errors.arn
-    login_failures   = aws_cloudwatch_metric_alarm.login_failures.arn
+    lambda_errors  = aws_cloudwatch_metric_alarm.lambda_errors.arn
+    secrets_errors = aws_cloudwatch_metric_alarm.secrets_errors.arn
+    login_failures = aws_cloudwatch_metric_alarm.login_failures.arn
   }
 }
 
