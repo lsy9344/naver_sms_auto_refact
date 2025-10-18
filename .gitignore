@@ -170,3 +170,7 @@ chromedriver.exe
 # Selenium
 geckodriver
 geckodriver.exe
+
+# BMAD (local only)
+.bmad-core/
+.bmad-*/
