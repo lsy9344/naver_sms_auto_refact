@@ -28,8 +28,11 @@ def ecr_client():
 
 @pytest.fixture
 def iam_client():
-    """Create IAM client for testing."""
-    return boto3.client('iam', region_name=REGION)
+    """Create IAM client for testing.
+
+    Note: IAM is a global service and does not use regional endpoints.
+    """
+    return boto3.client('iam')
 
 
 def test_ecr_repository_exists(ecr_client):
