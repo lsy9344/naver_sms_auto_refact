@@ -8,7 +8,7 @@
 
 plugin "aws" {
   enabled = true
-  version = "0.25.0"
+  version = "0.43.0"
   source  = "github.com/terraform-linters/tflint-ruleset-aws"
 }
 
@@ -37,29 +37,16 @@ rule "terraform_standard_module_structure" {
   enabled = true
 }
 
-rule "aws_instance_default_security_group" {
-  enabled = true
-}
-
 rule "aws_resource_missing_tags" {
   enabled = true
-  tags    = ["Project", "ManagedBy", "Environment"]
-}
+  tags    = ["ManagedBy", "Project"]
 
-rule "aws_s3_bucket_server_side_encryption_configuration" {
-  enabled = true
-}
-
-rule "aws_s3_bucket_versioning" {
-  enabled = true
-}
-
-rule "aws_iam_policy_no_statements_with_admin_access" {
-  enabled = true
-}
-
-rule "aws_iam_policy_blacklist_check" {
-  enabled = false
+  exclude = [
+    "/^aws_lambda_permission\\./",
+    "/^aws_cloudwatch_log_metric_filter\\./",
+    "/^aws_events_target\\./",
+    "/^aws_cloudwatch_dashboard\\./"
+  ]
 }
 
 rule "terraform_unused_declarations" {
@@ -72,16 +59,4 @@ rule "terraform_comment_syntax" {
 
 rule "terraform_required_version" {
   enabled = false
-}
-
-rule "aws_security_group_rule_description_required" {
-  enabled = true
-}
-
-rule "aws_elasticache_replication_group_default_parameter_group" {
-  enabled = true
-}
-
-rule "aws_db_instance_encrypted" {
-  enabled = true
 }

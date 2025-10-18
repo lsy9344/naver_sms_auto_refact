@@ -1,0 +1,212 @@
+{
+  "confirm": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "다비스튜디오를 찾아주신 고객님, 안녕하세요\n예약 확정되어 이용 안내 드립니다.\n\n비밀번호 입력 후 입장하셔서 커튼 안쪽의 \"촬영실\"로 들어가셔서 책상 위의 메뉴얼을 따라만 하시면 너무 쉬워요,\n문 열고 들어오시면 전 타임 손님들이 셀렉실 사용 중일 수도 있어요.\n바로 '촬영실'로 들어가시면 된답니다!\n\n*풍선 및 테이프 사용 시 \"겔 타입\"의 테이프만 사용 가능합니다,\n겔 타입이 아니면 벽 및 배경지가 훼손되니 주의 부탁드립니다.\n\n정시 입실, 퇴실 꼭 지켜주셔야 다음 예약 손님에게 피해가 가지 않습니다!\n\n[제공서비스]\n-이용시간 구성:\n촬영 50분 10분 내보내기 후\n셀렉실로 이동하여 50분 셀렉 및 인화\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n(평일 1시간 더 쿠폰 사용하신 분은\n기본 촬영 시간에 50분 추가돼요!)\n\n-사진인화 4장 (비닐백 포함)\n-모든 원본파일 무료 제공\n-2,4,6,9컷 무료 편집\n-사진 레터링 무료 제공\n-지점에 따라 배경지 무료 제공\n\n2,4,9컷 및 레터링은 아래 링크에서도 휴대폰으로 편집이 가능해요~\n집 소파, 침대에 누워 편하게 작업하세요 :)\nhttps://dabistudio.vercel.app\n\n이용시간 2시간전에 도어락 비밀번호, 주차관련, 이용 상세 정보 문자메시지가 발송 됩니다!\n",
+      "messages": [
+        {
+          "to": "01012345678"
+        }
+      ]
+    }
+  },
+  "event": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "\n고객님~ 안녕하세요, 다비스튜디오예요 :)\n\n소중한 사람들과의 소중한 추억을 잘 남기셨는지 궁금하네요!\n\n5,000원 상당의 무료 인화지 리뷰이벤트는 등록 하셨을까요?\n네이버: 예약 -> 포토리뷰 작성\n인스타: 팔로우하고 결과물 게시 후 사람태그 @_dabistudio_\n\n좋은 하루 보내세요 :D\n        ",
+      "messages": [
+        {
+          "to": "01098765432"
+        }
+      ]
+    }
+  },
+  "guide_1051707": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "다비스튜디오를 찾아주신 고객님, 안녕하세요\n이용 상세 안내 드립니다.\n\n-도어락 비밀번호 : 5282*\n\n-와이파이 ID : SK_WIFIGIGA6C48_2.4G\n\n-와이파이 비밀번호 : GIH4B@7451\n\n-오시는 길 :\n경기도 화성시 수노을중앙로 130, 1동 5층 510호\n(스타벅스 바로 옆 \"다이소 건물\" 5층이 다비스튜디오 입니다!)\n\n-주차 : 다이소 건물 지하주차장 이용\n평일 3시간, 주말 2시간 무료 제공\n셀렉실에서 PC로 주차 정산\n지하주차장 만차 시 \"수노을중앙공원 공영주차장\"(2시간 무료) 이용 바랍니다. 도보 2분 거리\n\n-예습 매뉴얼 :\nhttps://blog.naver.com/dabi-/223902385799\n\n-배경지 설치치 동영상 :\nhttp://pf.kakao.com/_EwvUxj/104914467\n\n비밀번호 입력 후 입장하셔서 커튼 안쪽의 \"촬영실\"로 들어가셔서 책상 위의 메뉴얼을 따라만 하시면 너무 쉬워요 :)\n\n[제공서비스]\n-이용시간 구성:\n촬영 50분 10분 내보내기 후\n셀렉실로 이동하여 50분 셀렉 및 인화\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n(평일 1시간 더 쿠폰 사용하신 분은\n기본 촬영 시간에 50분 추가돼요!)\n\n-프리미엄 인화지 4장\n-모든 원본파일 무료 제공\n-사진 레터링 무료 제공\n-3색 배경지 무료 이벤트\n\n이용하시다가 문의사항 있다면 연락 부탁 드릴께요! :)\n",
+      "messages": [
+        {
+          "to": "01000001234"
+        }
+      ]
+    }
+  },
+  "guide_951291": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "다비스튜디오를 찾아주신 고객님, 안녕하세요\n이용 상세 안내 드립니다.\n\n-도어락 비밀번호 : 5581*\n\n-와이파이 ID : U+NetFE24_5G\n\n-와이파이 비밀번호 : 5FDB7P@251\n\n-오시는 길 :\n경기도 안산시 단원구 당곡로 9 진양빌딩, 203호 (파란색 문을 찾으세요!)\n(\"전주식 콩나물 국밥집\" 2층이 다비스튜디오 입니다!)\n\n-주차 : 건물 바로 뒤, 옆에 시간당 1,200원인 주차 대수가 많은 공영주차장이 2개 있어요!\n번화가의 공영주차장은 협소한 경우도 있으니 30분 전 미리 도착하시면 편하실 거예요 :)\n\n-예습 매뉴얼 :\nhttps://blog.naver.com/dabi-/223902385799\n\n-배경지 설치 동영상 :\nhttp://pf.kakao.com/_EwvUxj/104973470\n\n비밀번호 입력 후 입장하셔서 커튼 안쪽의 \"촬영실\"로 들어가셔서 책상 위의 메뉴얼을 따라만 하시면 너무 쉬워요 :)\n\n[제공서비스]\n-이용시간 구성:촬영실 50분/셀렉실 이동 후 50분 (시간 조정 불가)\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n  ㄴ 이벤트 쿠폰 사용 고객님은 촬영실 100분 이용입니다 :)\n-프리미엄 인화지 4장\n-모든 원본파일 무료 제공\n-사진 레터링 무료 제공\n-3색 배경지 무료 이벤트\n\n이용하시다가 문의사항 있다면 연락 부탁 드릴께요!\n        ",
+      "messages": [
+        {
+          "to": "01000001234"
+        }
+      ]
+    }
+  },
+  "guide_1462519": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "\n        안녕하세요! 고객님~\n\n다비스튜디오 인천검단점을 찾아주셔서 감사합니다 :)\n금일 이용 상세 안내 드립니다.\n\n정시 입실/퇴실 꼭 지켜주셔야 하며,\n이용시간 준수하지 않음으로 인한 불이익은 책임지지 않습니다.\n\n⬇이용 매뉴얼 미리보기⬇\nhttps://blog.naver.com/dabi-/223902385799\n\n⬇배경지 설치 동영상 미리보기\nhttp://pf.kakao.com/_EwvUxj/108482706\n\n-도어락 비밀번호 : 열려있어요!\n-오시는 길 :\n인천광역시 서구 이름4로 6, KR법조타워 1, 1024호.  (1층 메가커피 건물이에요!)\n-주차 : 건물 주차장 이용, 평일 3시간 주말 2시간 무료 지원\n추가 주차비는 10분당 1,000원 입니다!\n\n주차 정산 방법: 셀렉실 PC에서 차량번호 입력.\n\n비밀번호 입력 후 입장하셔서 커튼 안쪽의 \"촬영실\"로 들어가셔서 책상 위의 메뉴얼을 따라만 하시면 너무 쉬워요 :)\n\n[제공서비스]\n이용 시간 구성:\n촬영 50분 10분 내보내기 후\n셀렉실로 이동하여 50분 셀렉 및 인화\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n\n(평일 1시간 더 쿠폰 사용하신 분은\n기본 촬영 시간에 50분 추가돼요!)\n\n-프리미엄 인화지 4장\n-모든 원본파일 무료 제공\n-2색 배경지 무료 이벤트\n-레터링 무료\n-2컷,4컷,6컷,9컷 무료 편집\n\n이용하시다가 문의사항 있다면 연락 부탁 드릴께요!\n        ",
+      "messages": [
+        {
+          "to": "01000001234"
+        }
+      ]
+    }
+  },
+  "guide_1120125": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "\n        다비스튜디오를 찾아주신 고객님, 안녕하세요\n이용 상세 안내 드립니다.\n\n-도어락 비밀번호 : 5282*\n-와이파이 ID : KT_GiGA_A42B\n-와이파이 비밀번호 : 8fhcdgb752\n\n-오시는 길 :\n경기도 수원시 권선구 금곡로 201, 로얄팰리스 1차 2층 215호\n엘레베이터 내리셔서 오른쪽 문으로 나가시면 \"다비스튜디오\" 간판이 보입니다.\n\n-주차 : 건물 지하 1,2,3층 주차장 이용 가능합니다. 만약 만차 시 건물 주차장 출입구 근처 이면주차 가능합니다. 주차는 2시간 무료 지원됩니다.\n주차 정산 방법: 셀렉실 PC에서 차량번호 입력.\n\n입주자전용, 상가전용 엘레베이터 있지만 모두 사용하셔도 무방합니다.\n-엘레베이터 비밀번호 : #1234#\n\n비밀번호 입력 후 입장하셔서 커튼 안쪽의 \"촬영실\"로 들어가셔서 책상 위의 메뉴얼을 따라만 하시면 너무 쉬워요 :)\n\n⬇이용 매뉴얼 미리보기⬇\nhttps://blog.naver.com/dabi-/223902385799\n\n⬇배경지 설치 동영상 미리보기\nhttp://pf.kakao.com/_EwvUxj/108482706\n\n[제공서비스]\n-이용시간 구성:촬영실 50분/셀렉실 이동 후 50분 (시간 조정 불가)\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n  ㄴ 이벤트 쿠폰 사용 고객님은 촬영실 100분 이용입니다 :)\n-프리미엄 인화지 4장\n-모든 원본파일 무료 제공\n-3색 배경지 무료 이벤트\n-사진레터링 무료\n\n이용하시다가 문의사항 있다면 연락 부탁 드릴께요!\n        ",
+      "messages": [
+        {
+          "to": "01000001234"
+        }
+      ]
+    }
+  },
+  "guide_1285716": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "\n        안녕하세요! 고객님~\n\n다비스튜디오 동탄점을 찾아주셔서 감사합니다 :)\n금일 이용 상세 안내 드립니다.\n\n정시 입실/퇴실 꼭 지켜주셔야 하며,\n이용시간 준수하지 않음으로 인한 불이익은 책임지지 않습니다.\n\n⬇이용 매뉴얼 미리보기⬇\nhttps://blog.naver.com/dabi-/223902385799\n\n⬇배경지 설치 동영상 미리보기\nhttp://pf.kakao.com/_EwvUxj/108482706\n\n-도어락 비밀번호 : 3756*\n-오시는 길 :\n경기도 화성시 동탄대로 636-1번지 센테라 IT 타워 2차, 704호.   (1층 농협 건물이에요!)\n-주차 : 건물 주차장 이용, 평일 3시간 주말 2시간 무료 지원\n추가 주차비는 10분당 500원 입니다!\n\n주차 정산 방법: 셀렉실 PC에서 차량번호 입력.\n\n비밀번호 입력 후 입장하셔서 커튼 안쪽의 \"촬영실\"로 들어가셔서 책상 위의 메뉴얼을 따라만 하시면 너무 쉬워요 :)\n\n[제공서비스]\n이용 시간 구성:\n촬영 50분 10분 내보내기 후\n셀렉실로 이동하여 50분 셀렉 및 인화\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n\n(평일 1시간 더 쿠폰 사용하신 분은\n기본 촬영 시간에 50분 추가돼요!)\n\n-프리미엄 인화지 4장\n-모든 원본파일 무료 제공\n-2색 배경지 무료 이벤트\n-레터링 무료\n-2컷,4컷,6컷,9컷 무료 편집\n\n이용하시다가 문의사항 있다면 연락 부탁 드릴께요!\n        ",
+      "messages": [
+        {
+          "to": "01000001234"
+        }
+      ]
+    }
+  },
+  "guide_1473826": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "\n        안녕하세요! 고객님~\n\n다비스튜디오 부천점을 찾아주셔서 감사합니다 :)\n금일 이용 상세 안내 드립니다.\n\n정시 입실/퇴실 꼭 지켜주셔야 하며,\n이용시간 준수하지 않음으로 인한 불이익은 책임지지 않습니다.\n\n⬇이용 매뉴얼 미리보기⬇\nhttps://blog.naver.com/dabi-/223902385799\n\n⬇배경지 설치 동영상 미리보기\nhttp://pf.kakao.com/_EwvUxj/108482706\n\n-도어락 비밀번호 : 5858*\n-오시는 길 :\n경기도 부천시 원미구 춘의동 73-1 (디아크원), 508호.  (1층 컴포즈커피 건물이에요!)\n-주차 : 건물 지하, 지상주차장 이용, (5층 주차 추천)\n주차비는 평일 3시간 주말 2시간 무료 지원\n추가 주차비는 10분당 1,000원 입니다!\n\n주차 정산 방법: 셀렉실 PC에서 차량번호 입력.\n\n비밀번호 입력 후 입장하셔서 커튼 안쪽의 \"촬영실\"로 들어가셔서 책상 위의 메뉴얼을 따라만 하시면 너무 쉬워요 :)\n\n[제공서비스]\n이용 시간 구성:\n촬영 50분 10분 내보내기 후\n셀렉실로 이동하여 50분 셀렉 및 인화\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n\n(평일 1시간 더 쿠폰 사용하신 분은\n기본 촬영 시간에 50분 추가돼요!)\n\n-프리미엄 인화지 4장\n-모든 원본파일 무료 제공\n-2색 배경지 무료 이벤트\n-레터링 무료\n-2컷,4컷,6컷,9컷 무료 편집\n\n이용하시다가 문의사항 있다면 연락 부탁 드릴께요!\n        ",
+      "messages": [
+        {
+          "to": "01000001234"
+        }
+      ]
+    }
+  },
+  "guide_1466783": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01055814318",
+      "subject": "다비스튜디오 안내",
+      "content": "\n        안녕하세요! 고객님~\n\n다비스튜디오 평택 고덕점을 찾아주셔서 감사합니다 :)\n금일 이용 상세 안내 드립니다.\n\n정시 입실/퇴실 꼭 지켜주셔야 하며,\n이용시간 준수하지 않음으로 인한 불이익은 책임지지 않습니다.\n\n-도어락 비밀번호 : 5805*\n-오시는 길 :\n경기도 평택시 고덕국제대로77 301동 3218호 (아파트 아니라 상가입니다)\n-주차 : 건물 주차장 이용, 주차비 무료\n\n**** 건물 특성상 길 찾기가 매우 어려우니\n아래 블로그 꼭 읽어주세요 ****\n \nhttps://blog.naver.com/dabi-/223967105578\n\n⬇이용 매뉴얼 미리보기⬇\nhttps://blog.naver.com/dabi-/223902385799\n\n⬇배경지 설치 동영상 미리보기\nhttp://pf.kakao.com/_EwvUxj/108482706\n\n입장 후 커튼 안쪽의 \"촬영실\" 들어가셔서 책상 위에 있는 \"셀프사진관 메뉴얼\"을 꼭 정독 해주세요!\n보고 따라만 하시면 너무 쉽습니다!\n\n[제공서비스]\n이용 시간 구성:\n촬영 50분 10분 내보내기 후\n셀렉실로 이동하여 50분 셀렉 및 인화\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n\n(평일 1시간 더 쿠폰 사용하신 분은\n기본 촬영 시간에 50분 추가돼요!)\n\n-프리미엄 인화지 4장 무료\n-모든 원본파일 무료 제공\n-5색 배경지 무료 이벤트\n-레터링 무료\n-2컷,4컷,6컷,9컷 무료 편집\n\n이용하시다가 문의사항 있다면 연락 부탁 드릴께요!\n        ",
+      "messages": [
+        {
+          "to": "01000001234"
+        }
+      ]
+    }
+  },
+  "guide_867589": {
+    "url": "https://sens.apigw.ntruss.com/sms/v2/services/ncp:sms:kr:324182048243:dabistudio/messages",
+    "headers": {
+      "Content-Type": "application/json; charset=utf-8",
+      "x-ncp-apigw-timestamp": "1700000000000",
+      "x-ncp-iam-access-key": "tpAFhfAWvpLqS5ve35Zw",
+      "x-ncp-apigw-signature-v2": "7qMAlJlCMlPQBjfZkXmS6XmmUi00hGRpuG5CM7FaNN4="
+    },
+    "payload": {
+      "type": "LMS",
+      "contentType": "COMM",
+      "from": "01022392673",
+      "subject": "다비스튜디오 안내",
+      "content": "\n        안녕하세요! 고객님~\n\n다비스튜디오 안산초지점을 찾아주셔서 감사합니다 :)\n금일 이용 상세 안내 드립니다.\n\n정시 입실/퇴실 꼭 지켜주셔야 하며,\n이용시간 준수하지 않음으로 인한 불이익은 책임지지 않습니다.\n\n⬇이용 매뉴얼 미리보기⬇\nhttp://pf.kakao.com/_EwvUxj/104666553\n\n-도어락 비밀번호 : 5282*\n-오시는 길 :\n경기도 안산시 ��원구 광덕3로 41, 3층\n('하나로차사랑' 쌩노란색 간판이 독보적으로 보이는 건물이에요!)\n-주차 : 건물 뒷편, 그 옆 CU건물, 대로변 앞은 오전8시 이전, 11-2시, 오후 6시 이후만 단속 없습니다.\n\n비밀번호 입력 후 입장하셔서 커튼 안쪽의 \"촬영실\"로 들어가셔서 책상 위의 메뉴얼을 따라만 하시면 너무 쉬워요 :)\n\n⚠️ 사진관 카메라 주의 안내 ⚠️\n사진관 내 고정 카메라는 초점,구도가 맞춰져 있으니, 절대 건드리거나 위치를 변경하지 말아주세요\n\n❗ 한 번 흐트러지면 다시 맞추기가 어렵고, 촬영에 큰 지장이 발생할 수 있습니다.\n꼭 유의 부탁드립니다.\n\n[제공서비스]\n이용 시간 구성:\n촬영 50분 10분 내보내기 후\n셀렉실로 이동하여 50분 셀렉 및 인화\n(내가 촬영할 때 셀렉실에서 전 타임 셀렉)\n\n(평일 1시간 더 쿠폰 사용하신 분은\n기본 촬영 시간에 50분 추가돼요!)\n\n-프리미엄 인화지 4장\n-모든 원본파일 무료 제공\n-레터링 무료\n-2컷,4컷,6컷,9컷 무료 편집\n\n이용하시다가 문의사항 있다면 연락 부탁 드릴께요!\n        ",
+      "messages": [
+        {
+          "to": "01000001234"
+        }
+      ]
+    }
+  }
+}
