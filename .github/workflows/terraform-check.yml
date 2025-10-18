@@ -41,8 +41,16 @@ jobs:
       - name: terraform fmt (check)
         run: terraform -chdir=infrastructure/terraform fmt -check -recursive
 
+      - name: Create backend override for CI
+        run: |
+          cat > infrastructure/terraform/backend_override.tf <<EOF
+          terraform {
+            backend "local" {}
+          }
+          EOF
+
       - name: terraform init (local backend)
-        run: terraform -chdir=infrastructure/terraform init -backend=false -input=false
+        run: terraform -chdir=infrastructure/terraform init -input=false
 
       - name: terraform validate
         run: terraform -chdir=infrastructure/terraform validate
