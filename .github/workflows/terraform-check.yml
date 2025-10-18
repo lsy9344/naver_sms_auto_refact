@@ -16,7 +16,6 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.TERRAFORM_AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.TERRAFORM_AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.TERRAFORM_AWS_SESSION_TOKEN }}
       AWS_REGION: ap-northeast-2
       TF_IN_AUTOMATION: "true"
     steps:
@@ -30,7 +29,7 @@ jobs:
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v3
         with:
-          tflint_version: v0.51.0
+          tflint_version: v0.53.0
 
       - name: Ensure AWS credentials are configured
         run: |
@@ -50,11 +49,11 @@ jobs:
 
       - name: tflint init
         working-directory: infrastructure/terraform
-        run: tflint --init
+        run: tflint --init --config=../.tflint.hcl
 
       - name: tflint
         working-directory: infrastructure/terraform
-        run: tflint --config=../.tflint.hcl
+        run: tflint --config=../.tflint.hcl --minimum-failure-severity=error
 
       - name: terraform plan (sandbox)
         run: terraform -chdir=infrastructure/terraform plan -var-file=environments/sandbox.tfvars -out=tfplan-sandbox.bin
