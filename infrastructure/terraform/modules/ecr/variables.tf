@@ -65,3 +65,9 @@ variable "deployment_role_arn" {
     error_message = "deployment_role_arn must be a valid IAM role ARN."
   }
 }
+
+variable "tags" {
+  description = "Common tags to apply to resources"
+  type        = map(string)
+  default     = {}
+}

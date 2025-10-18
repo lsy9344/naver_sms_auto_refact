@@ -19,15 +19,16 @@ resource "aws_ecr_repository" "main" {
   image_scanning_configuration {
     scan_on_push = var.scan_on_push
   }
-
+  tags = var.tags
+  
   encryption_configuration {
     encryption_type = "AES256"
   }
 
-  tags = {
+  tags = merge(var.tags, {
     Name        = var.repository_name
     Environment = var.environment
-  }
+  })
 }
 
 ###############################################################################

@@ -41,11 +41,14 @@ resource "aws_secretsmanager_secret" "secrets" {
   description             = each.value.description
   recovery_window_in_days = var.secret_recovery_window_days
 
-  tags = {
-    Name        = each.key
-    Environment = var.environment
-    Type        = "credential"
-  }
+  tags = merge(
+    var.tags,
+    {
+      Name        = each.key
+      Environment = var.environment
+      Type        = "credential"
+    }
+  )
 }
 
 resource "aws_secretsmanager_secret_version" "secrets" {

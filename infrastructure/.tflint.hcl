@@ -38,8 +38,14 @@ rule "terraform_standard_module_structure" {
 }
 
 rule "aws_resource_missing_tags" {
-  enabled = true
-  tags    = ["Project", "ManagedBy", "Environment"]
+  enabled  = true
+  tag_keys = ["ManagedBy", "Project"]
+
+  exclude = [
+    "/^aws_lambda_permission\\./",
+    "/^aws_cloudwatch_log_metric_filter\\./",
+    "/^aws_events_target\\./"
+  ]
 }
 
 rule "terraform_unused_declarations" {

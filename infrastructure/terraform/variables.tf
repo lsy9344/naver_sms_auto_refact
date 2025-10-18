@@ -8,6 +8,12 @@ variable "aws_region" {
   default     = "ap-northeast-2"
 }
 
+variable "project" {
+  type        = string
+  description = "Project tag"
+  default     = "naver-sms-automation"
+}
+
 variable "environment" {
   description = "Environment name (dev, staging, prod)"
   type        = string

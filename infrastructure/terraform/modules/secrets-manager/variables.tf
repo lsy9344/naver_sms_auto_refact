@@ -54,3 +54,9 @@ variable "secret_recovery_window_days" {
     error_message = "Recovery window must be between 7 and 30 days."
   }
 }
+
+variable "tags" {
+  description = "Common tags to apply to resources"
+  type        = map(string)
+  default     = {}
+}

@@ -57,3 +57,9 @@ variable "cloudwatch_namespace" {
   type        = string
   default     = "NaverSMSAutomation"
 }
+
+variable "tags" {
+  description = "Common tags to apply to resources"
+  type        = map(string)
+  default     = {}
+}

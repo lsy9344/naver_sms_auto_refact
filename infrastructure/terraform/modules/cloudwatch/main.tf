@@ -18,11 +18,11 @@ resource "aws_cloudwatch_log_group" "lambda" {
   retention_in_days = var.log_retention_days
   kms_key_id        = null # Use AWS-managed encryption
 
-  tags = {
+  tags = merge(var.tags, {
     Name        = "${var.lambda_function_name}-logs"
     Environment = var.environment
     Component   = "logging"
-  }
+  })
 }
 
 ###############################################################################
@@ -101,11 +101,11 @@ resource "aws_sns_topic" "alerts" {
   name              = "${var.lambda_function_name}-alerts"
   kms_master_key_id = "alias/aws/sns"
 
-  tags = {
+  tags = merge(var.tags, {
     Name        = "${var.lambda_function_name}-alerts"
     Environment = var.environment
     Component   = "alerting"
-  }
+  })
 }
 
 # SNS Topic Subscription (if email provided)
@@ -140,12 +140,12 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
     FunctionName = var.lambda_function_name
   }
 
-  tags = {
+  tags = merge(var.tags, {
     Name        = "${var.lambda_function_name}-lambda-errors"
     Environment = var.environment
     Component   = "alerting"
     Severity    = "high"
-  }
+  })
 }
 
 # Secrets Retrieval Failures
@@ -162,12 +162,12 @@ resource "aws_cloudwatch_metric_alarm" "secrets_errors" {
   alarm_actions       = [aws_sns_topic.alerts.arn]
   treat_missing_data  = "notBreaching"
 
-  tags = {
+  tags = merge(var.tags, {
     Name        = "${var.lambda_function_name}-secrets-errors"
     Environment = var.environment
     Component   = "alerting"
     Severity    = "high"
-  }
+  })
 }
 
 # Login Failures
@@ -184,12 +184,12 @@ resource "aws_cloudwatch_metric_alarm" "login_failures" {
   alarm_actions       = [aws_sns_topic.alerts.arn]
   treat_missing_data  = "notBreaching"
 
-  tags = {
+  tags = merge(var.tags, {
     Name        = "${var.lambda_function_name}-login-failures"
     Environment = var.environment
     Component   = "alerting"
     Severity    = "medium"
-  }
+  })
 }
 
 ###############################################################################
@@ -198,6 +198,7 @@ resource "aws_cloudwatch_metric_alarm" "login_failures" {
 
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = "${var.lambda_function_name}-dashboard"
+  tags           = var.tags
 
   dashboard_body = jsonencode({
     widgets = [
@@ -340,8 +341,8 @@ resource "aws_iam_policy" "lambda_cloudwatch_logs" {
   description = "Policy to allow Lambda to write to CloudWatch Logs"
   policy      = data.aws_iam_policy_document.lambda_cloudwatch_logs.json
 
-  tags = {
+  tags = merge(var.tags, {
     Name        = "${var.lambda_function_name}-cloudwatch-logs"
     Environment = var.environment
-  }
+  })
 }
