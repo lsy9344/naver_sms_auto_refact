@@ -1,0 +1,68 @@
+name: terraform-check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'infrastructure/**'
+      - '.github/workflows/terraform-check.yml'
+
+jobs:
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.TERRAFORM_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TERRAFORM_AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.TERRAFORM_AWS_SESSION_TOKEN }}
+      AWS_REGION: ap-northeast-2
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v3
+        with:
+          tflint_version: v0.51.0
+
+      - name: Ensure AWS credentials are configured
+        run: |
+          if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+            echo "::error::Missing AWS credentials for Terraform plan. Configure TERRAFORM_AWS_ACCESS_KEY_ID and TERRAFORM_AWS_SECRET_ACCESS_KEY repository secrets."
+            exit 1
+          fi
+
+      - name: terraform fmt (check)
+        run: terraform -chdir=infrastructure/terraform fmt -check -recursive
+
+      - name: terraform init (local backend)
+        run: terraform -chdir=infrastructure/terraform init -backend=false -input=false
+
+      - name: terraform validate
+        run: terraform -chdir=infrastructure/terraform validate
+
+      - name: tflint
+        working-directory: infrastructure/terraform
+        run: tflint --config=../.tflint.hcl
+
+      - name: terraform plan (sandbox)
+        run: terraform -chdir=infrastructure/terraform plan -var-file=environments/sandbox.tfvars -out=tfplan-sandbox.bin
+
+      - name: Render plan to text
+        run: terraform -chdir=infrastructure/terraform show -no-color tfplan-sandbox.bin > infrastructure/terraform/tfplan-sandbox.txt
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-sandbox
+          path: |
+            infrastructure/terraform/tfplan-sandbox.bin
+            infrastructure/terraform/tfplan-sandbox.txt
+          retention-days: 7

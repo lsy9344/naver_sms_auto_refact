@@ -158,6 +158,15 @@ temp/
 
 # Sensitive information
 config.json
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan-*.bin
+*.tfvars
+!infrastructure/terraform/environments/*.tfvars
 secrets.json
 .env.local
 .env.production
