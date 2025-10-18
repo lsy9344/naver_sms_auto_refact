@@ -44,7 +44,7 @@ resource "aws_ecr_lifecycle_policy" "main" {
     rules = [
       {
         rulePriority = 1
-        description  = "Keep only latest ${var.lifecycle_max_image_count} images"
+        description  = "Keep only latest ${var.lifecycle_max_image_count} images!"
         selection = {
           tagStatus   = "any"
           countType   = "imageCountMoreThan"
