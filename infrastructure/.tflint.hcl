@@ -38,13 +38,14 @@ rule "terraform_standard_module_structure" {
 }
 
 rule "aws_resource_missing_tags" {
-  enabled  = true
-  tag_keys = ["ManagedBy", "Project"]
+  enabled = true
+  tags    = ["ManagedBy", "Project"]
 
   exclude = [
     "/^aws_lambda_permission\\./",
     "/^aws_cloudwatch_log_metric_filter\\./",
-    "/^aws_events_target\\./"
+    "/^aws_events_target\\./",
+    "/^aws_cloudwatch_dashboard\\./"
   ]
 }
 
@@ -58,8 +59,4 @@ rule "terraform_comment_syntax" {
 
 rule "terraform_required_version" {
   enabled = false
-}
-
-rule "aws_elasticache_replication_group_default_parameter_group" {
-  enabled = true
 }
