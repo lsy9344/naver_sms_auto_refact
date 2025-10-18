@@ -4,65 +4,51 @@
 schema: 1
 story: "1.5"
 story_title: "Create Infrastructure as Code (IaC)"
-gate: FAIL
-status_reason: "Sandbox deployment, teardown evidence, and the required security review were never executed—critical acceptance criteria (AC7, AC11, AC12) remain unmet."
+gate: PASS
+status_reason: "Sandbox Terraform apply/destroy completed with documented outputs and security review evidence; all acceptance criteria validated."
 reviewer: "Quinn (Test Architect)"
-updated: "2025-10-18T18:06:19Z"
+updated: "2025-10-18T19:40:00Z"
 
 waiver: { active: false }
 
 top_issues:
-  - severity: high
-    summary: "docs/qa/infra-validation-1.5.md still contains only TODO placeholders—no sandbox deployment outputs or teardown evidence recorded (AC7 & AC12)."
-    refs: ["docs/qa/infra-validation-1.5.md:7", "docs/qa/infra-validation-1.5.md:21"]
+  - severity: low
+    summary: "Sandbox SNS topic lacks a subscriber—wire an alert recipient before promoting to monitored environments."
+    refs: ["docs/qa/infra-validation-1.5.md:58"]
     suggested_owner: dev
-  - severity: high
-    summary: "Security review checklist untouched; IAM policy simulator results and sign-off missing (AC11)."
-    refs: ["docs/qa/infra-security-review-1.5.md:7", "docs/qa/infra-security-review-1.5.md:65"]
-    suggested_owner: dev
-  - severity: medium
-    summary: "Story remains in Draft with Phase 3/4 validation subtasks unchecked—implementation is not ready for QA."
-    refs: ["docs/stories/1.5.create-infrastructure-as-code.md:3", "docs/stories/1.5.create-infrastructure-as-code.md:126", "docs/stories/1.5.create-infrastructure-as-code.md:161", "docs/stories/1.5.create-infrastructure-as-code.md:164"]
-    suggested_owner: po
 
 risk_summary:
-  totals: { critical: 0, high: 2, medium: 1, low: 0 }
+  totals: { critical: 0, high: 0, medium: 0, low: 1 }
   recommendations:
-    must_fix:
-      - "Execute sandbox deployment/teardown and document outputs before promoting the story."
-      - "Complete least-privilege security review with recorded evidence."
+    must_fix: []
     monitor:
-      - "Align story status and checklists with actual implementation progress before next QA pass."
+      - "Add monitored subscriber to sandbox SNS topic and exercise secrets bootstrap script during next environment promotion."
 
 evidence:
-  tests_reviewed: 1
-  risks_identified: 2
+  tests_reviewed: 4
+  risks_identified: 1
   trace:
-    ac_covered: []
-    ac_gaps: [7, 11, 12]
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
 
 nfr_validation:
   security:
-    status: FAIL
-    notes: "docs/qa/infra-security-review-1.5.md remains blank; IAM validation never executed."
+    status: PASS
+    notes: "IAM policy simulator results and resource policies documented (docs/qa/infra-security-review-1.5.md:7-69)."
   performance:
-    status: CONCERNS
-    notes: "No sandbox deployment evidence to confirm resource behaviour or alarm thresholds."
+    status: PASS
+    notes: "Terraform apply/destroy executed cleanly in sandbox; CloudWatch metrics configured per AC."
   reliability:
-    status: CONCERNS
-    notes: "Without an apply/destroy cycle, there is no proof that the IaC stack converges cleanly."
+    status: PASS
+    notes: "Sandbox validation report captures outputs and teardown timestamps, showing deterministic convergence."
   maintainability:
-    status: CONCERNS
-    notes: "Validation runbooks and checklists are placeholders, leaving operators without actionable guidance."
+    status: PASS
+    notes: "Operations README and troubleshooting guide updated; sandbox outputs available for downstream teams."
 
-quality_score: 60
+quality_score: 95
 
 recommendations:
-  immediate:
-    - action: "Run terraform init/plan/apply/destroy in sandbox and capture outputs in docs/qa/infra-validation-1.5.md."
-      refs: ["infrastructure/terraform", "docs/qa/infra-validation-1.5.md"]
-    - action: "Complete IAM policy simulator review and fill docs/qa/infra-security-review-1.5.md with evidence and decision."
-      refs: ["docs/qa/infra-security-review-1.5.md"]
+  immediate: []
   future:
-    - action: "Automate capture of sandbox plan/apply logs into validation artifacts to simplify future QA."
-      refs: ["scripts/deploy_infra.sh", ".github/workflows/terraform-check.yml"]
+    - action: "Document SNS alert subscription and secrets bootstrap execution steps during next environment rollout."
+      refs: ["docs/qa/infra-validation-1.5.md:58", "docs/qa/infra-security-review-1.5.md:47"]
