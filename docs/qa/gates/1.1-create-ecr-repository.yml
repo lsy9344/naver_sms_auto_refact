@@ -1,16 +1,16 @@
 schema: 1
 story: "1.1"
 story_title: "Create ECR Repository"
-gate: "FAIL"
-status_reason: "IAM verification tests target a regional IAM endpoint and fail before validating acceptance criteria."
+gate: "CONCERNS"
+status_reason: "IAM verification now passes, but the test suite still requires live AWS credentials with no skips/mocks, risking CI instability."
 reviewer: "Quinn (Test Architect)"
-updated: "2025-10-18T11:34:05Z"
+updated: "2025-10-18T11:53:52Z"
 waiver: { active: false }
 top_issues:
   - id: "TEST-001"
-    severity: high
-    finding: "IAM client uses region ap-northeast-2, but IAM is a global service, so boto3 cannot reach the endpoint and tests abort."
-    suggested_action: "Update tests/infrastructure/test_ecr.py to let the IAM client use the global endpoint (drop the region override) and re-run the suite."
+    severity: medium
+    finding: "Infrastructure tests depend on live AWS resources and credentials, with no skips or mocks; they will fail in CI without that environment."
+    suggested_action: "Introduce environment guards, recorded artefacts, or moto stubs so CI can execute deterministically."
     suggested_owner: dev
 risk_summary:
   totals: { critical: 0, high: 0, medium: 0, low: 0 }
