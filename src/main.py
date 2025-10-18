@@ -2,7 +2,7 @@
 Lambda Handler - Main entry point for Naver SMS automation
 
 Integrates NaverAuthenticator for authentication and uses authenticated
-session for booking API calls.
+session for booking API calls. Credentials are loaded from AWS Secrets Manager.
 """
 
 import json
@@ -12,6 +12,12 @@ from datetime import datetime, timedelta
 
 from auth.naver_login import NaverAuthenticator
 from auth.session_manager import SessionManager
+from config.settings import (
+    get_naver_credentials,
+    get_sens_credentials,
+    get_telegram_credentials,
+    setup_logging_redaction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,36 +27,18 @@ sms_table = dynamodb.Table('sms')
 session_table = dynamodb.Table('session')
 
 
-class Settings:
-    """Load configuration from Secrets Manager"""
-
-    @staticmethod
-    def load():
-        """Load Naver credentials from AWS Secrets Manager"""
-        import boto3
-        
-        secrets_client = boto3.client('secretsmanager', region_name='ap-northeast-2')
-        
-        try:
-            secret = secrets_client.get_secret_value(SecretId='naver/credentials')
-            credentials = json.loads(secret['SecretString'])
-            return credentials
-        except Exception as e:
-            logger.error(f"Failed to load credentials: {e}")
-            raise
-
-
 def lambda_handler(event, context):
     """
     Main Lambda handler for Naver booking SMS automation.
 
     Workflow:
-    1. Load Naver credentials from Secrets Manager
-    2. Authenticate with Naver (use cached cookies or fresh login)
-    3. Get authenticated requests.Session
-    4. Fetch booking data from Naver API
-    5. Process bookings and send SMS notifications
-    6. Return results
+    1. Load credentials from Secrets Manager (cold start)
+    2. Setup logging redaction for CloudWatch
+    3. Authenticate with Naver (use cached cookies or fresh login)
+    4. Get authenticated requests.Session
+    5. Fetch booking data from Naver API
+    6. Process bookings and send SMS notifications
+    7. Return results
 
     Args:
         event: Lambda event (not used for scheduled execution)
@@ -60,10 +48,12 @@ def lambda_handler(event, context):
         dict: Status and results
     """
     try:
+        # Setup logging redaction on cold start
+        setup_logging_redaction()
         logger.info("Starting Naver SMS automation")
 
-        # 1. Load configuration
-        settings = Settings.load()
+        # 1. Load credentials from Secrets Manager
+        naver_creds = get_naver_credentials()
         
         # 2. Initialize session manager (for DynamoDB cookie storage)
         session_mgr = SessionManager(dynamodb)
@@ -72,10 +62,10 @@ def lambda_handler(event, context):
         cached_cookies = session_mgr.get_cookies()
         logger.info(f"Cached cookies: {len(cached_cookies) if cached_cookies else 0}")
 
-        # 4. Initialize authenticator
+        # 4. Initialize authenticator with credentials from Secrets Manager
         authenticator = NaverAuthenticator(
-            username=settings['naver_username'],
-            password=settings['naver_password'],
+            username=naver_creds['username'],
+            password=naver_creds['password'],
             session_manager=session_mgr
         )
 
@@ -88,7 +78,7 @@ def lambda_handler(event, context):
 
         # 7. Fetch booking data from Naver API
         # (Implementation depends on booking API structure)
-        user_data = fetch_bookings(api_session, settings)
+        user_data = fetch_bookings(api_session)
         logger.info(f"Fetched {len(user_data)} bookings")
 
         # 8. Process bookings and send SMS
@@ -125,13 +115,12 @@ def lambda_handler(event, context):
         }
 
 
-def fetch_bookings(session, settings):
+def fetch_bookings(session):
     """
     Fetch booking data from Naver API.
 
     Args:
         session: Authenticated requests.Session with Naver cookies
-        settings: Configuration settings
 
     Returns:
         list: Booking data from API
