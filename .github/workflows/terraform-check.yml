@@ -50,7 +50,7 @@ jobs:
 
       - name: tflint init
         working-directory: infrastructure/terraform
-        run: tflint --init
+        run: tflint --init --config=../.tflint.hcl
 
       - name: tflint
         working-directory: infrastructure/terraform
