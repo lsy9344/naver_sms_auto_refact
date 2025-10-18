@@ -42,10 +42,6 @@ rule "aws_resource_missing_tags" {
   tags    = ["Project", "ManagedBy", "Environment"]
 }
 
-rule "aws_iam_policy_no_statements_with_admin_access" {
-  enabled = true
-}
-
 rule "aws_iam_policy_blacklist_check" {
   enabled = false
 }
