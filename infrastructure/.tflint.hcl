@@ -46,7 +46,7 @@ rule "aws_resource_missing_tags" {
   tags    = ["Project", "ManagedBy", "Environment"]
 }
 
-rule "aws_s3_bucket_server_side_encryption_configuration" {
+rule "aws_s3_bucket_server_side_encryption" {
   enabled = true
 }
 
