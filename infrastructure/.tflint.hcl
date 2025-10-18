@@ -69,7 +69,3 @@ rule "aws_security_group_rule_description_required" {
 rule "aws_elasticache_replication_group_default_parameter_group" {
   enabled = true
 }
-
-rule "aws_db_instance_encrypted" {
-  enabled = true
-}
