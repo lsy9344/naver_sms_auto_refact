@@ -89,14 +89,14 @@ variable "telegram_credentials" {
 locals {
   secrets = {
     "naver-credentials" = {
-      description = "Naver login credentials for portal authentication."
+      description = "Contains Naver login credentials (fields: username, password). Rotation: manual per SOP until Epic 5."
       values      = {
         username = var.naver_credentials.username
         password = var.naver_credentials.password
       }
     }
     "sens-credentials" = {
-      description = "Naver Cloud SENS API credentials for SMS delivery."
+      description = "Contains SENS API credentials (fields: access_key, secret_key, service_id). Rotation: manual per SOP until Epic 5."
       values      = {
         access_key = var.sens_credentials.access_key
         secret_key = var.sens_credentials.secret_key
@@ -104,7 +104,7 @@ locals {
       }
     }
     "telegram-credentials" = {
-      description = "Telegram bot credentials for operational alerts."
+      description = "Contains Telegram bot credentials (fields: bot_token, chat_id). Rotation: manual per SOP until Epic 5."
       values      = {
         bot_token = var.telegram_credentials.bot_token
         chat_id   = var.telegram_credentials.chat_id

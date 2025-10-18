@@ -56,6 +56,7 @@ Validating secrets in namespace 'naver-sms-automation' (region: ap-northeast-2)
 - CloudTrail event IDs for secret creation logged under `AWS::SecretsManager::Secret` on 2025-10-19.
 - Validation executed with the CI deployment role to confirm write access is restricted.
 - Lambda execution role access validated via `--assume-role-arn` dry run (no CloudWatch errors observed).
+- Secret descriptions updated per QA feedback (fields + rotation metadata); rerun `scripts/validate_secrets.py` after Terraform apply in AWS to capture refreshed output.
 
 ---
 
