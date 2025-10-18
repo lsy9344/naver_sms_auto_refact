@@ -58,7 +58,7 @@ resource "aws_ecr_lifecycle_policy" "main" {
   })
 }
 
-###############################################################################
+############################################################################### 
 # ECR Repository Policy
 #
 # Allows Lambda execution role to pull images.
