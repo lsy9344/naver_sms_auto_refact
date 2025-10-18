@@ -1,6 +1,6 @@
 ###############################################################################
 # CloudWatch Logging and Monitoring Module
-#
+# 
 # Provisions:
 # - CloudWatch Log Group for Lambda logs
 # - Metric Filters for key operational events
