@@ -58,10 +58,6 @@ rule "aws_iam_policy_no_statements_with_admin_access" {
   enabled = true
 }
 
-rule "aws_iam_policy_blacklist_check" {
-  enabled = false
-}
-
 rule "terraform_unused_declarations" {
   enabled = true
 }
