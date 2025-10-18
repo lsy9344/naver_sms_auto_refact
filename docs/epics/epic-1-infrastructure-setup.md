@@ -46,7 +46,7 @@ Set up the foundational AWS infrastructure required for the refactored system. T
 | 1.2 | Setup Secrets Manager | P0 | 1d | Draft |
 | 1.3 | Migrate Credentials to Secrets Manager | P0 | 1d | Draft |
 | 1.4 | Setup CloudWatch Logging & Dashboards | P0 | 1.5d | Draft |
-| 1.5 | Create Infrastructure as Code (IaC) | P1 | 1d | Draft |
+| 1.5 | Create Infrastructure as Code (IaC) | P1 | 1d | ✅ Ready for Development |
 
 **Total Estimated Effort:** 5 days
 
@@ -106,7 +106,7 @@ Set up the foundational AWS infrastructure required for the refactored system. T
    - `naver-sms-automation/naver-credentials`
    - `naver-sms-automation/sens-credentials`
    - `naver-sms-automation/telegram-credentials`
-3. CloudWatch Log Group: `/aws/lambda/naverplace_send_inform_v2`
+3. CloudWatch Log Group: `/aws/lambda/naver-sms-automation`
 4. CloudWatch Dashboard: `naver-sms-automation-dashboard`
 5. IaC template can recreate all resources from scratch
 6. Zero credentials remaining in source code
@@ -118,3 +118,5 @@ Set up the foundational AWS infrastructure required for the refactored system. T
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2025-10-18 | 1.0 | Epic created from PRD and architecture doc | Sarah (PO) |
+| 2025-10-19 | 1.1 | Updated CloudWatch Log Group name to `/aws/lambda/naver-sms-automation` (aligns with refactored project naming convention, updated during Story 1.4 validation) | Sarah (PO) |
+| 2025-10-19 | 1.2 | Story 1.5 validation complete: tool choice locked to Terraform, AC tightened, critical gaps resolved, dev notes enriched with provider versions and IAM details, 4-phase task structure established, story promoted to Ready for Development | Sarah (PO) |
