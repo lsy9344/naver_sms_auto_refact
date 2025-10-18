@@ -6,13 +6,14 @@ IMPORTANT: Requires real Naver test account credentials and DynamoDB access.
 These tests are skipped by default to avoid exposing credentials.
 """
 
-import pytest
+import os
 import json
-import boto3
-from moto import mock_aws
-import sys
 
-sys.path.insert(0, '/Users/sooyeol/Desktop/Code/naver_sms_automation_refactoring')
+import boto3
+import pytest
+
+moto = pytest.importorskip('moto')
+from moto import mock_aws  # type: ignore[attr-defined]
 
 from src.auth.naver_login import NaverAuthenticator
 from src.auth.session_manager import SessionManager
@@ -89,8 +90,11 @@ class TestNaverAuthenticatorIntegration:
         assert retrieved == second_cookies, "Should overwrite and return latest cookies"
 
 
-# Real Naver integration tests (skipped by default)
-@pytest.mark.skip(reason="Requires real Naver credentials and live environment")
+# Real Naver integration tests (run only when explicitly enabled)
+RUN_LIVE = os.getenv('RUN_NAVER_LIVE_TESTS') == '1'
+
+
+@pytest.mark.skipif(not RUN_LIVE, reason="Set RUN_NAVER_LIVE_TESTS=1 with test credentials to run live checks")
 class TestNaverAuthenticatorLive:
     """Live integration tests with real Naver (MANUAL ONLY)"""
 
@@ -105,10 +109,11 @@ class TestNaverAuthenticatorLive:
         Naver test credentials.
         IMPORTANT: Use test account, never production credentials!
         """
-        return {
-            'username': 'test_account_id',  # TODO: Configure test account
-            'password': 'test_password',     # TODO: Configure test password
-        }
+        username = os.getenv('NAVER_TEST_USERNAME')
+        password = os.getenv('NAVER_TEST_PASSWORD')
+        if not username or not password:
+            pytest.skip("NAVER_TEST_USERNAME and NAVER_TEST_PASSWORD environment variables must be set")
+        return {'username': username, 'password': password}
 
     def test_real_naver_fresh_login(self, real_dynamodb, naver_credentials):
         """

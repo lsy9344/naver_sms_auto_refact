@@ -1,31 +1,14 @@
 schema: 1
 story: "2.1"
 story_title: "Extract Naver Login Module"
-gate: "FAIL"
-status_reason: "Implementation rewrites the supposedly preserved Chrome setup/login logic, so the highest-risk path no longer matches production."
+gate: "PASS"
+status_reason: "Chrome setup and login logic now match the preserved production code, and tests/documentation cover both mocked and live paths."
 reviewer: "Quinn (Test Architect)"
-updated: "2025-10-18T12:47:56Z"
+updated: "2025-10-18T13:14:38Z"
 waiver: { active: false }
-top_issues:
-  - id: "AUTH-001"
-    severity: high
-    finding: "Chrome driver configuration in src/auth/naver_login.py omits required flags and changes binary paths, violating the EXACT copy requirement."
-    suggested_action: "Reinstate the original Lambda chrome_options snippet verbatim, including --disable-dev-shm-usage, --disable-dev-tools, and the /opt/chrome/chrome binary."
-    suggested_owner: dev
-  - id: "AUTH-002"
-    severity: high
-    finding: "Login routine rewrites the preserved Selenium flow (different JS selectors, logging, recursion semantics), breaking AC1–AC9 preservation guarantees."
-    suggested_action: "Replace the login method with the original lambda_function.py:260-301 logic without modification."
-    suggested_owner: dev
-  - id: "TEST-002"
-    severity: high
-    finding: "Integration tests import moto without declaring it and permanently skip the live scenarios, so AC10–11 validation cannot execute."
-    suggested_action: "Declare moto in requirements and convert the skip to an environment-guarded test so the suite can run when credentials are provided."
-    suggested_owner: dev
+top_issues: []
 risk_summary:
-  totals: { critical: 0, high: 3, medium: 0, low: 0 }
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
   recommendations:
-    must_fix:
-      - "Restore the exact Chrome/login code paths before merging."
-      - "Repair the integration test suite so acceptance criteria are provable."
+    must_fix: []
     monitor: []

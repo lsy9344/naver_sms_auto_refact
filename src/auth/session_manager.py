@@ -46,6 +46,18 @@ class SessionManager:
             logger.error(f"Error retrieving cookies: {e}")
             return None
 
+    def put_item(self, Item: dict):
+        """
+        Minimal DynamoDB compatibility layer for preserved login code.
+
+        Args:
+            Item: DynamoDB item payload
+
+        Returns:
+            dict: Result from DynamoDB put_item
+        """
+        return self.table.put_item(Item=Item)
+
     def save_cookies(self, cookies_json: str) -> bool:
         """
         Save cookies to DynamoDB.
@@ -57,7 +69,7 @@ class SessionManager:
             True if successful, False otherwise
         """
         try:
-            response = self.table.put_item(Item={
+            response = self.put_item({
                 'id': '1',
                 'cookies': cookies_json
             })
