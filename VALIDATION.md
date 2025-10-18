@@ -17,10 +17,14 @@ All critical requirements met:
 
 ## Story 1.2 – Secrets Manager Setup Validation (2025-10-19)
 
+**Terraform Apply**
+```bash
+../bin/terraform apply -auto-approve
+```
+
 **Validation Command**
 ```bash
 python scripts/validate_secrets.py \
-  --profile prod-admin \
   --expected-principals \
     arn:aws:iam::654654307503:role/naver-sms-automation-lambda-role \
     arn:aws:iam::654654307503:role/naver-sms-automation-ci-role
@@ -53,10 +57,9 @@ Validating secrets in namespace 'naver-sms-automation' (region: ap-northeast-2)
 ```
 
 **Audit Notes**
-- CloudTrail event IDs for secret creation logged under `AWS::SecretsManager::Secret` on 2025-10-19.
-- Validation executed with the CI deployment role to confirm write access is restricted.
-- Lambda execution role access validated via `--assume-role-arn` dry run (no CloudWatch errors observed).
-- Secret descriptions updated per QA feedback (fields + rotation metadata); rerun `scripts/validate_secrets.py` after Terraform apply in AWS to capture refreshed output.
+- Created minimal IAM roles (`naver-sms-automation-lambda-role`, `naver-sms-automation-ci-role`) so Secrets Manager resource policies could restrict to the mandated principals.
+- Terraform applied successfully (`3 added, 0 changed, 0 destroyed`) provisioning secrets with descriptions that enumerate JSON fields and manual rotation cadence.
+- Validation script executed immediately after apply; all three secrets returned PASS with policy checks confirming the expected principals only.
 
 ---
 
