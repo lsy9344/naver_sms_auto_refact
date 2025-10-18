@@ -6,11 +6,17 @@ Tests verify:
 - Image scanning is enabled
 - Lifecycle policy is configured
 - IAM permissions are correct
+
+Note: These tests require valid AWS credentials and access to the actual
+ECR repository and IAM resources. Tests will be skipped in CI environments
+without AWS credentials configured.
 """
 
 import json
+import os
 import boto3
 import pytest
+from botocore.exceptions import NoCredentialsError, ClientError
 
 
 # Constants
@@ -18,6 +24,29 @@ REPOSITORY_NAME = "naver-sms-automation"
 REGION = "ap-northeast-2"
 ACCOUNT_ID = "654654307503"
 EXPECTED_IMAGE_COUNT_LIMIT = 5
+
+
+def _check_aws_credentials():
+    """Check if AWS credentials are available.
+
+    Returns:
+        bool: True if credentials are available, False otherwise.
+    """
+    try:
+        # Try to get credentials from boto3 session
+        session = boto3.Session()
+        credentials = session.get_credentials()
+        return credentials is not None
+    except Exception:
+        # Catch all exceptions to handle various credential errors gracefully
+        return False
+
+
+# Skip all tests in this module if AWS credentials are not available
+pytestmark = pytest.mark.skipif(
+    not _check_aws_credentials(),
+    reason="AWS credentials not available - skipping infrastructure tests"
+)
 
 
 @pytest.fixture
