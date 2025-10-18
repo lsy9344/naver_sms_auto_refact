@@ -198,7 +198,6 @@ resource "aws_cloudwatch_metric_alarm" "login_failures" {
 
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = "${var.lambda_function_name}-dashboard"
-  tags           = var.tags
 
   dashboard_body = jsonencode({
     widgets = [
