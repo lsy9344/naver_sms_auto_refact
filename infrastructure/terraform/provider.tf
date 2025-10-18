@@ -14,8 +14,8 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project       = var.project
-      ManagedBy     = "github-actions"
+      Project       = naver-sms-automation
+      ManagedBy     = "terraform"
       Environment   = var.environment
       ProvisionedBy = "terraform"
     }
