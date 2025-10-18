@@ -11,6 +11,7 @@ These tests verify the actual AWS infrastructure setup for the naver-sms-automat
   - ECR repository: `naver-sms-automation` in `ap-northeast-2`
   - IAM policy: `NaverSmsAutomationECRAccessPolicy`
   - IAM role: `naverplace_send_inform-role-vb1bx6ro`
+  - Secrets namespace: `naver-sms-automation/*`
 
 ## Running Tests
 
@@ -20,9 +21,10 @@ When AWS credentials are available, all tests will execute:
 
 ```bash
 python -m pytest tests/infrastructure/test_ecr.py -v
+python -m pytest tests/infrastructure/test_secrets_manager.py -v
 ```
 
-Expected output: `9 passed`
+Expected output: `9 passed` for ECR tests and `3 passed` for Secrets Manager tests
 
 ### Without AWS Credentials (CI Environment)
 
@@ -31,9 +33,10 @@ When AWS credentials are not available, tests will be automatically skipped:
 ```bash
 # In CI environment without AWS credentials
 python -m pytest tests/infrastructure/test_ecr.py -v
+python -m pytest tests/infrastructure/test_secrets_manager.py -v
 ```
 
-Expected output: `9 skipped` with reason "AWS credentials not available - skipping infrastructure tests"
+Expected output: `9 skipped` for ECR tests and `3 skipped` for Secrets Manager tests with reason "AWS credentials not available - skipping ..."
 
 ## Test Coverage
 
@@ -58,6 +61,15 @@ The test suite validates all acceptance criteria:
 
 5. **Repository Access** (AC6, AC7)
    - Test image exists in repository
+
+### Secrets Manager (Story 1.2)
+
+1. **Secret Provisioning** (AC1, AC2)
+   - Secrets exist with correct namespace and names
+   - Secret payload contains required keys for each integration
+2. **IAM Access Controls** (AC3)
+   - Resource policy restricts access to Lambda and CI roles only
+   - Deny statements prevent other principals from reading secrets
 
 ## CI/CD Integration
 

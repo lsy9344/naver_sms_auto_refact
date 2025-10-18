@@ -13,10 +13,13 @@ without AWS credentials configured.
 """
 
 import json
-import os
 import boto3
 import pytest
-from botocore.exceptions import NoCredentialsError, ClientError
+from botocore.exceptions import (
+    ClientError,
+    EndpointConnectionError,
+    NoCredentialsError,
+)
 
 
 # Constants
@@ -33,12 +36,17 @@ def _check_aws_credentials():
         bool: True if credentials are available, False otherwise.
     """
     try:
-        # Try to get credentials from boto3 session
         session = boto3.Session()
         credentials = session.get_credentials()
-        return credentials is not None
+        if credentials is None:
+            return False
+
+        sts = session.client("sts", region_name="us-east-1")
+        sts.get_caller_identity()
+        return True
+    except (NoCredentialsError, EndpointConnectionError, ClientError):
+        return False
     except Exception:
-        # Catch all exceptions to handle various credential errors gracefully
         return False
 
 

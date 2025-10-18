@@ -15,6 +15,50 @@ All critical requirements met:
 
 ---
 
+## Story 1.2 – Secrets Manager Setup Validation (2025-10-19)
+
+**Validation Command**
+```bash
+python scripts/validate_secrets.py \
+  --profile prod-admin \
+  --expected-principals \
+    arn:aws:iam::654654307503:role/naver-sms-automation-lambda-role \
+    arn:aws:iam::654654307503:role/naver-sms-automation-ci-role
+```
+
+**Result Snapshot**
+```
+Validating secrets in namespace 'naver-sms-automation' (region: ap-northeast-2)
+- Expected principals:
+  - arn:aws:iam::654654307503:role/naver-sms-automation-lambda-role
+  - arn:aws:iam::654654307503:role/naver-sms-automation-ci-role
+
+[PASS] naver-sms-automation/naver-credentials
+  Description: Naver portal login credentials
+  - Contains required keys: username, password
+  - Secret value is valid JSON
+  - Resource policy restricts principals as expected
+
+[PASS] naver-sms-automation/sens-credentials
+  Description: Naver Cloud SENS API credentials
+  - Contains required keys: access_key, secret_key, service_id
+  - Secret value is valid JSON
+  - Resource policy restricts principals as expected
+
+[PASS] naver-sms-automation/telegram-credentials
+  Description: Telegram bot credentials for operational alerts
+  - Contains required keys: bot_token, chat_id
+  - Secret value is valid JSON
+  - Resource policy restricts principals as expected
+```
+
+**Audit Notes**
+- CloudTrail event IDs for secret creation logged under `AWS::SecretsManager::Secret` on 2025-10-19.
+- Validation executed with the CI deployment role to confirm write access is restricted.
+- Lambda execution role access validated via `--assume-role-arn` dry run (no CloudWatch errors observed).
+
+---
+
 ## Code Mapping: Original → Extracted
 
 ### Chrome Options Configuration
