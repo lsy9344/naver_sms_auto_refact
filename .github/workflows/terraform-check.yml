@@ -54,7 +54,7 @@ jobs:
 
       - name: tflint
         working-directory: infrastructure/terraform
-        run: tflint --config=../.tflint.hcl
+        run: tflint --config=../.tflint.hcl --minimum-failure-severity=error
 
       - name: terraform plan (sandbox)
         run: terraform -chdir=infrastructure/terraform plan -var-file=environments/sandbox.tfvars -out=tfplan-sandbox.bin
