@@ -1,1 +1,1 @@
-"""Tests package for naver-sms-automation."""
+"""Tests package"""

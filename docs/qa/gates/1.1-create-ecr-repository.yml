@@ -1,17 +1,12 @@
 schema: 1
 story: "1.1"
 story_title: "Create ECR Repository"
-gate: "CONCERNS"
-status_reason: "IAM verification now passes, but the test suite still requires live AWS credentials with no skips/mocks, risking CI instability."
+gate: "PASS"
+status_reason: "Test suite now skips safely without credentials, documentation added, and credentialed run confirms IAM/ECR validation."
 reviewer: "Quinn (Test Architect)"
-updated: "2025-10-18T11:53:52Z"
+updated: "2025-10-18T12:19:53Z"
 waiver: { active: false }
-top_issues:
-  - id: "TEST-001"
-    severity: medium
-    finding: "Infrastructure tests depend on live AWS resources and credentials, with no skips or mocks; they will fail in CI without that environment."
-    suggested_action: "Introduce environment guards, recorded artefacts, or moto stubs so CI can execute deterministically."
-    suggested_owner: dev
+top_issues: []
 risk_summary:
   totals: { critical: 0, high: 0, medium: 0, low: 0 }
   recommendations:

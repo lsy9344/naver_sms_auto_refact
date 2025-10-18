@@ -1,0 +1,73 @@
+"""
+Session Manager - Handles DynamoDB cookie storage and retrieval
+"""
+
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class SessionManager:
+    """
+    Manages session cookies in DynamoDB.
+    
+    Handles persistence and retrieval of Naver authentication cookies
+    to enable cookie reuse across Lambda invocations.
+    """
+
+    def __init__(self, dynamodb_resource):
+        """
+        Initialize SessionManager.
+
+        Args:
+            dynamodb_resource: boto3 DynamoDB resource
+        """
+        self.dynamodb = dynamodb_resource
+        self.table = self.dynamodb.Table('session')
+
+    def get_cookies(self):
+        """
+        Retrieve cached cookies from DynamoDB.
+
+        Returns:
+            List of cookie dicts or None if no cookies exist
+        """
+        try:
+            response = self.table.get_item(Key={'id': '1'})
+            cookies_json = response['Item']['cookies']
+            cookies = json.loads(cookies_json)
+            logger.info(f"Retrieved {len(cookies)} cookies from DynamoDB")
+            return cookies
+        except KeyError:
+            logger.info("No cached cookies found in DynamoDB")
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving cookies: {e}")
+            return None
+
+    def save_cookies(self, cookies_json: str) -> bool:
+        """
+        Save cookies to DynamoDB.
+
+        Args:
+            cookies_json: JSON string of cookies list
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            response = self.table.put_item(Item={
+                'id': '1',
+                'cookies': cookies_json
+            })
+
+            if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+                logger.info("Cookies saved to DynamoDB successfully")
+                return True
+            else:
+                logger.error(f"DynamoDB put_item failed with status {response['ResponseMetadata']['HTTPStatusCode']}")
+                return False
+        except Exception as e:
+            logger.error(f"Error saving cookies: {e}")
+            return False
