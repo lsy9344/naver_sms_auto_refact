@@ -48,6 +48,10 @@ jobs:
       - name: terraform validate
         run: terraform -chdir=infrastructure/terraform validate
 
+      - name: tflint init
+        working-directory: infrastructure/terraform
+        run: tflint --init
+
       - name: tflint
         working-directory: infrastructure/terraform
         run: tflint --config=../.tflint.hcl
