@@ -58,10 +58,6 @@ rule "terraform_required_version" {
   enabled = false
 }
 
-rule "aws_security_group_rule_description_required" {
-  enabled = true
-}
-
 rule "aws_elasticache_replication_group_default_parameter_group" {
   enabled = true
 }
