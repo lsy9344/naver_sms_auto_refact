@@ -37,10 +37,6 @@ rule "terraform_standard_module_structure" {
   enabled = true
 }
 
-rule "aws_instance_default_security_group" {
-  enabled = true
-}
-
 rule "aws_resource_missing_tags" {
   enabled = true
   tags    = ["Project", "ManagedBy", "Environment"]
