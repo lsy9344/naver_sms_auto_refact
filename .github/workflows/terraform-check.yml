@@ -16,7 +16,6 @@ jobs:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.TERRAFORM_AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.TERRAFORM_AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.TERRAFORM_AWS_SESSION_TOKEN }}
       AWS_REGION: ap-northeast-2
       TF_IN_AUTOMATION: "true"
     steps:
