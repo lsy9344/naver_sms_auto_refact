@@ -54,7 +54,7 @@ rule "aws_s3_bucket_versioning" {
   enabled = true
 }
 
-rule "aws_iam_policy_no_statements_with_admin_access" {
+rule "aws_iam_policy_no_admin_privileges" {
   enabled = true
 }
 
