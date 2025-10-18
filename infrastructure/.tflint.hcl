@@ -42,10 +42,6 @@ rule "aws_resource_missing_tags" {
   tags    = ["Project", "ManagedBy", "Environment"]
 }
 
-rule "aws_iam_policy_blacklist_check" {
-  enabled = false
-}
-
 rule "terraform_unused_declarations" {
   enabled = true
 }
