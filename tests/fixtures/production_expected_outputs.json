@@ -1,0 +1,440 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "description": "Expected outputs from both legacy and refactored implementations",
+    "generated_date": "2025-10-19",
+    "note": "These outputs should match identically between legacy (original_code/lambda_function.py) and refactored (src/main.py)"
+  },
+  "expected_outputs": {
+    "case1_new_booking_001": {
+      "scenario": "New Booking Confirmation",
+      "booking_id": "case1_new_booking_001",
+      "expected_actions": [
+        {
+          "action_type": "create_db_record",
+          "success": true,
+          "description": "Create new SMS record in DynamoDB"
+        },
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "confirm",
+          "description": "Send confirmation SMS to customer"
+        },
+        {
+          "action_type": "send_telegram",
+          "success": true,
+          "description": "Send Telegram notification"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019001",
+        "phone": "01012345678",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "expected_sms_count": 1,
+      "expected_sms_templates": ["confirmation"],
+      "parity_check_points": [
+        "SMS delivery confirmation",
+        "DynamoDB record created with correct flags",
+        "Telegram notification sent"
+      ]
+    },
+    "case2_two_hour_001": {
+      "scenario": "Two-Hour Window Reminder",
+      "booking_id": "case2_two_hour_001",
+      "expected_actions": [
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "guide",
+          "store_specific": true,
+          "description": "Send guide SMS (store-specific template)"
+        },
+        {
+          "action_type": "update_flag",
+          "success": true,
+          "flag_name": "remind_sms",
+          "new_value": true,
+          "description": "Update remind_sms flag in DynamoDB"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019002",
+        "phone": "01087654321",
+        "confirm_sms": true,
+        "remind_sms": true,
+        "option_sms": false
+      },
+      "expected_sms_count": 1,
+      "expected_sms_templates": ["guide"],
+      "parity_check_points": [
+        "Correct time window calculation (within 2 hours)",
+        "guide SMS sent with store-specific content",
+        "remind_sms flag updated to true"
+      ]
+    },
+    "case3_option_8pm_001": {
+      "scenario": "Option Keyword at 8 PM - 네이버",
+      "booking_id": "case3_option_8pm_001",
+      "expected_actions": [
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "event",
+          "description": "Send event SMS for option booking"
+        },
+        {
+          "action_type": "update_flag",
+          "success": true,
+          "flag_name": "option_sms",
+          "new_value": true,
+          "description": "Update option_sms flag in DynamoDB"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019003",
+        "phone": "01056781234",
+        "confirm_sms": true,
+        "remind_sms": true,
+        "option_sms": true
+      },
+      "expected_sms_count": 1,
+      "expected_sms_templates": ["event"],
+      "parity_check_points": [
+        "Hour check: current_time.hour == 20 (8 PM)",
+        "Option keyword matches '네이버' in allowed list",
+        "event SMS sent",
+        "option_sms flag updated to true"
+      ]
+    },
+    "case3b_option_8pm_002": {
+      "scenario": "Option Keyword at 8 PM - 인스타",
+      "booking_id": "case3b_option_8pm_002",
+      "expected_actions": [
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "event",
+          "description": "Send event SMS for option booking"
+        },
+        {
+          "action_type": "update_flag",
+          "success": true,
+          "flag_name": "option_sms",
+          "new_value": true,
+          "description": "Update option_sms flag in DynamoDB"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019003B",
+        "phone": "01011223344",
+        "confirm_sms": true,
+        "remind_sms": true,
+        "option_sms": true
+      },
+      "expected_sms_count": 1,
+      "expected_sms_templates": ["event"],
+      "parity_check_points": [
+        "Option keyword matches '인스타' in allowed list",
+        "event SMS sent",
+        "option_sms flag updated to true"
+      ]
+    },
+    "case3c_option_8pm_003": {
+      "scenario": "Option Keyword at 8 PM - 원본",
+      "booking_id": "case3c_option_8pm_003",
+      "expected_actions": [
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "event",
+          "description": "Send event SMS for option booking"
+        },
+        {
+          "action_type": "update_flag",
+          "success": true,
+          "flag_name": "option_sms",
+          "new_value": true,
+          "description": "Update option_sms flag in DynamoDB"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019003C",
+        "phone": "01055554444",
+        "confirm_sms": true,
+        "remind_sms": true,
+        "option_sms": true
+      },
+      "expected_sms_count": 1,
+      "expected_sms_templates": ["event"],
+      "parity_check_points": [
+        "Option keyword matches '원본' in allowed list",
+        "event SMS sent"
+      ]
+    },
+    "case4_cookie_refresh_001": {
+      "scenario": "Cookie Expiry - Forced Session Refresh",
+      "booking_id": "case4_cookie_refresh_001",
+      "expected_actions": [
+        {
+          "action_type": "session_refresh",
+          "success": true,
+          "description": "Session cookies expired, forcing re-authentication with Selenium"
+        },
+        {
+          "action_type": "create_db_record",
+          "success": true,
+          "description": "Create booking record after successful re-auth"
+        },
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "confirm",
+          "description": "Send confirmation SMS"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051708_BK20251019004",
+        "phone": "01098765432",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "expected_sms_count": 1,
+      "parity_check_points": [
+        "Session refresh triggered (Selenium login)",
+        "Cookies saved to DynamoDB session table",
+        "Booking still processed successfully after refresh",
+        "SMS delivery successful"
+      ]
+    },
+    "case4b_cookie_refresh_002": {
+      "scenario": "Multiple Bookings After Cookie Refresh",
+      "booking_id": "case4b_cookie_refresh_002",
+      "expected_actions": [
+        {
+          "action_type": "create_db_record",
+          "success": true,
+          "description": "Create booking record using refreshed session"
+        },
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "confirm",
+          "description": "Send confirmation SMS using persistent session"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051708_BK20251019004B",
+        "phone": "01012341234",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "expected_sms_count": 1,
+      "parity_check_points": [
+        "Refreshed session cookies persist across multiple bookings",
+        "All bookings processed using same authenticated session",
+        "No additional Selenium invocations needed"
+      ]
+    },
+    "case5_empty_response": {
+      "scenario": "Empty Booking Response",
+      "booking_id": "case5_empty_response",
+      "expected_actions": [],
+      "expected_db_state": null,
+      "expected_sms_count": 0,
+      "parity_check_points": [
+        "Empty response handled gracefully",
+        "No errors thrown",
+        "Lambda completes successfully",
+        "No database records created"
+      ]
+    },
+    "case6_volume_001": {
+      "scenario": "High-Volume Processing - Booking 1",
+      "booking_id": "case6_volume_001",
+      "expected_actions": [
+        {
+          "action_type": "create_db_record",
+          "success": true
+        },
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "confirm"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019100",
+        "phone": "01000001111",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "expected_sms_count": 1,
+      "parity_check_points": [
+        "First booking in batch processed correctly"
+      ]
+    },
+    "case6_volume_002": {
+      "scenario": "High-Volume Processing - Booking 2",
+      "booking_id": "case6_volume_002",
+      "expected_actions": [
+        {
+          "action_type": "create_db_record",
+          "success": true
+        },
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "confirm"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019101",
+        "phone": "01000002222",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "expected_sms_count": 1,
+      "parity_check_points": [
+        "Sequential booking processing maintains correct state"
+      ]
+    },
+    "case6_volume_050": {
+      "scenario": "High-Volume Processing - Booking 50 (Final)",
+      "booking_id": "case6_volume_050",
+      "expected_actions": [
+        {
+          "action_type": "create_db_record",
+          "success": true
+        },
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "confirm"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019149",
+        "phone": "01000050050",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "expected_sms_count": 1,
+      "parity_check_points": [
+        "Final booking in batch processed correctly",
+        "No performance degradation in high-volume scenario"
+      ]
+    },
+    "case1b_new_with_option": {
+      "scenario": "New Booking with Option at 8 PM",
+      "booking_id": "case1b_new_with_option",
+      "expected_actions": [
+        {
+          "action_type": "create_db_record",
+          "success": true
+        },
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "confirm"
+        },
+        {
+          "action_type": "send_sms",
+          "success": true,
+          "sms_type": "event",
+          "description": "Option SMS at 8 PM (if hour is 20)"
+        }
+      ],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019200",
+        "phone": "01066667777",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": true
+      },
+      "expected_sms_count": 2,
+      "parity_check_points": [
+        "Confirmation SMS sent",
+        "Option SMS sent (if at 8 PM)",
+        "Both flags set correctly"
+      ]
+    },
+    "case2b_all_flags_set": {
+      "scenario": "Already Processed - All Flags Set",
+      "booking_id": "case2b_all_flags_set",
+      "expected_actions": [],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019201",
+        "phone": "01088889999",
+        "confirm_sms": true,
+        "remind_sms": true,
+        "option_sms": true
+      },
+      "expected_sms_count": 0,
+      "parity_check_points": [
+        "No actions executed when all flags are set",
+        "No duplicate SMS sent"
+      ]
+    },
+    "case2c_no_option_match": {
+      "scenario": "Non-Matching Option Keyword",
+      "booking_id": "case2c_no_option_match",
+      "expected_actions": [],
+      "expected_db_state": {
+        "booking_num": "1051707_BK20251019202",
+        "phone": "01077776666",
+        "confirm_sms": true,
+        "remind_sms": true,
+        "option_sms": false
+      },
+      "expected_sms_count": 0,
+      "parity_check_points": [
+        "Option keyword '유튜브' does not match allowed keywords",
+        "No option SMS sent",
+        "option_sms flag remains false"
+      ]
+    }
+  },
+  "validation_rules": {
+    "sms_delivery": {
+      "rule": "All expected SMS must be sent via SENS API",
+      "check": "Verify SMS API calls and response codes"
+    },
+    "db_persistence": {
+      "rule": "All DynamoDB updates must match expected state",
+      "check": "Verify booking_num, phone, flags in DynamoDB"
+    },
+    "action_ordering": {
+      "rule": "Actions must execute in correct sequence",
+      "check": "Verify create_db_record before send_sms"
+    },
+    "error_handling": {
+      "rule": "Failures in one booking should not block others",
+      "check": "Verify high-volume batch completes despite individual failures"
+    },
+    "session_management": {
+      "rule": "Cookie refresh should only happen when expired",
+      "check": "Verify Selenium login only when necessary"
+    },
+    "option_keyword_matching": {
+      "rule": "Only allowed keywords trigger option SMS",
+      "check": "Verify keyword list: [네이버, 인스타, 원본]"
+    },
+    "time_window_calculation": {
+      "rule": "Reminder should only trigger within 2-hour window",
+      "check": "Verify booking_time - current_time < 2 hours"
+    },
+    "8pm_trigger": {
+      "rule": "Option SMS should only trigger at hour 20 (8 PM)",
+      "check": "Verify current_time.hour == 20"
+    }
+  }
+}

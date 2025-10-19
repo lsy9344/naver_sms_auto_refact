@@ -1,110 +1,209 @@
 """
 Lambda Handler - Main entry point for Naver SMS automation
 
-Integrates NaverAuthenticator for authentication and uses authenticated
-session for booking API calls. Credentials are loaded from AWS Secrets Manager.
+Orchestrates authentication, booking retrieval, rule processing, and notifications.
+Implements Story 4.1 requirements for end-to-end Lambda execution.
 """
 
 import json
 import logging
-import boto3
 from datetime import datetime
+from typing import List, Dict, Any, Tuple
+import yaml
+from pathlib import Path
 
-from .auth.naver_login import NaverAuthenticator
-from .auth.session_manager import SessionManager
-from .config.settings import (
-    get_naver_credentials,
-    setup_logging_redaction,
-)
-from .utils.logger import get_logger
+import boto3
+import requests
+
+from src.auth.naver_login import NaverAuthenticator
+from src.auth.session_manager import SessionManager
+from src.api.naver_booking import NaverBookingAPIClient
+from src.config.settings import Settings, setup_logging_redaction
+from src.database.dynamodb_client import BookingRepository
+from src.domain.booking import Booking
+from src.notifications.sms_service import SensSmsClient
+from src.rules.engine import RuleEngine, ActionResult
+from src.rules.conditions import register_conditions
+from src.rules.actions import register_actions, ActionServicesBundle
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# AWS clients
+# AWS resources (initialized on cold start)
 dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-2')
-sms_table = dynamodb.Table('sms')
-session_table = dynamodb.Table('session')
 
 
 def lambda_handler(event, context):
     """
     Main Lambda handler for Naver booking SMS automation.
 
-    Workflow:
-    1. Load credentials from Secrets Manager (cold start)
-    2. Setup logging redaction for CloudWatch
-    3. Authenticate with Naver (use cached cookies or fresh login)
-    4. Get authenticated requests.Session
-    5. Fetch booking data from Naver API
-    6. Process bookings and send SMS notifications
-    7. Return results
+    Workflow (AC 1-8):
+    1. Setup logging redaction (AC 1)
+    2. Load configuration and credentials (AC 1)
+    3. Authenticate with Naver using cached cookies (AC 2)
+    4. Fetch confirmed and completed bookings (AC 3)
+    5. Build rule-engine contexts for each booking (AC 4)
+    6. Process bookings through rule engine (AC 5)
+    7. Persist DynamoDB updates and send notifications (AC 6)
+    8. Return structured response or error summary (AC 7, 8)
 
     Args:
         event: Lambda event (not used for scheduled execution)
         context: Lambda context
 
     Returns:
-        dict: Status and results
+        dict: Status 200 with summary on success, 500 with error on failure
     """
+    # ============================================================
+    # AC 1: Bootstrap - Logging redaction and configuration
+    # ============================================================
     try:
-        # Setup logging redaction on cold start
         setup_logging_redaction()
-        logger.info("Starting Naver SMS automation")
+        logger.info("Starting Naver SMS automation Lambda handler")
 
-        # 1. Load credentials from Secrets Manager
-        naver_creds = get_naver_credentials()
+        # Load settings and credentials
+        settings = Settings()
+        naver_creds = settings.load_naver_credentials()
+        sens_creds = settings.load_sens_credentials()
 
-        # 2. Initialize session manager (for DynamoDB cookie storage)
+        # Load stores configuration to get store IDs
+        config_root = Path(__file__).resolve().parents[1] / "config"
+        stores_path = config_root / "stores.yaml"
+        with stores_path.open("r", encoding="utf-8") as f:
+            stores_config = yaml.safe_load(f)
+
+        store_ids = list(stores_config["stores"].keys())
+        logger.info(f"Loaded {len(store_ids)} stores from configuration")
+
+        # ============================================================
+        # AC 2: Authentication - Naver login with cookie reuse (with resource cleanup)
+        # ============================================================
         session_mgr = SessionManager(dynamodb)
-
-        # 3. Get cached cookies if available
         cached_cookies = session_mgr.get_cookies()
-        ccount = len(cached_cookies) if cached_cookies else 0
-        logger.info(f"Cached cookies: {ccount}")
 
-        # 4. Initialize authenticator
+        logger.info(
+            f"Cached cookies: {len(cached_cookies) if cached_cookies else 0} found"
+        )
+
         authenticator = NaverAuthenticator(
             username=naver_creds['username'],
             password=naver_creds['password'],
             session_manager=session_mgr
         )
 
-        # 5. Authenticate (uses cached cookies or fresh login)
-        cookies = authenticator.login(cached_cookies=cached_cookies)
-        cookie_count = len(cookies)
-        logger.info(f"Authentication successful: {cookie_count} cookies")
+        try:
+            cookies = authenticator.login(cached_cookies=cached_cookies)
+            logger.info(f"Authentication successful: {len(cookies)} cookies")
 
-        # 6. Get authenticated requests.Session for API calls
-        api_session = authenticator.get_session()
+            api_session = authenticator.get_session()
 
-        # 7. Fetch booking data from Naver API
-        user_data = fetch_bookings(api_session)
-        logger.info(f"Fetched {len(user_data)} bookings")
+            # ============================================================
+            # AC 3: Booking retrieval orchestration
+            # ============================================================
+            booking_api = NaverBookingAPIClient(
+                session=api_session,
+                option_keywords=['네이버', '인스타', '원본']
+            )
 
-        # 8. Process bookings and send SMS
-        sms_results = process_bookings(user_data)
-        result_count = len(sms_results)
-        logger.info(f"SMS processing complete: {result_count} results")
+            # Fetch confirmed (RC03) bookings
+            confirmed_bookings = booking_api.get_all_confirmed_bookings(store_ids)
+            logger.info(f"Fetched {len(confirmed_bookings)} confirmed bookings")
 
-        # 9. Cleanup
-        authenticator.cleanup()
+            # Fetch completed (RC08) bookings
+            completed_bookings = booking_api.get_all_completed_bookings(store_ids)
+            logger.info(f"Fetched {len(completed_bookings)} completed bookings")
 
-        # 10. Return results
-        return {
-            'statusCode': 200,
-            'body': json.dumps({
-                'message': 'Naver SMS automation completed',
-                'bookings_processed': len(user_data),
-                'sms_sent': len([r for r in sms_results if r['status'] == 'sent']),
-                'timestamp': datetime.now().isoformat()
-            })
-        }
+            # Combine all bookings
+            all_bookings = confirmed_bookings + completed_bookings
+            logger.info(f"Total bookings to process: {len(all_bookings)}")
+
+            # ============================================================
+            # AC 5: Rule engine setup and executor registration
+            # ============================================================
+            # Initialize rule engine
+            rules_path = config_root / "rules.yaml"
+            engine = RuleEngine(str(rules_path))
+
+            # Register condition evaluators
+            register_conditions(engine, settings)
+
+            # Register action executors with services bundle
+            booking_repo = BookingRepository(table_name='sms', dynamodb_resource=dynamodb)
+            sms_service = SensSmsClient(settings=settings, credentials=sens_creds)
+
+            services_bundle = ActionServicesBundle(
+                db_repo=booking_repo,
+                sms_service=sms_service,
+                logger=logger,
+                settings_dict={'slack_enabled': False}  # Slack not enabled yet
+            )
+
+            register_actions(engine, services_bundle)
+
+            logger.info("Rule engine initialized with conditions and actions")
+
+            # ============================================================
+            # AC 4, 5, 6: Process bookings through rule engine
+            # ============================================================
+            all_results, summary = process_all_bookings(
+                bookings=all_bookings,
+                engine=engine,
+                booking_repo=booking_repo,
+                settings=settings
+            )
+
+            logger.info(
+                f"Processing complete: {summary['bookings_processed']} bookings processed, "
+                f"{summary['actions_executed']} actions executed, "
+                f"{summary['actions_succeeded']} succeeded, {summary['actions_failed']} failed"
+            )
+
+            # ============================================================
+            # AC 6: Send summary notification (Telegram)
+            # ============================================================
+            try:
+                telegram_creds = settings.load_telegram_credentials()
+                send_telegram_summary(
+                    telegram_creds=telegram_creds,
+                    summary=summary,
+                    all_results=all_results
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send Telegram summary: {e}")
+
+            # ============================================================
+            # AC 7: Return success response
+            # ============================================================
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'message': 'Naver SMS automation completed successfully',
+                    'bookings_processed': summary['bookings_processed'],
+                    'actions_executed': summary['actions_executed'],
+                    'actions_succeeded': summary['actions_succeeded'],
+                    'actions_failed': summary['actions_failed'],
+                    'sms_sent': summary['sms_sent'],
+                    'timestamp': datetime.now().isoformat()
+                })
+            }
+
+        finally:
+            # QA Fix: Always cleanup Selenium resources, even on errors
+            authenticator.cleanup()
 
     except Exception as e:
-        logger.error(f"Error in lambda_handler: {e}", exc_info=True)
+        # ============================================================
+        # AC 8: Error handling with logging and notification
+        # ============================================================
+        logger.error(f"Lambda handler failed: {e}", error=str(e))
 
         # Send error notification
-        notify_error(str(e))
+        try:
+            settings = Settings()
+            telegram_creds = settings.load_telegram_credentials()
+            notify_telegram_error(telegram_creds, str(e))
+        except Exception as notify_err:
+            logger.error(f"Failed to send error notification: {notify_err}")
 
         return {
             'statusCode': 500,
@@ -116,68 +215,185 @@ def lambda_handler(event, context):
         }
 
 
-def fetch_bookings(session):
+def process_all_bookings(
+    bookings: List[Booking],
+    engine: RuleEngine,
+    booking_repo: BookingRepository,
+    settings: Settings
+) -> Tuple[List[ActionResult], Dict[str, Any]]:
     """
-    Fetch booking data from Naver API.
+    Process all bookings through rule engine.
+
+    Implements AC 4, 5, 6:
+    - Build rule-engine-ready contexts (AC 4)
+    - Execute rule engine and collect results (AC 5)
+    - Track summary statistics (AC 6)
 
     Args:
-        session: Authenticated requests.Session with Naver cookies
+        bookings: List of Booking domain objects
+        engine: Initialized RuleEngine with registered conditions/actions
+        booking_repo: BookingRepository for fetching DB records
+        settings: Settings instance for context
 
     Returns:
-        list: Booking data from API
+        Tuple of (all_results, summary_dict)
     """
-    logger.info("Fetching bookings from Naver API")
+    all_results: List[ActionResult] = []
+    current_time = datetime.now()
 
-    # TODO: Implement booking API calls
-    # Use session.get() for authenticated requests
-    # API endpoints documented in architecture.md
+    # Summary statistics
+    summary = {
+        'bookings_processed': 0,
+        'actions_executed': 0,
+        'actions_succeeded': 0,
+        'actions_failed': 0,
+        'sms_sent': 0,
+    }
 
-    return []
+    for booking in bookings:
+        try:
+            # ============================================================
+            # AC 4: Build rule-engine-ready context
+            # ============================================================
+            # Fetch existing DB record (if any)
+            db_record = booking_repo.get_booking(booking.booking_num, booking.phone)
+
+            # Build context dict
+            context = {
+                'booking': booking,
+                'db_record': db_record,
+                'current_time': current_time,
+                'settings': settings,
+                'db_repo': booking_repo,
+            }
+
+            logger.debug(
+                f"Processing booking {booking.booking_num}",
+                context={'has_db_record': db_record is not None}
+            )
+
+            # ============================================================
+            # AC 5: Execute rule engine
+            # ============================================================
+            results = engine.process_booking(context)
+            all_results.extend(results)
+
+            # Update summary statistics
+            summary['bookings_processed'] += 1
+            summary['actions_executed'] += len(results)
+
+            for result in results:
+                if result.success:
+                    summary['actions_succeeded'] += 1
+                    if result.action_type == 'send_sms':
+                        summary['sms_sent'] += 1
+                else:
+                    summary['actions_failed'] += 1
+
+        except Exception as e:
+            logger.error(
+                f"Failed to process booking {booking.booking_num}: {e}",
+                error=str(e)
+            )
+            summary['actions_failed'] += 1
+
+    return all_results, summary
 
 
-def process_bookings(user_data):
+def send_telegram_summary(
+    telegram_creds: Dict[str, str],
+    summary: Dict[str, Any],
+    all_results: List[ActionResult]
+) -> None:
     """
-    Process bookings and send SMS notifications.
+    Send summary notification to Telegram.
+
+    Implements AC 6 notification contract.
 
     Args:
-        user_data: List of booking data
-
-    Returns:
-        list: Processing results
+        telegram_creds: Dict with 'bot_token' and 'chat_id'
+        summary: Summary statistics dict
+        all_results: List of ActionResult objects
     """
-    logger.info(f"Processing {len(user_data)} bookings")
+    bot_token = telegram_creds['bot_token']
+    chat_id = telegram_creds['chat_id']
 
-    results = []
-    for booking in user_data:
-        # TODO: Implement booking processing logic
-        # Check SMS status, send notifications, update DynamoDB
-        pass
+    # Build message
+    message = (
+        f"📊 Naver SMS Automation Summary\n\n"
+        f"✅ Bookings Processed: {summary['bookings_processed']}\n"
+        f"🔧 Actions Executed: {summary['actions_executed']}\n"
+        f"✔️ Actions Succeeded: {summary['actions_succeeded']}\n"
+        f"❌ Actions Failed: {summary['actions_failed']}\n"
+        f"📨 SMS Sent: {summary['sms_sent']}\n"
+        f"🕒 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
 
-    return results
+    # Send to Telegram
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': message
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        logger.info("Telegram summary sent successfully")
+    except requests.RequestException as e:
+        logger.error(f"Failed to send Telegram summary: {e}")
+        raise
 
 
-def notify_error(error_message):
+def notify_telegram_error(telegram_creds: Dict[str, str], error_message: str) -> None:
     """
-    Send error notification (e.g., via Telegram).
+    Send error notification to Telegram.
+
+    Implements AC 8 error notification contract.
 
     Args:
+        telegram_creds: Dict with 'bot_token' and 'chat_id'
         error_message: Error description
     """
-    logger.warning(f"Error notification: {error_message}")
-    # TODO: Implement error notification
-    # Could use Telegram API, SNS, CloudWatch, etc.
+    bot_token = telegram_creds['bot_token']
+    chat_id = telegram_creds['chat_id']
+
+    message = (
+        f"🚨 Naver SMS Automation Error\n\n"
+        f"Error: {error_message}\n"
+        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': message
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        logger.info("Telegram error notification sent")
+    except requests.RequestException as e:
+        logger.error(f"Failed to send Telegram error notification: {e}")
 
 
 if __name__ == '__main__':
-    # Local testing
+    """
+    Local testing entry point.
+
+    Simulates Lambda execution environment with mock context.
+    """
     class MockContext:
         def __init__(self):
             self.function_name = 'naver-sms-automation'
             self.request_id = 'local-test'
+            self.invoked_function_arn = 'arn:aws:lambda:local:local'
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
     result = lambda_handler({}, MockContext())
-    logger.info("Lambda handler result", context={"result": result})
-    # For direct output, use logger instead of print
-    import sys
-    json.dump(result, sys.stdout, indent=2)
+    print(json.dumps(result, indent=2))

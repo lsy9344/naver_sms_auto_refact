@@ -6,7 +6,8 @@ Designed to support dynamic field expansion for future requirements.
 """
 
 from dataclasses import dataclass, field, asdict
-from typing import Dict, Any
+from datetime import datetime
+from typing import Dict, Any, Optional
 
 
 @dataclass
@@ -19,10 +20,15 @@ class Booking:
         phone: Customer phone number "010-XXXX-XXXX" (sort key)
         name: Customer name
         booking_time: Booking datetime as "YYYY-MM-DD HH:MM:SS" string
-        confirm_sms: Flag indicating confirmation SMS was sent
-        remind_sms: Flag indicating 2-hour reminder SMS was sent
-        option_sms: Flag indicating event/option SMS was sent
+        confirm_sms: Flag indicating confirmation SMS was sent (default: False for new bookings)
+        remind_sms: Flag indicating 2-hour reminder SMS was sent (default: False)
+        option_sms: Flag indicating event/option SMS was sent (default: False)
         option_time: Reserved field (currently unused)
+        book_id: Naver booking ID
+        biz_id: Store/business ID
+        option: Boolean flag for option keyword detection
+        reserve_at: Reservation datetime (KST, naive)
+        status: Booking status code (RC03, RC08, etc.)
 
     Future fields (to be added in later stories):
         - customer_id: Naver member ID
@@ -44,10 +50,15 @@ class Booking:
     phone: str
     name: str
     booking_time: str
-    confirm_sms: bool
-    remind_sms: bool
-    option_sms: bool
+    confirm_sms: bool = False
+    remind_sms: bool = False
+    option_sms: bool = False
     option_time: str = ""
+    book_id: Optional[int] = None
+    biz_id: Optional[str] = None
+    option: bool = False
+    reserve_at: Optional[datetime] = None
+    status: str = ""
     extra_fields: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -74,6 +85,11 @@ class Booking:
             "remind_sms",
             "option_sms",
             "option_time",
+            "book_id",
+            "biz_id",
+            "option",
+            "reserve_at",
+            "status",
         }
 
         # Extract core fields
@@ -143,6 +159,11 @@ class Booking:
             "remind_sms",
             "option_sms",
             "option_time",
+            "book_id",
+            "biz_id",
+            "option",
+            "reserve_at",
+            "status",
         }
 
         if field_name in core_fields:

@@ -1,0 +1,141 @@
+{
+  "manifest": {
+    "version": "1.0",
+    "dataset_name": "production_bookings_synthetic",
+    "created_date": "2025-10-19",
+    "created_by": "comparison_testing_framework",
+    "description": "Synthetic production-equivalent test dataset covering all edge cases for parity validation"
+  },
+  "dataset_info": {
+    "total_bookings": 15,
+    "total_scenarios": 10,
+    "edge_cases_covered": 6,
+    "high_volume_batch_size": 50
+  },
+  "edge_case_coverage": {
+    "case1_new_booking_confirmation": {
+      "id": "case1_new_booking_001",
+      "description": "New booking not yet in DynamoDB triggers confirmation SMS",
+      "key_assertions": [
+        "create_db_record action executes",
+        "confirm_sms flag set to true",
+        "SMS sent via SENS API",
+        "Telegram notification sent"
+      ]
+    },
+    "case2_two_hour_window_reminder": {
+      "id": "case2_two_hour_001",
+      "description": "Booking within 2-hour window and reminder not sent yet",
+      "key_assertions": [
+        "Correct time window calculation (booking_time - current_time < 2h)",
+        "Guide SMS sent with store-specific content",
+        "remind_sms flag updated to true",
+        "Only when remind_sms is currently false"
+      ]
+    },
+    "case3_option_keyword_8pm_trigger": {
+      "id": "case3_option_8pm_001, case3b_option_8pm_002, case3c_option_8pm_003, case1b_new_with_option",
+      "description": "Option SMS triggered at 8 PM (20:00) for matching keywords",
+      "key_assertions": [
+        "Current hour must be 20 (8 PM)",
+        "Option keyword must match allowed list: [네이버, 인스타, 원본]",
+        "Non-matching keywords like '유튜브' do NOT trigger (case2c_no_option_match)",
+        "Event SMS sent",
+        "option_sms flag updated to true"
+      ]
+    },
+    "case4_cookie_expiry_forced_refresh": {
+      "id": "case4_cookie_refresh_001, case4b_cookie_refresh_002",
+      "description": "Session cookies expire, forcing Selenium re-authentication",
+      "key_assertions": [
+        "Selenium login invoked when session invalid",
+        "New cookies saved to DynamoDB session table",
+        "Subsequent bookings processed with refreshed session",
+        "No additional Selenium calls needed for multiple bookings"
+      ]
+    },
+    "case5_empty_booking_response": {
+      "id": "case5_empty_response",
+      "description": "API returns no bookings for a store",
+      "key_assertions": [
+        "Empty response handled gracefully",
+        "No exceptions thrown",
+        "Lambda completes successfully",
+        "No DynamoDB records created"
+      ]
+    },
+    "case6_high_volume_processing": {
+      "id": "case6_volume_001, case6_volume_002, case6_volume_050",
+      "description": "Batch of 50+ bookings processed sequentially",
+      "key_assertions": [
+        "All bookings processed deterministically",
+        "No state leakage between bookings",
+        "Performance acceptable for production load",
+        "Final booking processes identically to first"
+      ]
+    }
+  },
+  "additional_test_cases": {
+    "case2b_all_flags_set": {
+      "description": "Booking with all flags already set - no actions execute",
+      "test": "Verify no duplicate SMS or DB updates"
+    },
+    "case1b_new_with_option": {
+      "description": "New booking with option keyword arriving at 8 PM",
+      "test": "Both confirmation and event SMS should be sent"
+    }
+  },
+  "files": {
+    "production_bookings.json": {
+      "path": "tests/fixtures/production_bookings.json",
+      "format": "JSON",
+      "size_estimate": "~8 KB",
+      "description": "All test booking scenarios with metadata"
+    },
+    "production_expected_outputs.json": {
+      "path": "tests/fixtures/production_expected_outputs.json",
+      "format": "JSON",
+      "size_estimate": "~12 KB",
+      "description": "Expected outputs for each booking, including SMS counts and DB state"
+    },
+    "dataset_manifest.json": {
+      "path": "tests/fixtures/dataset_manifest.json",
+      "format": "JSON",
+      "size_estimate": "~6 KB",
+      "description": "This file - dataset documentation"
+    }
+  },
+  "validation_strategy": {
+    "parity_checks": [
+      "SMS template types (confirm, guide, event) match between implementations",
+      "SMS delivery counts match exactly",
+      "DynamoDB state (confirm_sms, remind_sms, option_sms flags) identical",
+      "Action execution sequences identical",
+      "Error handling behavior identical"
+    ],
+    "diff_reporting": {
+      "format": "JSON + Markdown",
+      "output_location": "tests/comparison/results/",
+      "includes": [
+        "Per-booking comparison results",
+        "Aggregated statistics",
+        "Field-level mismatches",
+        "Severity levels (critical, warning)"
+      ]
+    }
+  },
+  "data_sensitivity": {
+    "masking_applied": false,
+    "raw_data_shown": true,
+    "pii_fields": ["customer_phone", "customer_name"],
+    "note": "Test data is synthetic and non-sensitive. Phone numbers and names are generated test values."
+  },
+  "maintenance": {
+    "refresh_frequency": "Ad-hoc or when adding new edge cases",
+    "refresh_script": "scripts/comparison/refresh_comparison_dataset.py",
+    "versioning": "Bump version in manifest when adding new edge cases",
+    "changelog": {
+      "1.0": "Initial dataset with 10 edge cases"
+    }
+  }
+}

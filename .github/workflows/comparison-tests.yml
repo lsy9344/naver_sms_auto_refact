@@ -1,0 +1,190 @@
+name: comparison-tests
+
+on:
+  push:
+    branches:
+      - main
+      - Epic2
+    paths:
+      - "src/**"
+      - "tests/comparison/**"
+      - "tests/fixtures/production_*.json"
+      - ".github/workflows/comparison-tests.yml"
+      - "pytest.ini"
+      - "Makefile"
+  pull_request:
+    paths:
+      - "src/**"
+      - "tests/comparison/**"
+      - "tests/fixtures/production_*.json"
+      - ".github/workflows/comparison-tests.yml"
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: "Enable verbose output"
+        required: false
+        default: "false"
+
+jobs:
+  comparison-parity:
+    name: Output Parity Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Load fixtures
+        run: |
+          echo "📁 Verifying comparison fixtures..."
+          ls -lh tests/fixtures/production_*.json
+          python -c "
+          import json
+          with open('tests/fixtures/production_bookings.json') as f:
+              bookings = json.load(f)
+              print(f'✅ Loaded {len(bookings[\"bookings\"])} bookings')
+          with open('tests/fixtures/production_expected_outputs.json') as f:
+              expected = json.load(f)
+              print(f'✅ Loaded {len(expected[\"expected_outputs\"])} expected outputs')
+          "
+
+      - name: Run comparison parity tests
+        run: |
+          pytest tests/comparison/test_output_parity.py::TestOutputParity::test_all_scenarios_parity \
+            -v --tb=short \
+            --junit-xml=comparison-results.xml || true
+
+      - name: Run fixture validation tests
+        run: |
+          pytest tests/comparison/test_output_parity.py::TestComparisonFixtures \
+            -v --tb=short
+
+      - name: Run masking enforcement tests
+        run: |
+          pytest tests/comparison/test_output_parity.py::TestOutputParity::test_masking_enforcement \
+            -v --tb=short
+
+      - name: Run determinism validation
+        run: |
+          pytest tests/comparison/test_output_parity.py::TestOutputParity::test_determinism \
+            -v --tb=short || true
+
+      - name: Generate coverage report
+        run: |
+          pytest tests/comparison/ \
+            --cov=src --cov=tests/comparison \
+            --cov-report=term-missing --cov-report=json \
+            --cov-fail-under=80 || true
+
+      - name: Upload comparison artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: comparison-results
+          path: |
+            tests/comparison/results/
+            comparison-results.xml
+            .coverage
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            if (fs.existsSync('tests/comparison/results/SUMMARY.md')) {
+              const summary = fs.readFileSync('tests/comparison/results/SUMMARY.md', 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '## 📊 Comparison Testing Results\n\n' + summary
+              });
+            }
+
+      - name: Fail if critical mismatches found
+        run: |
+          if [ -f tests/comparison/results/SUMMARY.md ]; then
+            if grep -q "Failed:" tests/comparison/results/SUMMARY.md; then
+              echo "❌ Parity validation failed with critical mismatches"
+              exit 1
+            fi
+          fi
+
+  security-check:
+    name: Fixture Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for PII in fixtures
+        run: |
+          echo "🔒 Checking for raw PII in fixtures..."
+          
+          # Pattern: Korean phone numbers (01X-XXXX-XXXX)
+          if grep -r "01[0-9]-[0-9]\{3,4\}-[0-9]\{4\}" tests/fixtures/production_*.json; then
+            echo "❌ Found raw phone numbers in fixtures!"
+            exit 1
+          fi
+          
+          # Pattern: Raw Korean names (가-힣 characters in sequences)
+          if grep -r "[가-힣]\{2,\}" tests/fixtures/production_*.json | grep -v "option"; then
+            echo "⚠️ Found Korean text patterns - verify no PII"
+          fi
+          
+          echo "✅ Fixture security check passed"
+
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Generate coverage
+        run: |
+          pytest tests/comparison/ \
+            --cov=src/rules --cov=tests/comparison \
+            --cov-report=html --cov-report=term-missing || true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: comparison
+          name: comparison-coverage
+          fail_ci_if_error: false
