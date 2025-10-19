@@ -242,14 +242,37 @@ Tests all 6 action executors with 28 test cases:
 
 **6 tests** comparing new engine against legacy baselines:
 
-- ✓ Booking 001: New confirmation (PASS)
-- ✓ Booking 002: Two-hour reminder (advanced scenario)
-- ✓ Booking 003: Evening option SMS (advanced scenario)
-- ✓ Booking 004: All flags set - no match (PASS)
-- ✓ Booking 005: No option keyword - no SMS (PASS)
-- ✓ Full regression suite (3/5 passing, 2 advanced scenarios)
+- ✓ Booking 001: New confirmation
+- ✓ Booking 002: Two-hour reminder parity
+- ✓ Booking 003: Evening option SMS parity
+- ✓ Booking 004: All flags set - no match
+- ✓ Booking 005: No option keyword - no SMS
+- ✓ Full regression suite coverage report
 
-**Note:** Regression tests verify behavior parity with legacy system. Advanced scenarios (002, 003) require complex fixture setup and are documented for future enhancement.
+**Regression Failure Artifacts**
+- Mismatches write JSON artifacts to `tests/integration/artifacts/rule_engine_regression/{booking_id}.json`.
+- Artifacts capture expected vs actual actions and a normalized `differences` list to speed triage.
+- A companion `summary.json` highlights all failing bookings, generated only when discrepancies are detected.
+
+Example artifact payload:
+
+```json
+{
+  "booking_id": "booking_002",
+  "booking_name": "Two-Hour Reminder",
+  "timestamp": "2025-10-19T12:34:56Z",
+  "expected_actions": [{"action_type": "send_sms"}],
+  "actual_actions": [{"action_type": "send_sms"}],
+  "differences": [
+    {
+      "type": "params_mismatch",
+      "index": 1,
+      "expected": {"flag": "remind_sms", "value": true},
+      "actual": {"flag": "remind_sms", "value": false}
+    }
+  ]
+}
+```
 
 ---
 

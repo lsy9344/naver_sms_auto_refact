@@ -155,6 +155,8 @@ logs/
 # Temporary files
 tmp/
 temp/
+.artifacts/
+tests/integration/artifacts/
 
 # Sensitive information
 config.json

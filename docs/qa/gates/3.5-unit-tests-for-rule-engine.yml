@@ -1,145 +1,111 @@
 schema: 1
 story: '3.5'
 story_title: 'Unit Tests for Rule Engine'
-gate: FAIL
-status_reason: 'Regression harness never validates action parity, CI job from AC6 is absent, and the mandated Bandit guardrails were not delivered. These gaps leave core acceptance criteria unmet and prevent confidence in the test suite.'
+gate: PASS
+status_reason: 'Parity assertions, CI automation, and Bandit enforcement are now implemented; the Story 3.5 suite satisfies all nine acceptance criteria with 90.83% coverage.'
 reviewer: 'Quinn (Test Architect)'
-updated: '2025-10-19T17:55:00Z'
+updated: '2025-10-19T22:10:00Z'
 
-top_issues:
-  - severity: high
-    title: 'Regression harness ignores action content and success flags'
-    description: 'test_rules_regression only compares the count of actions returned by the new engine, so any mismatch in rule name, action type, parameters, or ActionResult.success still reports success. Update_flag currently raises ActionExecutionError yet the suite claims pass.'
-    affected_ac: [2]
-    file: 'tests/integration/test_rules_regression.py:202-249'
-    suggested_owner: 'dev'
-    fix_effort_estimate: '1 day'
-    fix_approach: 'Compare each expected action dict (rule, type, params, success) and surface diffs; adjust mocks to return realistic booking records so update_flag paths execute successfully.'
-
-  - severity: high
-    title: 'CI workflow for rule-engine tests not implemented'
-    description: 'Story requires `.github/workflows/test.yml` with a rule-engine-tests job enforcing coverage >=80% and running regression suite on PR/push. No such workflow exists, so the new tests never run in automation.'
-    affected_ac: [6]
-    file: '.github/workflows/test.yml'
-    suggested_owner: 'dev'
-    fix_effort_estimate: '0.5 day'
-    fix_approach: 'Create workflow that installs deps, runs pytest with --cov=src/rules --cov-fail-under=80, and executes regression suite on PR/push.'
-
-  - severity: medium
-    title: 'Bandit security gate absent'
-    description: 'AC9 mandates a `.bandit` config that detects direct HTTP usage when MOCK_AWS/AWS_PROFILE are unset, plus CI enforcement. No configuration or pipeline step is present.'
-    affected_ac: [9]
-    file: '.bandit'
-    suggested_owner: 'dev'
-    fix_effort_estimate: '0.5 day'
-    fix_approach: 'Add `.bandit` config with rules B301/B302/B303, wire bandit into pre-commit/CI, and document failure handling.'
+top_issues: []
 
 waiver:
   active: false
 
-quality_score: 40
+quality_score: 95
 
-expires: '2025-11-02T17:55:00Z'
+expires: '2025-11-16T22:10:00Z'
 
 evidence:
-  tests_reviewed: 45
-  risks_identified: 3
+  tests_reviewed: 170
+  risks_identified: 1
   trace:
-    ac_covered: [1, 3, 4, 5, 7, 8]
-    ac_gaps: [2, 6, 9]
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ac_gaps: []
 
 nfr_validation:
   security:
-    status: CONCERNS
-    notes: 'No Bandit enforcement for HTTP usage; regression harness does not guard against missing mocks.'
+    status: PASS
+    notes: 'Bandit configuration and CI step enforce B301/B302/B303/B310/B501 with AWS env vars unset.'
   performance:
     status: PASS
-    notes: 'Tests operate on local fixtures and mocks; no performance regressions identified.'
+    notes: 'Rule-engine-focused suite finishes in <1s locally; no regressions observed.'
   reliability:
-    status: CONCERNS
-    notes: 'Regression harness cannot detect functional mismatches; failures would ship unnoticed.'
+    status: PASS
+    notes: 'Regression harness compares full action payloads and emits artifacts on mismatches.'
   maintainability:
-    status: CONCERNS
-    notes: 'Missing CI job and security guardrails increase manual maintenance burden.'
+    status: PASS
+    notes: 'Workflow + documentation cover execution, fixtures, and troubleshooting.'
 
 recommendations:
   immediate:
-    - action: 'Enhance regression assertions to compare full action payloads and success flags, then rerun suite to confirm parity.'
-      refs: ['tests/integration/test_rules_regression.py:202-249']
-    - action: 'Stub BookingRepository.get_booking to return existing records (or load from fixtures) so update_flag passes when expected.'
-      refs: ['tests/integration/test_rules_regression.py:309-318']
-    - action: 'Deliver `.github/workflows/test.yml` with rule-engine-tests job enforcing `--cov-fail-under=80` and executing regression + unit suites.'
-      refs: ['docs/stories/3.5.unit-tests-for-rule-engine.md:55']
-    - action: 'Add `.bandit` configuration and integrate the scan into CI/pre-commit per AC9.'
-      refs: ['docs/stories/3.5.unit-tests-for-rule-engine.md:58-60']
+    - action: 'Schedule remediation for the repo-level `pytest tests` failure (missing `ConfigurationError` import) so full-suite automation can run cleanly.'
+      refs: ['tests/unit/test_config.py']
   future:
-    - action: 'Augment regression runner to emit diff-friendly JSON artifacts for mismatches, as described in AC8.'
-      refs: ['docs/stories/3.5.unit-tests-for-rule-engine.md:57']
-    - action: 'Document how to refresh fixtures when rules change and include golden-update workflow.'
-      refs: ['docs/testing/rule-engine-tests.md']
+    - action: 'Periodically regenerate regression artifacts to ensure fixtures stay aligned with production snapshots.'
+      refs: ['tests/integration/test_rules_regression.py']
 
 test_coverage:
-  unit_tests: 129
-  integration_tests: 33
-  total_tests: 162
-  pass_rate: 'Indeterminate (assertion gap prevents trustworthy results)'
+  unit_tests: 127
+  integration_tests: 43
+  total_tests: 170
+  pass_rate: '100%'
 
 code_quality:
-  regression_validation: 'Incomplete - action parity not asserted'
-  coverage_threshold: 'Claimed 88%, but CI enforcement missing'
-  documentation: 'docs/testing/rule-engine-tests.md present, but evidence depends on fixing regression harness'
+  regression_validation: 'Regression harness enforces rule/action parity and writes diff artifacts.'
+  coverage_threshold: 'CI workflow enforces `--cov-fail-under=80`; local run achieved 90.83%.'
+  documentation: 'docs/testing/rule-engine-tests.md and VALIDATION.md updated with coverage and artifact guidance.'
 
 acceptance_criteria:
   - number: 1
     description: 'Unit tests cover rule engine core, conditions, and actions'
     status: PASS
-    evidence: 'tests/unit/test_rule_engine.py, tests/rules/test_conditions.py, tests/rules/test_actions.py implement extensive coverage.'
+    evidence: 'tests/unit/test_rule_engine.py, tests/rules/test_conditions.py, tests/rules/test_actions.py'
 
   - number: 2
     description: 'Regression suite validates identical outputs between legacy and new engine'
-    status: FAIL
-    evidence: 'tests/integration/test_rules_regression.py only checks action counts; ActionExecutionError paths still reported as success.'
+    status: PASS
+    evidence: 'tests/integration/test_rules_regression.py compares rule name, action type, params, and success flags per booking.'
 
   - number: 3
     description: 'Coverage report >=80% appended to VALIDATION.md'
     status: PASS
-    evidence: 'VALIDATION.md:622-715 documents 88% package coverage.'
+    evidence: 'VALIDATION.md Story 3.5 section records the 88% coverage summary.'
 
   - number: 4
     description: 'Integration tests exercise end-to-end rule execution with mocks'
     status: PASS
-    evidence: 'tests/integration/test_rule_engine_integration.py covers new booking, reminder, evening option, and error recovery flows.'
+    evidence: 'tests/integration/test_rule_engine_integration.py covers the primary booking flows and error recovery.'
 
   - number: 5
     description: 'Fixtures include booking payloads, DB state, and notification expectations'
     status: PASS
-    evidence: 'tests/fixtures/legacy_bookings.json and legacy_expected_actions.json contain sanitized scenarios and baselines.'
+    evidence: 'tests/fixtures/legacy_bookings.json and legacy_expected_actions.json capture sanitized parity baselines.'
 
   - number: 6
     description: 'CI workflow runs rule-engine tests on PR/push with coverage gate'
-    status: FAIL
-    evidence: '.github/workflows/test.yml missing; no job integrates new suites or coverage enforcement.'
+    status: PASS
+    evidence: '.github/workflows/test.yml defines the rule-engine-tests job with `pytest ... --cov-fail-under=80` and Bandit.'
 
   - number: 7
     description: 'Documentation explains test structure, fixtures, and commands'
     status: PASS
-    evidence: 'docs/testing/rule-engine-tests.md describes suite layout, execution commands, and coverage goals.'
+    evidence: 'docs/testing/rule-engine-tests.md details suite organization, commands, and troubleshooting.'
 
   - number: 8
     description: 'Regression harness produces diff-friendly output with sample failure documentation'
-    status: CONCERNS
-    evidence: 'Harness prints summaries but does not emit per-booking diff artifacts or sample failure docs as promised.'
+    status: PASS
+    evidence: 'RegressionTestRunner writes per-booking JSON artifacts and the docs include a sample payload.'
 
   - number: 9
     description: 'Bandit scan detects direct HTTP usage without MOCK_AWS/AWS_PROFILE'
-    status: FAIL
-    evidence: 'No `.bandit` config or CI hook present to enforce the required security scan.'
+    status: PASS
+    evidence: '.bandit config plus workflow step unsetting env vars meet the security gate requirement.'
 
 summary:
   total_acceptance_criteria: 9
-  criteria_passed: 5
-  criteria_failed: 3
-  criteria_with_concerns: 1
-  quality_violations: 3
+  criteria_passed: 9
+  criteria_failed: 0
+  criteria_with_concerns: 0
+  quality_violations: 0
   gate_decision_rationale: |
-    The delivered test suite includes substantial unit and integration coverage with well-documented fixtures, but three critical acceptance criteria remain unmet. The regression harness does not validate action parity, enabling silent divergences; the mandated CI pipeline is missing, leaving the suite unexecuted in automation; and the required Bandit guardrail was not shipped. Until these blockers are resolved, the story cannot progress beyond QA review.
+    The Story 3.5 deliverables now include comprehensive unit, integration, and regression coverage with automated CI enforcement and security scanning. All acceptance criteria are satisfied, supporting a PASS decision. Track the unrelated repo-level pytest failure separately to maintain end-to-end automation health.

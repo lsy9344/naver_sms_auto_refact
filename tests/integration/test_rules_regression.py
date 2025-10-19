@@ -21,6 +21,7 @@ Acceptance Criteria Coverage:
 
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 
@@ -181,18 +182,90 @@ class RegressionTestRunner:
     """Run regression tests against rule engine."""
 
     def __init__(
-        self, rule_engine: RuleEngine, fixtures: RegressionTestFixture
+        self,
+        rule_engine: RuleEngine,
+        fixtures: RegressionTestFixture,
+        *,
+        artifact_dir: Optional[Path] = None,
     ):
         """Initialize test runner."""
         self.engine = rule_engine
         self.fixtures = fixtures
         self.results = []
         self.db_repo = getattr(rule_engine, "_db_repo_for_tests", None)
+        self.artifact_dir = (
+            artifact_dir
+            if artifact_dir is not None
+            else Path(__file__).parent / "artifacts" / "rule_engine_regression"
+        )
+        self.summary_path = self.artifact_dir / "summary.json"
+
+    def _artifact_path(self, booking_id: str) -> Path:
+        """Compute path for a booking-specific artifact."""
+        safe_id = booking_id.replace("/", "_")
+        return self.artifact_dir / f"{safe_id}.json"
+
+    def _ensure_artifact_dir(self) -> None:
+        """Ensure artifact directory exists."""
+        self.artifact_dir.mkdir(parents=True, exist_ok=True)
+
+    def _write_failure_artifact(
+        self, booking_id: str, payload: Dict[str, Any]
+    ) -> str:
+        """Persist mismatch details for later inspection."""
+        self._ensure_artifact_dir()
+        artifact_path = self._artifact_path(booking_id)
+        with open(artifact_path, "w", encoding="utf-8") as artifact_file:
+            json.dump(payload, artifact_file, ensure_ascii=False, indent=2)
+        return str(artifact_path)
+
+    def _remove_artifact(self, booking_id: str) -> None:
+        """Remove stale artifact for passing bookings."""
+        artifact_path = self._artifact_path(booking_id)
+        if artifact_path.exists():
+            artifact_path.unlink()
+
+    def _write_summary(self) -> None:
+        """Write summary file when mismatches detected."""
+        failed_results = [r for r in self.results if not r["success"]]
+        if not failed_results:
+            self._remove_summary()
+            return
+
+        self._ensure_artifact_dir()
+        summary_payload = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "total": len(self.results),
+            "failed": len(failed_results),
+            "failed_bookings": [
+                {
+                    "booking_id": r["booking_id"],
+                    "booking_name": r["booking_name"],
+                    "artifact_path": r.get("artifact_path"),
+                    "differences": r.get("differences", []),
+                    "error": r.get("error"),
+                }
+                for r in failed_results
+            ],
+        }
+        with open(self.summary_path, "w", encoding="utf-8") as summary_file:
+            json.dump(summary_payload, summary_file, ensure_ascii=False, indent=2)
+
+    def _remove_summary(self) -> None:
+        """Remove summary file and clean directory if empty."""
+        if self.summary_path.exists():
+            self.summary_path.unlink()
+        try:
+            # Remove artifact directory if it exists and is now empty
+            self.artifact_dir.rmdir()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            # Directory not empty - keep artifacts in place
+            pass
 
     def build_context(self, booking: Dict[str, Any]) -> Dict[str, Any]:
         """Build execution context from booking fixture, converting to domain objects."""
-        from datetime import datetime
-
         def parse_datetime(value: str) -> Optional[datetime]:
             if not value:
                 return None
@@ -387,10 +460,31 @@ class RegressionTestRunner:
             "differences": differences,
         }
 
+        artifact_payload = {
+            "booking_id": booking_id,
+            "booking_name": booking_name,
+            "error": error,
+            "differences": differences,
+            "expected_actions": expected_actions,
+            "actual_actions": actual_actions,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
         if differences:
             logger.error(
                 "Action parity mismatch for %s: %s", booking_id, differences
             )
+            result["artifact_path"] = self._write_failure_artifact(
+                booking_id, artifact_payload
+            )
+        elif not success:
+            logger.error("Error processing booking %s: %s", booking_id, error)
+            result["artifact_path"] = self._write_failure_artifact(
+                booking_id, artifact_payload
+            )
+        else:
+            self._remove_artifact(booking_id)
+            result["artifact_path"] = None
 
         self.results.append(result)
         return result
@@ -406,6 +500,8 @@ class RegressionTestRunner:
         total = len(self.results)
         passed = sum(1 for r in self.results if r["success"])
         failed = total - passed
+
+        self._write_summary()
 
         return {
             "total": total,
