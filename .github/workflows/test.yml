@@ -37,9 +37,38 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run unit, integration, and regression tests with coverage
+      - name: Run unit tests with coverage
         run: |
-          pytest tests --cov=src/rules --cov-report=term-missing --cov-fail-under=80
+          pytest tests/unit tests/comparison tests/integration -v \
+            --cov=src --cov-report=term-missing --cov-report=json \
+            --junit-xml=test-results.xml
+
+      - name: Run failure scenario tests (Story 4.4)
+        run: |
+          pytest tests/integration/test_failure_scenarios.py -v \
+            --junit-xml=failure-results.xml || true
+
+      - name: Run Slack integration tests (Story 4.4)
+        run: |
+          pytest tests/integration/test_slack_integration.py -v \
+            --junit-xml=slack-results.xml || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            failure-results.xml
+            slack-results.xml
+            coverage.json
+          retention-days: 30
+
+      - name: Check coverage threshold
+        run: |
+          python -m pytest tests --cov=src --cov-fail-under=80 \
+            --cov-report=term-missing
 
       - name: Run Bandit security scan
         env:

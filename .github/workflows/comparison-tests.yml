@@ -95,6 +95,37 @@ jobs:
             --cov-report=term-missing --cov-report=json \
             --cov-fail-under=80 || true
 
+      - name: Create parity summary report
+        if: always()
+        run: |
+          python << 'EOF'
+          import json
+          import glob
+          from datetime import datetime
+
+          # Collect all JSON results
+          results = []
+          for json_file in glob.glob("tests/comparison/results/*.json"):
+            try:
+              with open(json_file) as f:
+                results.append(json.load(f))
+            except:
+              pass
+
+          # Generate summary
+          summary = {
+            "timestamp": datetime.now().isoformat(),
+            "total_tests": len(results),
+            "passed": sum(1 for r in results if r.get("parity_status") == "PASS"),
+            "failed": sum(1 for r in results if r.get("parity_status") == "FAIL"),
+          }
+
+          with open("tests/comparison/results/PARITY_SUMMARY.json", "w") as f:
+            json.dump(summary, f, indent=2)
+
+          print(f"✅ Parity Report: {summary['passed']}/{summary['total_tests']} passed")
+          EOF
+
       - name: Upload comparison artifacts
         if: always()
         uses: actions/upload-artifact@v3
@@ -103,7 +134,7 @@ jobs:
           path: |
             tests/comparison/results/
             comparison-results.xml
-            .coverage
+            coverage.json
           retention-days: 30
 
       - name: Comment PR with results

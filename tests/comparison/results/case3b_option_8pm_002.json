@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "booking_id": "case3b_option_8pm_002",
+    "generated_at": "2025-10-20T01:23:46.712804",
+    "version": "1.0",
+    "container_digest": "local-development",
+    "dataset_version": "1.0",
+    "parity_run_timestamp": "2025-10-20T01:23:46.714132"
+  },
+  "statistics": {
+    "booking_id": "case3b_option_8pm_002",
+    "total_mismatches": 0,
+    "critical_mismatches": 0,
+    "warning_mismatches": 0,
+    "parity_status": "PASS",
+    "timestamp": "2025-10-20T01:23:46.712799"
+  },
+  "mismatches": [],
+  "canonical_outputs": {
+    "legacy": {
+      "sms": [],
+      "db_records": [],
+      "telegram": [],
+      "actions": []
+    },
+    "refactored": {
+      "sms": [],
+      "db_records": [],
+      "telegram": [],
+      "actions": []
+    }
+  }
+}

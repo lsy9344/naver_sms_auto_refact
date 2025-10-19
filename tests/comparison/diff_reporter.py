@@ -212,18 +212,22 @@ class DiffReporter:
         mismatches: List[ComparisonMismatch],
         stats: Dict[str, Any],
         canonical_legacy: Dict[str, Any] = None,
-        canonical_refactored: Dict[str, Any] = None
+        canonical_refactored: Dict[str, Any] = None,
+        container_digest: str = None,
+        dataset_version: str = "1.0"
     ) -> str:
         """
         Generate JSON report for a booking comparison.
-        
+
         Args:
             booking_id: ID of booking
             mismatches: List of mismatches
             stats: Statistics dict
             canonical_legacy: Legacy canonical output (optional)
             canonical_refactored: Refactored canonical output (optional)
-            
+            container_digest: Docker container SHA256 digest (optional)
+            dataset_version: Version of test dataset (optional)
+
         Returns:
             JSON string
         """
@@ -232,6 +236,9 @@ class DiffReporter:
                 "booking_id": booking_id,
                 "generated_at": datetime.now().isoformat(),
                 "version": "1.0",
+                "container_digest": container_digest or "local-development",
+                "dataset_version": dataset_version,
+                "parity_run_timestamp": datetime.now().isoformat(),
             },
             "statistics": stats,
             "mismatches": [asdict(m) for m in mismatches],

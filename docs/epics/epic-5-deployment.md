@@ -10,21 +10,21 @@
 
 ## Epic Overview
 
-Deploy the containerized Lambda to production using a parallel deployment strategy, validate outputs for 1 week, then perform zero-downtime cutover. This epic includes rollback planning, monitoring setup, and validation procedures to ensure safe production deployment.
+Deploy the containerized Lambda to production after comprehensive offline validation using golden datasets and comparison testing artifacts. The legacy Lambda is no longer operational, so validation relies on captured test data, regression suites, and monitoring readiness checks before production cutover.
 
-**Why This Epic:** Brownfield deployment to production requires extreme caution. Parallel deployment minimizes risk while allowing comprehensive validation.
+**Why This Epic:** Brownfield deployment to production requires extreme caution. Offline validation against golden datasets and comprehensive testing ensures functional parity before cutover.
 
 ---
 
 ## Epic Goals
 
 1. ✅ Deploy container to ECR
-2. ✅ Create new Lambda function (separate from old)
-3. ✅ Run parallel deployment for 1 week (old + new Lambda)
-4. ✅ Compare outputs continuously (zero discrepancies required)
-5. ✅ Perform zero-downtime cutover to new Lambda
+2. ✅ Create new Lambda function
+3. ✅ Execute comprehensive offline validation using golden datasets and regression suites
+4. ✅ Verify monitoring and alerting infrastructure readiness
+5. ✅ Perform production cutover after validation sign-off
 6. ✅ Monitor for 1 week post-cutover
-7. ✅ Decommission old Lambda
+7. ✅ Archive legacy artifacts and document migration completion
 
 ---
 
@@ -32,11 +32,11 @@ Deploy the containerized Lambda to production using a parallel deployment strate
 
 - [ ] Container image pushed to ECR successfully
 - [ ] New Lambda function created and configured
-- [ ] Parallel deployment runs for 7 days
-- [ ] Comparison monitoring shows 100% match
+- [ ] Offline validation campaign shows 100% parity with golden datasets
+- [ ] Monitoring and alerting infrastructure verified and ready
 - [ ] Cutover completes without customer disruption
-- [ ] Post-cutover monitoring shows zero incidents
-- [ ] Old Lambda decommissioned safely
+- [ ] Post-cutover monitoring shows zero incidents for 1 week
+- [ ] Migration documentation complete and legacy artifacts archived
 
 ---
 
@@ -46,49 +46,69 @@ Deploy the containerized Lambda to production using a parallel deployment strate
 |----------|-------|----------|--------|--------|
 | 5.1 | Deploy to ECR | P0 | 0.5d | Draft |
 | 5.2 | Create New Lambda Function | P0 | 1d | Draft |
-| 5.3 | Setup Parallel Deployment | P0 | 1d | Draft |
-| 5.4 | Implement Comparison Monitoring | P0 | 1.5d | Draft |
-| 5.5 | Run 1-Week Parallel Validation | P0 | 5d | Draft |
+| ~~5.3~~ | ~~Setup Parallel Deployment~~ | ~~P0~~ | ~~1d~~ | **REMOVED** (no legacy Lambda) |
+| 5.4 | Implement Monitoring Infrastructure | P0 | 1d | Draft |
+| 5.5 | Validate New Lambda Readiness | P0 | 2d | Draft |
 | 5.6 | Perform Production Cutover | P0 | 0.5d | Draft |
-| 5.7 | Post-Cutover Monitoring | P0 | 0.5d | Draft |
+| 5.7 | Post-Cutover Monitoring | P0 | 1d | Draft |
 
-**Total Estimated Effort:** 10 days (includes 5-day waiting period)
+**Total Estimated Effort:** 6 days
+
+**Note:** Story 5.3 removed as legacy Lambda is no longer operational; parallel deployment strategy not applicable.
 
 ---
 
 ## Technical Context
 
-### Parallel Deployment Architecture
+### Validation-Only Deployment Architecture
 
 ```
+Offline Validation Phase:
+┌─────────────────────────────────────────┐
+│ Golden Datasets (from Epic 4)           │
+│ - Captured booking scenarios           │
+│ - Expected outputs (SMS, DB, Telegram) │
+└─────────────────┬───────────────────────┘
+                  │
+                  ▼
+         ┌────────────────────┐
+         │   New Lambda       │
+         │   (Test Mode)      │
+         └────────┬───────────┘
+                  │
+                  ▼
+         ┌────────────────────┐
+         │  Diff Reporter     │
+         │  Comparison Tool   │
+         └────────┬───────────┘
+                  │
+                  ▼
+         ┌────────────────────┐
+         │ Validation Report  │
+         │ (100% parity req.) │
+         └────────────────────┘
+
+Production Cutover:
 EventBridge (every 20 minutes)
     │
-    ├──────────────┬──────────────┐
-    │              │              │
-    ▼              ▼              ▼
-Old Lambda    New Lambda    Comparison
-(existing)    (new)         Script
-    │              │              │
-    │              │              │
-    ▼              ▼              ▼
-DynamoDB      DynamoDB      CloudWatch
-(sms table)   (sms_v2?)     Metrics
-    │              │
-    └──────┬───────┘
-           ▼
-    Comparison
-    Dashboard
+    ▼
+New Lambda (Container-based)
+    │
+    ├─────────┬──────────┬──────────┐
+    │         │          │          │
+    ▼         ▼          ▼          ▼
+DynamoDB   SENS SMS   Telegram  CloudWatch
 ```
 
 **Strategy:**
-1. Both Lambdas run every 20 minutes (separate EventBridge rules)
-2. Both read same Naver Booking API
-3. Both write to separate DynamoDB tables (sms vs sms_v2) OR same table with version tagging
-4. Comparison script compares outputs every execution
-5. After 1 week of 100% match → cutover
-6. Cutover: disable old Lambda's EventBridge rule, enable new Lambda's rule
-7. Monitor for 1 week
-8. Decommission old Lambda
+1. Execute offline validation using golden datasets captured during Epic 4
+2. Run regression test suite against new Lambda
+3. Use diff reporter to verify 100% parity with expected outputs
+4. Verify monitoring infrastructure (CloudWatch, alarms, dashboards)
+5. Obtain go/no-go approval based on validation evidence
+6. Cutover: Enable EventBridge rule for new Lambda
+7. Monitor production for 1 week
+8. Archive legacy artifacts after successful validation period
 
 ### Deployment Steps
 
@@ -114,66 +134,84 @@ aws lambda create-function \
   --region ap-northeast-2
 ```
 
-**3. EventBridge Rule (Disabled Initially):**
+**3. EventBridge Rule (Production Trigger):**
 ```bash
+# Create EventBridge rule (disabled until validation complete)
 aws events put-rule \
-  --name naver-sms-automation-v2-trigger \
+  --name naver-sms-automation-trigger \
   --schedule-expression "rate(20 minutes)" \
   --state DISABLED \
   --region ap-northeast-2
 
 aws events put-targets \
-  --rule naver-sms-automation-v2-trigger \
+  --rule naver-sms-automation-trigger \
   --targets "Id"="1","Arn"="arn:aws:lambda:ap-northeast-2:654654307503:function:naverplace_send_inform_v2"
 ```
 
-### Comparison Monitoring
+**4. Offline Validation:**
+```bash
+# Run validation suite using golden datasets
+pytest tests/comparison/test_output_parity.py -v
 
-**Metrics to Compare:**
-- Number of SMS sent (by type: confirmation, guide, event)
-- SMS content (character-by-character)
-- DynamoDB records created
-- DynamoDB records updated
-- Telegram notifications sent
+# Generate validation report
+python scripts/generate_validation_report.py
+```
 
-**CloudWatch Custom Metrics:**
-- `naver-sms/comparison/discrepancies` (should be 0)
-- `naver-sms/comparison/sms_sent_old`
-- `naver-sms/comparison/sms_sent_new`
-- `naver-sms/comparison/match_percentage` (should be 100%)
+### Monitoring Infrastructure
 
-**Alerting:**
-- Alert if discrepancies > 0
-- Alert if match_percentage < 100%
-- Alert if error rate > 1%
+**CloudWatch Metrics to Monitor:**
+- Lambda invocations, errors, duration
+- DynamoDB read/write capacity
+- SENS API call counts
+- SMS sent (by type, by store)
+- Telegram notification success rate
+
+**CloudWatch Alarms:**
+- Lambda error rate > 5%
+- Lambda duration > 4 minutes
+- DynamoDB throttling events
+- SENS API failures
+
+**Alerting Channels:**
+- Telegram for critical alerts
+- CloudWatch Logs for detailed diagnostics
 
 ### Rollback Procedures
 
-**Scenario 1: Discrepancies Detected During Parallel Deployment**
-- Action: Keep old Lambda running, fix new Lambda
-- Timeline: No customer impact (old Lambda still serving)
+**IMPORTANT:** Legacy Lambda is no longer operational. Rollback strategy relies on rapid issue detection and Lambda code reversion.
 
-**Scenario 2: Issues After Cutover**
+**Scenario 1: Critical Issues Detected Post-Cutover**
 - Action:
-  1. Disable new Lambda EventBridge rule
-  2. Enable old Lambda EventBridge rule
-  3. Verify old Lambda working
-  4. Investigate new Lambda issues
-- Timeline: <5 minutes to rollback
+  1. Disable new Lambda EventBridge rule (stop all automated processing)
+  2. Assess issue severity and impact
+  3. If code defect: Deploy previous working container image version
+  4. If infrastructure issue: Fix infrastructure and re-enable
+- Timeline: <15 minutes to stop automation, <1 hour to deploy fix
 
-**Scenario 3: Database Issues**
+**Scenario 2: Database Corruption**
 - Action:
-  1. Rollback Lambda (as above)
-  2. Restore DynamoDB from backup if needed
-  3. Replay missed bookings manually
-- Timeline: <15 minutes
+  1. Disable Lambda EventBridge rule immediately
+  2. Restore DynamoDB from point-in-time backup
+  3. Manually process missed bookings using runbook procedures
+  4. Verify data integrity before re-enabling
+- Timeline: <30 minutes
+
+**Scenario 3: Partial Failure (e.g., SMS sending issues)**
+- Action:
+  1. Keep Lambda running if non-critical
+  2. Monitor error rates and customer impact
+  3. Apply hotfix if possible
+  4. Disable if customer impact exceeds threshold
+- Timeline: Monitoring-based decision within 1 hour
+
+**Mitigation:** Comprehensive offline validation (Story 5.5) minimizes rollback probability
 
 ### References
 - Architecture Doc: Lines 1439-1446 (Phase 5: Deployment)
-- Architecture Doc: Lines 1440-1446 (Parallel Deployment Strategy)
-- Architecture Doc: Lines 1683-1713 (Comparison Testing)
+- Architecture Doc: Lines 1683-1713 (Comparison Testing Strategy)
 - PRD: Section 5.1 MSC1 (Functional Parity)
-- PRD: Section 7.1 BC1 (Zero Downtime Requirement)
+- Epic 4: Integration & Testing (golden dataset creation)
+- Story 4.4: Integration Testing (test artifacts and comparison tooling)
 
 ---
 
@@ -192,12 +230,12 @@ aws events put-targets \
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
-| Discrepancies found | Medium | High | Fix before cutover, keep old Lambda running |
-| Cutover causes downtime | Low | Critical | EventBridge rule switching is instant |
-| Rollback needed | Low | High | Documented procedures, tested rollback |
-| Database corruption | Very Low | Critical | Separate tables during parallel, backups |
-| Monitoring gaps | Medium | Medium | Comprehensive metrics, alarms |
-| Cost overrun (2 Lambdas) | Low | Low | ~$10 extra for 1 week, acceptable |
+| Undiscovered edge cases | Medium | High | Comprehensive offline validation with diverse golden datasets |
+| Cutover causes downtime | Low | Critical | EventBridge rule switching is instant, monitoring in place |
+| Rollback needed post-cutover | Medium | High | Container versioning, rapid redeployment procedures, DynamoDB backups |
+| Monitoring gaps | Medium | Medium | Pre-validate all CloudWatch alarms and dashboards (Story 5.4) |
+| Golden datasets incomplete | Medium | High | Epic 4 coverage review, ensure representative scenarios captured |
+| Production environment differences | Low | Medium | Test in staging environment mirroring production config |
 
 ---
 
@@ -216,114 +254,120 @@ aws events put-targets \
    - IAM role: Permissions for DynamoDB, Secrets Manager, CloudWatch
    - Environment variables: None (use Secrets Manager)
 
-3. **Parallel Deployment:**
-   - Both Lambdas triggered every 20 minutes
-   - Both process same bookings
-   - Both write to separate tracking (DynamoDB tables or version tags)
-   - Comparison script runs after each execution
+3. **Offline Validation Campaign:**
+   - Automated regression suite executes successfully with 100% pass rate
+   - Comparison testing against golden datasets shows 100% parity
+   - All edge cases and error scenarios validated
+   - Validation evidence documented in VALIDATION.md
 
-4. **Comparison Monitoring:**
-   - CloudWatch dashboard shows comparison metrics
-   - Alarms configured for discrepancies
-   - Slack/Telegram notifications for alerts
-   - Logs include comparison results
+4. **Monitoring Infrastructure:**
+   - CloudWatch dashboard configured with Lambda, DynamoDB, SENS metrics
+   - Alarms configured for error rate, duration, throttling
+   - Telegram notifications verified and working
+   - Logs structured and queryable
 
-5. **1-Week Validation:**
-   - 7 days × 24 hours × 3 executions/hour = ~504 executions
-   - 100% match rate required (zero discrepancies)
-   - No errors or timeouts
-   - Performance within NFRs
+5. **Validation Sign-Off:**
+   - PO/stakeholder review of validation evidence complete
+   - Go/no-go decision documented
+   - Readiness report confirms MSC1 functional parity criteria satisfied
+   - Rollback procedures tested and documented
 
 6. **Production Cutover:**
-   - Disable old Lambda EventBridge rule
-   - Enable new Lambda EventBridge rule
-   - Verify first execution successful
+   - EventBridge rule enabled for new Lambda
+   - First execution successful with no errors
    - No customer SMS disruption
    - Zero downtime
 
 7. **Post-Cutover Monitoring:**
-   - 1 week zero production incidents
+   - 1 week zero critical production incidents
    - Error rate <1%
-   - Performance within NFRs
+   - Performance within NFRs (execution time, throughput)
    - Customer feedback: zero complaints
 
-8. **Decommission Old Lambda:**
-   - Archive old Lambda function (don't delete)
-   - Disable but keep for 30 days
-   - Document rollback to old Lambda if needed
-   - Clean up old Lambda Layers
+8. **Migration Completion:**
+   - Legacy artifacts archived and documented
+   - Migration runbook updated with lessons learned
+   - Team trained on new system operations
+   - Documentation complete (operational runbooks, troubleshooting guides)
 
 ---
 
 ## Go/No-Go Decision Points
 
-**Decision Point 1: Enable Parallel Deployment (Day 0)**
+**Decision Point 1: Begin Offline Validation (After Epic 4 Complete)**
 - ✅ Container deployed to ECR
 - ✅ New Lambda function created
-- ✅ Comparison monitoring ready
-- ✅ Rollback procedures documented
-- **Go/No-Go:** Enable both Lambdas if all green
+- ✅ Golden datasets available from Epic 4
+- ✅ Comparison tooling ready
+- **Go/No-Go:** Start validation campaign if infrastructure ready
 
-**Decision Point 2: Proceed to Cutover (Day 7)**
-- ✅ 100% match rate for 7 days
-- ✅ Zero discrepancies
-- ✅ No errors or timeouts
-- ✅ Performance acceptable
-- **Go/No-Go:** Cutover if validation passes
+**Decision Point 2: Proceed to Production Cutover (After Validation Complete)**
+- ✅ Offline validation shows 100% parity
+- ✅ Zero critical discrepancies in validation report
+- ✅ Monitoring infrastructure verified
+- ✅ Stakeholder approval obtained
+- ✅ Rollback procedures documented and tested
+- **Go/No-Go:** Enable production EventBridge rule if validation evidence satisfactory
 
-**Decision Point 3: Decommission Old Lambda (Day 14)**
-- ✅ 1 week post-cutover with zero incidents
-- ✅ New Lambda stable
-- ✅ Team comfortable with new system
-- **Go/No-Go:** Archive old Lambda if stable
+**Decision Point 3: Declare Migration Complete (7 days post-cutover)**
+- ✅ 1 week post-cutover with zero critical incidents
+- ✅ New Lambda stable (error rate <1%)
+- ✅ Team trained and comfortable with operations
+- ✅ Documentation complete
+- **Go/No-Go:** Archive legacy artifacts and close Epic 5
 
 ---
 
 ## Monitoring & Alerting Plan
 
-**CloudWatch Alarms:**
-1. **Comparison Discrepancies Alarm**
-   - Metric: `naver-sms/comparison/discrepancies`
-   - Threshold: > 0
-   - Action: Slack + Telegram + Email
-
-2. **New Lambda Error Rate Alarm**
+**CloudWatch Alarms (Production):**
+1. **Lambda Error Rate Alarm**
    - Metric: `AWS/Lambda/Errors`
    - Threshold: > 5% of invocations
-   - Action: Slack + Telegram
+   - Action: Telegram notification
 
-3. **New Lambda Duration Alarm**
+2. **Lambda Duration Alarm**
    - Metric: `AWS/Lambda/Duration`
    - Threshold: > 240000 ms (4 minutes)
-   - Action: Slack
+   - Action: Telegram notification
 
-4. **Match Percentage Alarm**
-   - Metric: `naver-sms/comparison/match_percentage`
-   - Threshold: < 100%
-   - Action: Slack + Telegram + Email
+3. **Lambda Throttling Alarm**
+   - Metric: `AWS/Lambda/Throttles`
+   - Threshold: > 0
+   - Action: Telegram notification
+
+4. **DynamoDB Throttling Alarm**
+   - Metric: `AWS/DynamoDB/UserErrors`
+   - Threshold: > 5
+   - Action: Telegram notification
 
 **CloudWatch Dashboard:**
-- Comparison metrics (old vs new)
-- Lambda invocations, errors, duration
-- DynamoDB read/write capacity
-- SENS API call counts
-- SMS sent (by type, by store)
+- Lambda invocations, errors, duration, concurrent executions
+- DynamoDB read/write capacity utilization
+- SENS API call counts (via custom metrics)
+- SMS sent by type and store (via custom metrics)
+- Telegram notification success rate
 
 ---
 
 ## Rollback Testing
 
-**Pre-Deployment:**
-- Test rollback procedure in test environment
-- Verify EventBridge rule switching works instantly
-- Confirm DynamoDB state after rollback
-- Practice rollback communication
+**Pre-Deployment Validation:**
+- Test EventBridge rule disable procedure
+- Verify container redeployment from previous ECR image
+- Test DynamoDB point-in-time recovery procedure
+- Practice rollback communication and escalation
 
-**Rollback SLA:**
-- Detection: <5 minutes (monitoring alerts)
-- Decision: <5 minutes (PO approval)
-- Execution: <5 minutes (disable/enable EventBridge)
-- **Total: <15 minutes from issue to rollback complete**
+**Rollback SLA (Post-Cutover):**
+- Detection: <10 minutes (monitoring alerts + manual observation)
+- Decision: <10 minutes (PO approval)
+- Execution: <15 minutes (disable EventBridge + assess/fix or redeploy)
+- **Total: <35 minutes from issue detection to resolution**
+
+**Note:** Without legacy Lambda fallback, rollback means:
+1. Stop automation (disable EventBridge)
+2. Deploy previous working container version, OR
+3. Apply emergency hotfix to current version
 
 ---
 
@@ -332,3 +376,4 @@ aws events put-targets \
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2025-10-18 | 1.0 | Epic created from PRD and architecture doc | Sarah (PO) |
+| 2025-10-20 | 2.0 | Updated to validation-only strategy; legacy Lambda non-operational, removed parallel deployment (Story 5.3), updated rollback procedures | Sarah (PO) |

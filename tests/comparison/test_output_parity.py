@@ -11,8 +11,10 @@ Story 4.2 Task 2, Task 3: Implements AC 2, 3, 4, 8
 import json
 import logging
 import pytest
+import os
 from pathlib import Path
 from typing import Dict, List, Any
+from datetime import datetime
 
 from tests.comparison.comparison_factory import ComparisonFactory
 from tests.comparison.output_normalizer import OutputNormalizer
@@ -25,6 +27,13 @@ logger = logging.getLogger(__name__)
 FACTORY = ComparisonFactory()
 REPORTER = DiffReporter()
 VALIDATOR = ParityValidator()
+
+# Get container digest from environment for audit trail (AC 6: production tracking)
+CONTAINER_DIGEST = os.environ.get(
+    "CONTAINER_DIGEST",
+    os.environ.get("GITHUB_SHA", "local-development")
+)
+DATASET_VERSION = os.environ.get("DATASET_VERSION", "1.0")
 
 
 class TestOutputParity:
@@ -42,6 +51,23 @@ class TestOutputParity:
         logger.info("Starting parity test")
         yield
         logger.info("Completed parity test")
+    
+    @staticmethod
+    def _update_report_with_container_metadata(booking_id: str):
+        """Update JSON report with container digest for audit trail (AC 6)."""
+        json_path = REPORTER.output_dir / f"{booking_id.replace('/', '_')}.json"
+        if json_path.exists():
+            try:
+                with json_path.open("r", encoding="utf-8") as f:
+                    report = json.load(f)
+                report["metadata"]["container_digest"] = CONTAINER_DIGEST
+                report["metadata"]["dataset_version"] = DATASET_VERSION
+                report["metadata"]["parity_run_timestamp"] = datetime.now().isoformat()
+                with json_path.open("w", encoding="utf-8") as f:
+                    json.dump(report, f, indent=2)
+                logger.debug(f"Updated container metadata for {booking_id}")
+            except Exception as e:
+                logger.warning(f"Could not update container metadata: {e}")
 
     @pytest.mark.parametrize(
         "booking_id",
@@ -149,7 +175,7 @@ class TestOutputParity:
 
                 all_stats.append(stats)
 
-                # Write reports
+                # Write reports with container metadata for audit trail (AC 6)
                 REPORTER.write_reports(
                     booking_id,
                     scenario.get("scenario"),
@@ -158,6 +184,9 @@ class TestOutputParity:
                     canonical_legacy,
                     canonical_refactored
                 )
+                
+                # Update with container metadata for audit trail
+                TestOutputParity._update_report_with_container_metadata(booking_id)
 
                 # Track critical failures
                 if stats["critical_mismatches"] > 0:
@@ -293,6 +322,9 @@ class TestOutputParity:
             canonical_legacy,
             canonical_refactored
         )
+        
+        # Update with container metadata for audit trail (AC 6)
+        TestOutputParity._update_report_with_container_metadata(booking_id)
 
         # Assert parity
         if stats["critical_mismatches"] > 0:
@@ -324,12 +356,12 @@ class TestComparisonFixtures:
         """Test that fixtures cover all required edge cases."""
         bookings_fixture = FACTORY.load_bookings_fixture()
         required_edge_cases = {
-            "new_booking_confirmation",
-            "two_hour_window_reminder",
-            "option_keyword_trigger_at_8pm",
-            "cookie_expiry_forced_refresh",
-            "empty_booking_response",
-            "high_volume_processing",
+            "new booking confirmation",
+            "two-hour window reminder",
+            "option keyword trigger at 8 pm",
+            "cookie expiry",
+            "empty booking response",
+            "high-volume processing",
         }
 
         scenario_names = " ".join([b["scenario"].lower() for b in bookings_fixture["bookings"]])

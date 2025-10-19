@@ -1,4 +1,4 @@
-.PHONY: help fmt test lint comparison-test comparison-refresh clean
+.PHONY: help fmt test lint comparison-test test-performance comparison-refresh clean
 
 # Variables
 PYTHON := python3
@@ -14,10 +14,11 @@ help:
 	@echo "  make lint          - Run linting and type checks"
 	@echo ""
 	@echo "Testing:"
-	@echo "  make test          - Run all tests except comparison"
+	@echo "  make test          - Run all tests except comparison and performance"
 	@echo "  make test-unit     - Run unit tests only"
+	@echo "  make test-performance - Run performance load tests"
 	@echo "  make comparison-test - Run comparison/parity tests"
-	@echo "  make test-all      - Run all tests including comparison"
+	@echo "  make test-all      - Run all tests including comparison and performance"
 	@echo ""
 	@echo "Comparison Framework:"
 	@echo "  make comparison-refresh - Regenerate comparison fixtures"
@@ -45,8 +46,8 @@ lint:
 # ============================================================================
 
 test:
-	@echo "Running tests (excluding comparison)..."
-	$(PYTEST) tests/ -m "not comparison" -v --tb=short
+	@echo "Running tests (excluding comparison and performance)..."
+	$(PYTEST) tests/ -m "not comparison and not performance" -v --tb=short
 
 test-unit:
 	@echo "Running unit tests..."
@@ -55,6 +56,12 @@ test-unit:
 test-integration:
 	@echo "Running integration tests..."
 	$(PYTEST) tests/integration/ -v --tb=short
+
+test-performance:
+	@echo "Running performance tests..."
+	$(PYTEST) tests/performance/ -v --tb=short -m "performance"
+	@echo ""
+	@echo "📊 Performance results written to: tests/fixtures/performance/"
 
 comparison-test:
 	@echo "Running comparison/parity tests..."
@@ -65,7 +72,7 @@ comparison-test:
 	@ls -la tests/comparison/results/ 2>/dev/null || echo "No results yet - run tests first"
 
 test-all:
-	@echo "Running all tests (including comparison)..."
+	@echo "Running all tests (including comparison and performance)..."
 	$(PYTEST) tests/ -v --tb=short
 	@echo ""
 	@echo "📊 Test coverage report generated: htmlcov/index.html"

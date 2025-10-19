@@ -1,333 +1,286 @@
 # Local Development Setup Guide
 
-This guide explains how to set up the Naver SMS Automation refactored codebase for local development without storing credentials in source files.
-
-## Overview
-
-The application stores all sensitive credentials in AWS Secrets Manager:
-- **Naver authentication** (username/password)
-- **SENS SMS API keys** (access key, secret key, service ID)
-- **Telegram bot credentials** (bot token, chat ID)
-
-Local development fetches credentials securely at runtime using AWS CLI profiles and boto3.
+**Story 4.4 AC 4:** Developer-facing documentation for container build, execution, and integration testing
 
 ## Prerequisites
 
-- Python 3.13+
-- AWS CLI v2 or later
-- AWS account with access to Secrets Manager
-- Appropriate IAM permissions (see [Bootstrap Script](#bootstrap-script))
+- **Docker Desktop** (for container-based Lambda testing)
+- **Python 3.11+** (for local development)
+- **AWS CLI v2** (configured with valid credentials)
+- **Git** (for version control)
+- **Make** (for build automation)
 
-## Step 1: Configure AWS CLI Profile
+## Quick Start
 
-Set up a local AWS CLI profile with your credentials:
-
-```bash
-aws configure --profile naver-sms-dev
-# Follow prompts:
-# AWS Access Key ID: <your-access-key>
-# AWS Secret Access Key: <your-secret-key>
-# Default region: ap-northeast-2
-# Default output format: json
-```
-
-**IMPORTANT:** Never store the secret access key in source code. Use AWS CLI's secure credential storage.
-
-### Using IAM User Credentials
-
-For local development, use an IAM user with minimal permissions (principle of least privilege):
-
-1. Create an IAM user in AWS Console:
-   - Name: `naver-sms-dev` (or similar)
-   - Access type: Programmatic access only
-
-2. Attach policy with Secrets Manager permissions:
-   ```json
-   {
-       "Version": "2012-10-17",
-       "Statement": [
-           {
-               "Effect": "Allow",
-               "Action": [
-                   "secretsmanager:GetSecretValue",
-                   "secretsmanager:DescribeSecret"
-               ],
-               "Resource": [
-                   "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:naver-sms-automation/*"
-               ]
-           },
-           {
-               "Effect": "Allow",
-               "Action": [
-                   "kms:Decrypt"
-               ],
-               "Resource": [
-                   "arn:aws:kms:ap-northeast-2:ACCOUNT_ID:key/KEY_ID"
-               ],
-               "Condition": {
-                   "StringEquals": {
-                       "kms:ViaService": "secretsmanager.ap-northeast-2.amazonaws.com"
-                   }
-               }
-           }
-       ]
-   }
-   ```
-
-3. Download and securely store the access key and secret key
-4. Configure local profile as shown above
-
-## Step 2: Bootstrap Environment
-
-Run the bootstrap script to validate AWS setup and Secrets Manager access:
+### Step 1: Clone and Setup Environment
 
 ```bash
-source scripts/bootstrap_env.sh
-```
+# Clone repository
+git clone <your-repo-url>
+cd naver_sms_automation_refactoring
 
-This script:
-- ✓ Verifies AWS CLI is installed
-- ✓ Checks AWS credentials are configured
-- ✓ Validates all required secrets exist in Secrets Manager
-- ✓ Validates secret schemas (required fields present)
-- ✓ Sets required environment variables
-
-## Step 3: Set AWS Profile
-
-Tell the application which AWS profile to use:
-
-```bash
-# Option 1: Set for current shell session
-export AWS_PROFILE=naver-sms-dev
-
-# Option 2: Add to .env file (local, not checked in)
-echo "AWS_PROFILE=naver-sms-dev" > .env.local
-
-# Option 3: Set in IDE/editor configuration
-# PyCharm: Run → Edit Configurations → Environment variables
-# VS Code: .vscode/settings.json or launch.json
-```
-
-## Step 4: Install Dependencies
-
-```bash
-python -m venv venv
+# Create virtual environment
+python3.11 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
+# Install dependencies
 pip install -r requirements.txt
-pip install -e .  # Install package in development mode
 ```
 
-## Step 5: Verify Setup
+### Step 2: Configure Secrets
 
-Test that the application can fetch credentials:
+Create a `.env` file from the template:
 
 ```bash
-# Run unit tests for configuration loader
-python -m pytest tests/unit/test_config.py -v
-
-# Run integration tests with mock DynamoDB
-python -m pytest tests/integration/test_naver_auth_live.py -v
-
-# Test credential retrieval directly
-python -c "from src.config.settings import get_naver_credentials; creds = get_naver_credentials(); print('✓ Credentials loaded successfully')"
+cp .env.example .env
 ```
 
-## Fetching Temporary Credentials via AWS CLI
-
-If you need to manually verify credentials exist (debugging):
+Edit `.env` with your credentials from AWS Secrets Manager:
 
 ```bash
-# List available secrets
-aws secretsmanager list-secrets --filters "Key=name,Values=naver-sms-automation" --region ap-northeast-2 --profile naver-sms-dev
+# Naver Authentication
+NAVER_USERNAME=your_username
+NAVER_PASSWORD=your_password
 
-# Describe a specific secret (does NOT return secret value)
-aws secretsmanager describe-secret \
-    --secret-id naver-sms-automation/naver-credentials \
-    --region ap-northeast-2 \
-    --profile naver-sms-dev
+# SENS SMS API
+SENS_ACCESS_KEY=your_access_key
+SENS_SECRET_KEY=your_secret_key
+SENS_SERVICE_ID=your_service_id
 
-# Retrieve secret value (for debugging only - never log this!)
-# WARNING: This exposes credentials in shell history!
-aws secretsmanager get-secret-value \
-    --secret-id naver-sms-automation/naver-credentials \
-    --region ap-northeast-2 \
-    --profile naver-sms-dev \
-    --query 'SecretString' \
-    --output text | jq .
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+
+# Slack (optional)
+SLACK_ENABLED=false
+
+# AWS
+AWS_REGION=ap-northeast-2
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
 ```
 
-## Environment Variables
+**⚠️ WARNING:** Never commit `.env` file to git. Add to `.gitignore`.
 
-The application respects the following environment variables:
-
-### For AWS Secrets Manager (Recommended)
+### Step 3: Verify Installation
 
 ```bash
-# Use specific AWS region (defaults to ap-northeast-2)
-export AWS_REGION=ap-northeast-2
+# Run unit tests
+make test-unit
 
-# Use specific AWS profile
-export AWS_PROFILE=naver-sms-dev
+# Run integration tests
+make test-integration
+
+# Run all tests
+make test-all
 ```
 
-### For Local File-Based Development (Testing Only)
+## Docker Container Setup
 
-To use a local secrets file for testing without AWS access:
+### Building the Container
 
 ```bash
-# Enable local secrets file mode
-export USE_LOCAL_SECRETS_FILE=true
+# Build container image
+docker build -t naver-sms-automation:latest .
 
-# Path to local secrets JSON file (defaults to .local/secrets.json)
-export LOCAL_SECRETS_FILE_PATH=.local/secrets.json
+# Tag for ECR
+docker tag naver-sms-automation:latest \
+  654654307503.dkr.ecr.ap-northeast-2.amazonaws.com/naver-sms-automation:latest
 ```
 
-Local secrets file format:
+### Running Locally with Lambda RIE
 
-```json
-{
-    "naver": {
-        "username": "test_user",
-        "password": "test_pass123"
-    },
-    "sens": {
-        "access_key": "test_access_key",
-        "secret_key": "test_secret_key",
-        "service_id": "test_service_id"
-    },
-    "telegram": {
-        "bot_token": "test_bot_token",
-        "chat_id": "test_chat_id"
-    }
-}
-```
-
-**IMPORTANT:** Never commit `.local/secrets.json` to version control. Add to `.gitignore`:
+The **Lambda Runtime Interface Emulator** allows testing Lambda functions locally:
 
 ```bash
-echo ".local/" >> .gitignore
+# Start container with Lambda RIE
+docker run --rm \
+  -p 9000:8080 \
+  --env-file .env \
+  naver-sms-automation:latest
+
+# In another terminal, invoke the function:
+curl -X POST "http://localhost:9000/2015-03-31/functions/function/invocations" \
+  -d '{"scenario": "test_booking_001"}' \
+  -H "Content-Type: application/json"
 ```
 
-## Application Configuration
+## Running Tests Locally
 
-The application loads credentials from:
+### Unit Tests Only
 
-1. **AWS Secrets Manager** (production & recommended)
-   - Credentials are fetched on Lambda cold start
-   - Cached in memory for duration of execution
-   - Automatically redacted from CloudWatch Logs
+```bash
+# Run unit tests with coverage
+python -m pytest tests/unit/ -v --cov=src --cov-report=html
 
-2. **Local secrets file** (development/testing only)
-   - Only if `USE_LOCAL_SECRETS_FILE=true`
-   - Specified by `LOCAL_SECRETS_FILE_PATH`
-   - For testing without AWS credentials
+# Open HTML report
+open htmlcov/index.html
+```
 
-## Security Best Practices
+### Integration Tests
 
-### DO:
-- ✓ Use AWS profiles for local development
-- ✓ Use minimal IAM permissions (principle of least privilege)
-- ✓ Rotate IAM user credentials regularly
-- ✓ Use different profiles for dev/test/prod
-- ✓ Review bootstrap script output for security warnings
-- ✓ Enable CloudTrail logging for Secrets Manager access
-- ✓ Use MFA for IAM user accounts in production
+```bash
+# Run integration tests
+python -m pytest tests/integration/ -v
 
-### DON'T:
-- ✗ Never hardcode credentials in source files
-- ✗ Never commit `.env` files with credentials to git
-- ✗ Never echo/print secret values to logs or console
-- ✗ Never use root AWS account credentials for development
-- ✗ Never disable logging or CloudTrail
-- ✗ Never share IAM user credentials with other developers
+# Run regression tests (all bookings)
+python -m pytest tests/integration/test_rules_regression.py -v
+
+# Run failure scenario tests (new in Story 4.4)
+python -m pytest tests/integration/test_failure_scenarios.py -v
+
+# Run Slack integration tests (new in Story 4.4)
+python -m pytest tests/integration/test_slack_integration.py -v
+```
+
+### Comparison/Parity Tests
+
+```bash
+# Run comparison tests between implementations
+python -m pytest tests/comparison/test_output_parity.py -v
+
+# Run all scenarios parity check
+python -m pytest tests/comparison/test_output_parity.py::TestOutputParity::test_all_scenarios_parity -v
+
+# Run masking validation
+python -m pytest tests/comparison/test_output_parity.py::TestOutputParity::test_masking_enforcement -v
+```
+
+## Using Make Commands
+
+```bash
+# Display all available commands
+make help
+
+# Code formatting with Black
+make fmt
+
+# Linting and type checking
+make lint
+
+# Run all tests except comparison
+make test
+
+# Run unit tests only
+make test-unit
+
+# Run integration tests
+make test-integration
+
+# Run comparison/parity tests
+make comparison-test
+
+# Run all tests including comparison
+make test-all
+
+# Clean build artifacts
+make clean
+
+# Refresh comparison fixtures
+make comparison-refresh
+```
+
+## Debugging
+
+### Local Debugging
+
+```bash
+# Run tests with verbose output
+python -m pytest tests/integration/test_rules_regression.py::TestRulesRegression::test_booking_001_new_confirmation -v -s
+
+# Use Python debugger - add this in test:
+# import pdb; pdb.set_trace()
+```
+
+### Viewing Test Results
+
+```bash
+# Generate HTML coverage report
+python -m pytest tests/ --cov=src --cov-report=html
+open htmlcov/index.html
+
+# View comparison test artifacts
+ls -la tests/comparison/results/
+
+# View regression test artifacts
+ls -la tests/integration/artifacts/rule_engine_regression/
+```
+
+## Environment Variables Reference
+
+### Required
+
+```bash
+AWS_REGION                  # AWS region (default: ap-northeast-2)
+```
+
+### Development Only
+
+```bash
+NAVER_USERNAME              # Naver login username
+NAVER_PASSWORD              # Naver login password
+SENS_ACCESS_KEY            # SENS API access key
+SENS_SECRET_KEY            # SENS API secret key
+SENS_SERVICE_ID            # SENS service ID
+TELEGRAM_BOT_TOKEN         # Telegram bot token
+TELEGRAM_CHAT_ID           # Telegram chat ID
+```
+
+### Optional
+
+```bash
+SLACK_ENABLED              # Enable/disable Slack (default: false)
+DEBUG                      # Enable debug logging (default: false)
+```
 
 ## Troubleshooting
 
-### "Secret not found in Secrets Manager"
+### Tests Fail with Import Errors
 
 ```bash
-# Verify secret exists and you have access
-aws secretsmanager list-secrets --region ap-northeast-2 --profile naver-sms-dev
+# Reinstall dependencies
+pip install --force-reinstall -r requirements.txt
 
-# Check IAM permissions
-aws iam get-user-policy --user-name naver-sms-dev --policy-name <policy-name> --profile naver-sms-dev
+# Clear Python cache
+make clean
 ```
 
-### "Access denied" error
+### Coverage Threshold Failures
+
+When running tests, if coverage is below 80%:
 
 ```bash
-# Verify IAM policy is attached
-aws iam list-user-policies --user-name naver-sms-dev
+# Generate detailed coverage report
+python -m pytest tests/ --cov=src --cov-report=html --cov-report=term-missing
 
-# Test permissions with policy simulator
-aws iam simulate-principal-policy \
-    --policy-source-arn arn:aws:iam::ACCOUNT_ID:user/naver-sms-dev \
-    --action-names secretsmanager:GetSecretValue \
-    --resource-arns arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:naver-sms-automation/* \
-    --profile naver-sms-dev
+# View which lines need coverage
+open htmlcov/index.html
 ```
 
-### "KMS Decrypt failed"
-
-If using a custom KMS key for Secrets Manager encryption:
+### Docker Build Issues
 
 ```bash
-# Grant KMS permissions to IAM user
-aws kms create-grant \
-    --key-id KEY_ID \
-    --grantee-principal arn:aws:iam::ACCOUNT_ID:user/naver-sms-dev \
-    --operations Decrypt \
-    --region ap-northeast-2 \
-    --profile admin-profile
+# Clear Docker cache and rebuild
+docker system prune -a
+docker build --no-cache -t naver-sms-automation:latest .
 ```
 
-### Credentials cached too long in memory
+## Contributing
 
-The application caches credentials for the lifetime of the Lambda execution (typically seconds to minutes). For long-running processes, credentials refresh every 60 minutes automatically. To refresh manually:
+### Before Committing
 
-```python
-# Force reload credentials
-from src.config.settings import Settings
-creds = Settings.load_naver_credentials()  # Fetches fresh copy
+```bash
+# Format code
+make fmt
+
+# Lint and type check
+make lint
+
+# Run all tests
+make test-all
 ```
 
-## Integration with IDE
+## Next Steps
 
-### PyCharm
-
-1. Settings → Project → Python Interpreter
-2. Click gear icon → Edit → Environment Variables
-3. Add:
-   ```
-   AWS_PROFILE=naver-sms-dev
-   AWS_REGION=ap-northeast-2
-   ```
-
-### VS Code
-
-Create `.vscode/settings.json`:
-
-```json
-{
-    "python.envFile": "${workspaceFolder}/.env.local",
-    "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": [
-        "tests"
-    ]
-}
-```
-
-Create `.env.local` (not checked in):
-
-```
-AWS_PROFILE=naver-sms-dev
-AWS_REGION=ap-northeast-2
-```
-
-## Related Documentation
-
-- [Secrets Manager Setup](../../docs/infra/secrets-manager.md)
-- [Architecture - Configuration](../../docs/architecture.md)
-- [Story 1.2 - Setup Secrets Manager](../../docs/stories/1.2.setup-secrets-manager.md)
-- [Story 1.3 - Migrate Credentials](../../docs/stories/1.3.migrate-credentials-to-secrets-manager.md)
+- **Integration Testing Guide:** See `docs/testing/integration-testing.md`
+- **Architecture:** See `docs/brownfield-architecture.md`
