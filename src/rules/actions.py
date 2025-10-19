@@ -180,7 +180,8 @@ def send_sms(
         )
 
         # Route to correct SMS method based on template
-        if template == "confirm":
+        # Accept both "confirm" and "confirmation" as aliases
+        if template in ("confirm", "confirmation"):
             context.sms_service.send_confirm_sms(
                 phone=booking.phone,
                 store_id=None,  # Confirmation SMS not store-specific

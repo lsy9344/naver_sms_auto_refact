@@ -10,9 +10,11 @@ import logging
 import os
 import time
 from functools import lru_cache
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import boto3
+import jsonschema
+import yaml
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
@@ -106,6 +108,8 @@ class Settings:
         self._secrets_cache: Dict[str, Any] = {}
         self._cache_initialized = False
         self.secrets_client = None
+        self.rules: List[Dict[str, Any]] = []
+        self.rules_schema: Dict[str, Any] = {}
 
     def _get_secrets_client(self):
         """Lazy initialize Secrets Manager client."""
@@ -288,6 +292,67 @@ class Settings:
             )
         except json.JSONDecodeError as e:
             raise RuntimeError(f"Local secrets file contains invalid JSON: {str(e)}")
+
+    def load_rules(self, rules_config_path: str, schema_config_path: str) -> None:
+        """
+        Load rules from YAML configuration and validate against schema.
+
+        Args:
+            rules_config_path: Path to rules.yaml configuration file
+            schema_config_path: Path to rules.schema.json validation schema
+
+        Raises:
+            FileNotFoundError: If config files not found
+            ValueError: If rule schema is invalid
+            jsonschema.ValidationError: If rules don't match schema
+            yaml.YAMLError: If YAML parsing fails
+        """
+        # Load schema first
+        try:
+            with open(schema_config_path, "r", encoding="utf-8") as f:
+                self.rules_schema = json.load(f)
+                logger.debug(f"Loaded rules schema from {schema_config_path}")
+        except FileNotFoundError:
+            logger.error(f"Rules schema file not found: {schema_config_path}")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in rules schema: {e}")
+            raise ValueError(f"Invalid JSON in {schema_config_path}: {e}") from e
+
+        # Load and validate rules
+        try:
+            with open(rules_config_path, "r", encoding="utf-8") as f:
+                rules_config = yaml.safe_load(f)
+        except FileNotFoundError:
+            logger.error(f"Rules configuration file not found: {rules_config_path}")
+            raise
+        except yaml.YAMLError as e:
+            logger.error(f"Invalid YAML in rules configuration: {e}")
+            raise ValueError(f"Invalid YAML in {rules_config_path}: {e}") from e
+
+        if not rules_config:
+            logger.warning(f"Empty rules configuration: {rules_config_path}")
+            self.rules = []
+            return
+
+        # Validate against schema
+        try:
+            jsonschema.validate(instance=rules_config, schema=self.rules_schema)
+            logger.info(f"Rules configuration validated against schema")
+        except jsonschema.ValidationError as e:
+            logger.error(f"Rules configuration failed schema validation: {e.message}")
+            raise ValueError(
+                f"Rules configuration validation failed: {e.message}"
+            ) from e
+        except jsonschema.SchemaError as e:
+            logger.error(f"Rules schema is invalid: {e.message}")
+            raise ValueError(f"Rules schema is invalid: {e.message}") from e
+
+        # Extract and store rules
+        self.rules = rules_config.get("rules", [])
+        logger.info(
+            f"Successfully loaded {len(self.rules)} rules from {rules_config_path}"
+        )
 
     @staticmethod
     def setup_redaction_filter(logger_instance: logging.Logger) -> None:

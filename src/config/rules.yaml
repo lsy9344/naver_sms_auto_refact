@@ -1,0 +1,123 @@
+# rules.yaml - SMS Automation Rules Configuration
+# Version: 1.0
+# Last Updated: 2025-10-19 by James (Dev Agent)
+# Schema: config/rules.schema.json
+#
+# Change Log:
+#   - 2025-10-19: Version 1.0 created from Story 3.4 requirements
+
+rules:
+  # Rule 1: New Booking Confirmation
+  # Priority: HIGH - Ensures customers receive immediate confirmation
+  # Triggers when: New booking detected (not yet in DynamoDB)
+  # Expected behavior: Create DB record + send confirmation SMS + notify via Telegram
+  - name: "New Booking Confirmation"
+    enabled: true
+    description: "Send confirmation SMS when new booking detected in system"
+    tags: ["core", "confirmation"]
+    priority: "high"
+    conditions:
+      - type: "booking_not_in_db"
+    actions:
+      - type: "create_db_record"
+      - type: "send_sms"
+        params:
+          template: "confirmation"
+      - type: "send_telegram"
+        params:
+          message: "[SMS] Confirmation sent to customer"
+
+  # Rule 2: Two-Hour Reminder
+  # Priority: HIGH - Critical for reducing no-shows
+  # Triggers when: Booking is within 2 hours AND reminder SMS not yet sent
+  # Expected behavior: Send guide SMS + mark reminder flag as sent
+  - name: "Two-Hour Reminder"
+    enabled: true
+    description: "Send reminder SMS 2 hours before booking"
+    tags: ["core", "reminder"]
+    priority: "high"
+    conditions:
+      - type: "time_before_booking"
+        params:
+          hours: 2
+      - type: "flag_not_set"
+        params:
+          flag: "remind_sms"
+    actions:
+      - type: "send_sms"
+        params:
+          template: "guide"
+          store_specific: true
+      - type: "update_flag"
+        params:
+          flag: "remind_sms"
+          value: true
+
+  # Rule 3: Evening Option SMS
+  # Priority: MEDIUM - Increases engagement for customers with options
+  # Triggers when: Current time is 20:00 (8 PM) AND customer has option AND SMS not yet sent
+  # Expected behavior: Send event SMS + mark option SMS flag as sent
+  - name: "Evening Option SMS"
+    enabled: true
+    description: "Send option-related SMS at 8 PM for customers with option selections"
+    tags: ["core", "option"]
+    priority: "medium"
+    conditions:
+      - type: "current_hour"
+        params:
+          hour: 20
+      - type: "flag_not_set"
+        params:
+          flag: "option_sms"
+      - type: "has_option_keyword"
+        params:
+          keywords: ["네이버", "인스타", "원본"]
+    actions:
+      - type: "send_sms"
+        params:
+          template: "event"
+      - type: "update_flag"
+        params:
+          flag: "option_sms"
+          value: true
+
+  # Template: Slack Notification (DISABLED - Future Enhancement)
+  # This rule serves as a template for future implementation
+  # When enabled, sends SMS summary to Slack channel daily
+  - name: "Slack Notification (Template)"
+    enabled: false
+    description: "[FUTURE] Send SMS summary to Slack channel daily"
+    tags: ["future", "notification"]
+    priority: "low"
+    notes: "Requires Slack bot token and channel configuration"
+    conditions:
+      - type: "current_hour"
+        params:
+          hour: 22
+    actions:
+      - type: "send_slack"
+        params:
+          channel: "#sms-automation"
+          message: "Daily SMS Summary: [to be implemented]"
+
+  # Template: Date Range Promotion (DISABLED - Future Enhancement)
+  # This rule serves as a template for future implementation
+  # When enabled, sends promotional SMS only during specified date ranges
+  - name: "Date Range Promotion (Template)"
+    enabled: false
+    description: "[FUTURE] Send promotional SMS only during specified date ranges"
+    tags: ["future", "promotion"]
+    priority: "low"
+    notes: "Enable and configure store_ids and dates for targeted promotions"
+    conditions:
+      - type: "date_range"
+        params:
+          start_date: "2025-11-01"
+          end_date: "2025-11-30"
+      - type: "store_id_matches"
+        params:
+          store_ids: [1051707]
+    actions:
+      - type: "send_sms"
+        params:
+          template: "custom_promotion"

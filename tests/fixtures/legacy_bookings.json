@@ -1,0 +1,101 @@
+{
+  "bookings": [
+    {
+      "id": "booking_001",
+      "name": "New Booking - No DB Record",
+      "description": "Test Case 1: New booking detected (not yet in DynamoDB)",
+      "booking": {
+        "customer_phone": "01012345678",
+        "customer_name": "김철수",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T14:00:00",
+        "status": "confirmed"
+      },
+      "db_record": null,
+      "current_time": "2025-10-19T14:00:00",
+      "expected_rule_matches": ["New Booking Confirmation"]
+    },
+    {
+      "id": "booking_002",
+      "name": "Two-Hour Reminder - Should Trigger",
+      "description": "Test Case 2: Booking in 2-hour window AND reminder not yet sent",
+      "booking": {
+        "customer_phone": "01087654321",
+        "customer_name": "이영희",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T16:30:00",
+        "status": "confirmed"
+      },
+      "db_record": {
+        "booking_id": "booking_002",
+        "created_at": "2025-10-19T10:00:00",
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "current_time": "2025-10-19T14:35:00",
+      "expected_rule_matches": ["Two-Hour Reminder"]
+    },
+    {
+      "id": "booking_003",
+      "name": "Evening Option SMS - Should Trigger",
+      "description": "Test Case 3: Current time is 20:00 (8 PM) AND customer has option AND SMS not yet sent",
+      "booking": {
+        "customer_phone": "01056781234",
+        "customer_name": "박민수",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T19:00:00",
+        "status": "confirmed",
+        "option": "네이버"
+      },
+      "db_record": {
+        "booking_id": "booking_003",
+        "created_at": "2025-10-19T10:00:00",
+        "remind_sms": true,
+        "option_sms": false
+      },
+      "current_time": "2025-10-19T20:00:00",
+      "expected_rule_matches": ["Evening Option SMS"]
+    },
+    {
+      "id": "booking_004",
+      "name": "All Flags Set - No Rules Match",
+      "description": "Test Case 4: Booking already processed (all flags set)",
+      "booking": {
+        "customer_phone": "01098765432",
+        "customer_name": "최영수",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T18:00:00",
+        "status": "confirmed"
+      },
+      "db_record": {
+        "booking_id": "booking_004",
+        "created_at": "2025-10-19T10:00:00",
+        "remind_sms": true,
+        "option_sms": true
+      },
+      "current_time": "2025-10-19T14:30:00",
+      "expected_rule_matches": []
+    },
+    {
+      "id": "booking_005",
+      "name": "No Option Keyword - No Option SMS",
+      "description": "Test Case 5: Booking at 8 PM but no matching option keyword",
+      "booking": {
+        "customer_phone": "01011111111",
+        "customer_name": "정준호",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T19:00:00",
+        "status": "confirmed",
+        "option": "기타옵션"
+      },
+      "db_record": {
+        "booking_id": "booking_005",
+        "created_at": "2025-10-19T10:00:00",
+        "remind_sms": true,
+        "option_sms": false
+      },
+      "current_time": "2025-10-19T20:00:00",
+      "expected_rule_matches": []
+    }
+  ]
+}
