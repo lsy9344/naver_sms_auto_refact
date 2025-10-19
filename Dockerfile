@@ -22,24 +22,26 @@
 FROM public.ecr.aws/lambda/python:3.11
 
 # ============================================================================
-# Layer 1: System dependencies (ChromeDriver, Chrome, and build tools)
+# Layer 1: System dependencies
 # ============================================================================
 # Combine into single RUN to reduce layer count and image size
 #
-# Chrome installation via Google's official repository:
-#   - Stable release channel for Google Chrome
-#   - Automatically updated with security patches
-#   - Installed to /usr/bin/google-chrome for system-wide discovery
+# Dependencies:
+#   - ca-certificates: For SSL/TLS connections to APIs
+#   - chromedriver: WebDriver binary for Selenium automation
+#     * Installed from Amazon Linux 2 repository (chromium-chromedriver)
+#     * Symlinked to /usr/local/bin for PATH discovery
 #
-# ChromeDriver installation:
-#   - Installed from Amazon Linux 2 repository (chromium-chromedriver)
-#   - Matches Chrome major version for compatibility
-#   - Installed to /usr/bin/chromedriver
+# Chrome Browser:
+#   - NOT pre-installed (saves ~300MB image size)
+#   - Downloaded at runtime by webdriver-manager (Python package in requirements.txt)
+#   - Fallback: Can be manually installed if needed via system packages
 #
-# webdriver-manager:
-#   - Python package to automatically download/manage matching Chrome/ChromeDriver
-#   - Installed as part of requirements.txt for dynamic discovery
-#   - Fallback if system binaries not available
+# Design Rationale:
+#   - webdriver-manager handles automatic Chrome discovery/download
+#   - Provides version matching between Chrome and ChromeDriver
+#   - Reduces image size while maintaining compatibility
+#   - Follows Lambda best practice of minimal base image
 #
 # yum cleanup:
 #   - Remove package manager cache to save ~100MB per layer
@@ -47,21 +49,10 @@ FROM public.ecr.aws/lambda/python:3.11
 
 RUN yum update -y && \
     yum install -y \
-    wget \
-    unzip \
-    ca-certificates && \
+    ca-certificates \
+    chromium-chromedriver && \
     \
-    # Install Google Chrome stable (x86_64 for Lambda)
-    cd /tmp && \
-    wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-    yum install -y ./google-chrome-stable_current_x86_64.rpm && \
-    rm -f ./google-chrome-stable_current_x86_64.rpm && \
-    \
-    # Install ChromeDriver from Amazon Linux repository
-    yum install -y chromium-chromedriver && \
-    \
-    # Create symlinks for ease of discovery
-    ln -sf /usr/bin/chromium-browser /usr/bin/google-chrome || true && \
+    # Create symlinks for compatibility
     ln -sf /usr/bin/chromedriver /usr/local/bin/chromedriver && \
     \
     # Cleanup to minimize layer size
@@ -70,20 +61,20 @@ RUN yum update -y && \
     rm -rf /tmp/*
 
 # ============================================================================
-# Layer 2: Export Chrome/ChromeDriver paths for Selenium
+# Layer 2: Export Binary Paths for Selenium
 # ============================================================================
-# These environment variables allow Selenium to discover and use the
-# installed Chrome and ChromeDriver binaries without requiring PATH
-# modifications or hardcoded binary paths in code.
+# ChromeDriver binary location - explicitly set for Selenium
+# Chrome binary - will be downloaded by webdriver-manager at first runtime
 #
-# Naver login implementation (src/auth/naver_login.py) expects:
-#   - CHROME_BIN: Path to Chrome executable
-#   - CHROMEDRIVER_BIN: Path to ChromeDriver executable
+# webdriver-manager (Python package):
+#   - Automatically discovers system Chrome if available
+#   - Falls back to downloading Chrome to ~/.wdm/ if not found
+#   - Provides automatic version matching
 #
-# Fallback paths for webdriver-manager if system binaries not used:
-#   - These can be overridden by webdriver-manager cache at runtime
+# Alternative approach (if pre-installed Chrome needed):
+#   - Add: RUN yum install -y chromium-browser
+#   - Set: ENV CHROME_BIN=/usr/bin/chromium-browser
 
-ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_BIN=/usr/bin/chromedriver
 
 # ============================================================================
@@ -98,10 +89,13 @@ ENV CHROMEDRIVER_BIN=/usr/bin/chromedriver
 #   - Saves ~20-30MB per dependency
 #   - Trade-off: Slightly slower installs, but image is smaller
 #
-# webdriver-manager included in requirements.txt:
-#   - Automatically detects Chrome version at runtime
-#   - Downloads matching ChromeDriver if needed
-#   - Provides fallback binary discovery for compatibility
+# Key dependencies:
+#   - selenium==4.15.2: Browser automation
+#   - webdriver-manager==4.0.1: Automatic Chrome/ChromeDriver management
+#   - boto3==1.34.0: AWS SDK for DynamoDB, Lambda context
+#   - requests==2.31.0: HTTP client for APIs
+#   - PyYAML==6.0.2: Configuration file parsing
+#   - Other dependencies in requirements.txt
 
 COPY requirements.txt ${LAMBDA_TASK_ROOT}/
 
@@ -113,19 +107,13 @@ RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 # Copy project files into Lambda task root:
 #   - src/: Refactored modules (auth, api, rules, notifications, etc.)
 #   - config/: Runtime configuration (rules.yaml, stores.yaml, sms_templates.yaml)
-#   - bin/: Any utility scripts
 #
-# $LAMBDA_TASK_ROOT is set by AWS Lambda base image to:
-#   /var/task (on Lambda) or /var/task (in RIE emulator)
-#
+# $LAMBDA_TASK_ROOT is set by AWS Lambda base image to /var/task
 # Python PYTHONPATH automatically includes $LAMBDA_TASK_ROOT, so imports like
 # 'from src.auth.naver_login import NaverAuthenticator' work without modification.
 
 COPY src/ ${LAMBDA_TASK_ROOT}/src/
 COPY config/ ${LAMBDA_TASK_ROOT}/config/
-
-# Optional: Copy utility scripts if needed
-# COPY bin/ ${LAMBDA_TASK_ROOT}/bin/
 
 # ============================================================================
 # Lambda Entrypoint
