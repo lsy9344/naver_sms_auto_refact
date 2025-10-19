@@ -1,330 +1,229 @@
 """
-Structured JSON Logger for CloudWatch Integration
+Structured logging utility for the application.
 
-Provides:
-- JSON-formatted log output for CloudWatch ingestion
-- Correlation field injection (request_id, rule_name, action_type, status)
-- PII redaction (phone numbers, secret values)
-- Structured logging with custom fields
+Provides JSON-formatted logging with built-in phone number masking,
+context injection, and operation timing for CloudWatch integration.
 """
 
 import json
 import logging
-import os
-import re
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from functools import wraps
 
 
-class PiiRedactor:
-    """Redacts personally identifiable information from log output."""
+def mask_phone(phone: str) -> str:
+    """
+    Mask phone number to preserve privacy in logs.
 
-    # Phone number pattern (10-digit Korean mobile)
-    PHONE_PATTERN = re.compile(r"01[016-9]-\d{3,4}-\d{4}")
+    Format: 010-XXXX-5678 (keeps last 4 digits, masks middle 4)
 
-    @staticmethod
-    def redact_phone_number(text: str) -> str:
-        """
-        Redact phone numbers to format: 010-****-5678 (keep last 4 digits visible).
+    Args:
+        phone: Phone number in format "010-XXXX-XXXX" or "010XXXXXXXX"
 
-        Args:
-            text: Text potentially containing phone numbers
+    Returns:
+        Masked phone number string
 
-        Returns:
-            Text with phone numbers redacted
-        """
-        def mask_phone(match):
-            phone = match.group()
-            # Keep first 4 chars (010-) and last 4 digits (-5678), mask middle
-            parts = phone.split("-")
-            if len(parts) == 3:
-                return f"{parts[0]}-****-{parts[2]}"
-            return phone
+    Example:
+        >>> mask_phone("010-1234-5678")
+        "010-****-5678"
+        >>> mask_phone("01012345678")
+        "010-****-5678"
+    """
+    if not phone:
+        return "unknown"
 
-        return PiiRedactor.PHONE_PATTERN.sub(mask_phone, text)
+    # Normalize: remove hyphens
+    clean_phone = phone.replace("-", "")
 
-    @staticmethod
-    def redact_secrets(text: str, secret_patterns: Optional[Dict[str, str]] = None) -> str:
-        """
-        Redact secret values from text.
+    if len(clean_phone) < 8:
+        return "invalid"
 
-        Args:
-            text: Text potentially containing secrets
-            secret_patterns: Dict of secret_name -> secret_value to redact
-
-        Returns:
-            Text with secrets redacted as ***REDACTED***
-        """
-        if not secret_patterns:
-            return text
-
-        redacted = text
-        for secret_value in secret_patterns.values():
-            if isinstance(secret_value, str) and len(secret_value) > 3:
-                redacted = redacted.replace(secret_value, "***REDACTED***")
-
-        return redacted
-
-    @staticmethod
-    def redact_value(value: Any, secret_patterns: Optional[Dict[str, str]] = None) -> Any:
-        """
-        Recursively redact PII and secrets from a value.
-
-        Args:
-            value: Value to redact (str, dict, list, or other)
-            secret_patterns: Optional dict of secrets to redact
-
-        Returns:
-            Redacted value
-        """
-        if isinstance(value, str):
-            redacted = PiiRedactor.redact_phone_number(value)
-            redacted = PiiRedactor.redact_secrets(redacted, secret_patterns)
-            return redacted
-        elif isinstance(value, dict):
-            return {
-                k: PiiRedactor.redact_value(v, secret_patterns)
-                for k, v in value.items()
-            }
-        elif isinstance(value, (list, tuple)):
-            return type(value)(
-                PiiRedactor.redact_value(item, secret_patterns)
-                for item in value
-            )
-        else:
-            return value
-
-
-class JsonFormatter(logging.Formatter):
-    """Custom JSON formatter for structured logging."""
-
-    def __init__(self, secret_patterns: Optional[Dict[str, str]] = None):
-        """
-        Initialize JSON formatter.
-
-        Args:
-            secret_patterns: Optional dict of secrets to redact
-        """
-        super().__init__()
-        self.secret_patterns = secret_patterns
-
-    def format(self, record: logging.LogRecord) -> str:
-        """
-        Format log record as JSON.
-
-        Args:
-            record: Log record
-
-        Returns:
-            JSON-formatted log line
-        """
-        # Get message and redact PII
-        message = record.getMessage()
-        message = PiiRedactor.redact_phone_number(message)
-        message = PiiRedactor.redact_secrets(message, self.secret_patterns)
-
-        log_obj = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": message,
-        }
-
-        # Add correlation fields if present in extra
-        if hasattr(record, "fields"):
-            for key, value in record.fields.items():
-                log_obj[key] = PiiRedactor.redact_value(value, self.secret_patterns)
-
-        # Add exception info if present
-        if record.exc_info:
-            log_obj["exception"] = self.formatException(record.exc_info)
-
-        return json.dumps(log_obj, default=str)
+    # Format: 010-****-XXXX (last 4 digits visible)
+    return f"{clean_phone[:3]}-****-{clean_phone[-4:]}"
 
 
 class StructuredLogger:
-    """Structured logger with correlation fields and PII redaction."""
+    """
+    JSON-formatted logger with context injection and operation timing.
 
-    def __init__(
-        self,
-        name: str,
-        log_level: Optional[str] = None,
-        secret_patterns: Optional[Dict[str, str]] = None,
-    ):
+    All log output is JSON format for CloudWatch integration and easier parsing.
+    """
+
+    def __init__(self, name: str):
         """
         Initialize structured logger.
 
         Args:
-            name: Logger name
-            log_level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-            secret_patterns: Optional dict of secrets to redact
+            name: Logger name (typically __name__ from calling module)
         """
         self.logger = logging.getLogger(name)
+        self.logger.setLevel(logging.DEBUG)
 
-        # Set log level from env or parameter
-        log_level_str = log_level or os.getenv("LOG_LEVEL", "INFO")
-        self.logger.setLevel(log_level_str.upper())
+        # Create console handler with JSON formatting
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.DEBUG)
 
-        # Remove existing handlers
-        self.logger.handlers = []
+            # JSON formatter
+            formatter = logging.Formatter("%(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
-        # Create stream handler with JSON formatter
-        handler = logging.StreamHandler()
-        formatter = JsonFormatter(secret_patterns=secret_patterns)
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-
-        # Store for use in logging methods
-        self.secret_patterns = secret_patterns
-
-    def _log(
+    def _format_log(
         self,
-        level: int,
+        level: str,
         message: str,
-        request_id: Optional[str] = None,
-        rule_name: Optional[str] = None,
-        action_type: Optional[str] = None,
-        status: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
+        operation: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        duration_ms: Optional[float] = None,
+        error: Optional[str] = None,
+    ) -> str:
         """
-        Log with correlation fields.
+        Format log entry as JSON.
 
         Args:
-            level: Log level
-            message: Log message
-            request_id: Request correlation ID
-            rule_name: Name of rule (if applicable)
-            action_type: Type of action (e.g., send_sms, login)
-            status: Status (e.g., success, failure)
-            **kwargs: Additional fields to include in log
+            level: Log level (DEBUG, INFO, WARNING, ERROR)
+            message: Human-readable message
+            operation: Operation name (e.g., "get_booking", "update_flag")
+            context: Context dict with booking_id, store_id, etc.
+            duration_ms: Operation duration in milliseconds
+            error: Error message if applicable
+
+        Returns:
+            JSON-formatted log string
         """
-        extra_fields = {
-            "fields": {
-                **kwargs,
-            }
+        log_entry: Dict[str, Any] = {
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "level": level,
+            "message": message,
         }
 
-        # Add correlation fields if provided
-        if request_id:
-            extra_fields["fields"]["request_id"] = request_id
-        if rule_name:
-            extra_fields["fields"]["rule_name"] = rule_name
-        if action_type:
-            extra_fields["fields"]["action_type"] = action_type
-        if status:
-            extra_fields["fields"]["status"] = status
+        if operation:
+            log_entry["operation"] = operation
 
-        self.logger.log(level, message, extra=extra_fields)
+        if context:
+            log_entry["context"] = context
+
+        if duration_ms is not None:
+            log_entry["duration_ms"] = round(duration_ms, 2)
+
+        if error:
+            log_entry["error"] = error
+
+        return json.dumps(log_entry, ensure_ascii=False)
 
     def debug(
         self,
         message: str,
-        request_id: Optional[str] = None,
-        rule_name: Optional[str] = None,
-        action_type: Optional[str] = None,
-        status: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log at DEBUG level with correlation fields."""
-        self._log(
-            logging.DEBUG,
-            message,
-            request_id=request_id,
-            rule_name=rule_name,
-            action_type=action_type,
-            status=status,
-            **kwargs,
-        )
+        operation: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ):
+        """Log debug message."""
+        log_json = self._format_log("DEBUG", message, operation, context)
+        self.logger.debug(log_json)
 
     def info(
         self,
         message: str,
-        request_id: Optional[str] = None,
-        rule_name: Optional[str] = None,
-        action_type: Optional[str] = None,
-        status: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log at INFO level with correlation fields."""
-        self._log(
-            logging.INFO,
-            message,
-            request_id=request_id,
-            rule_name=rule_name,
-            action_type=action_type,
-            status=status,
-            **kwargs,
-        )
+        operation: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        duration_ms: Optional[float] = None,
+    ):
+        """Log info message."""
+        log_json = self._format_log("INFO", message, operation, context, duration_ms)
+        self.logger.info(log_json)
 
     def warning(
         self,
         message: str,
-        request_id: Optional[str] = None,
-        rule_name: Optional[str] = None,
-        action_type: Optional[str] = None,
-        status: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log at WARNING level with correlation fields."""
-        self._log(
-            logging.WARNING,
-            message,
-            request_id=request_id,
-            rule_name=rule_name,
-            action_type=action_type,
-            status=status,
-            **kwargs,
-        )
+        operation: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+    ):
+        """Log warning message."""
+        log_json = self._format_log("WARNING", message, operation, context, error=error)
+        self.logger.warning(log_json)
 
     def error(
         self,
         message: str,
-        request_id: Optional[str] = None,
-        rule_name: Optional[str] = None,
-        action_type: Optional[str] = None,
-        status: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log at ERROR level with correlation fields."""
-        self._log(
-            logging.ERROR,
-            message,
-            request_id=request_id,
-            rule_name=rule_name,
-            action_type=action_type,
-            status=status,
-            **kwargs,
+        operation: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+        duration_ms: Optional[float] = None,
+    ):
+        """Log error message."""
+        log_json = self._format_log(
+            "ERROR", message, operation, context, duration_ms, error
         )
-
-    def critical(
-        self,
-        message: str,
-        request_id: Optional[str] = None,
-        rule_name: Optional[str] = None,
-        action_type: Optional[str] = None,
-        status: Optional[str] = None,
-        **kwargs: Any,
-    ) -> None:
-        """Log at CRITICAL level with correlation fields."""
-        self._log(
-            logging.CRITICAL,
-            message,
-            request_id=request_id,
-            rule_name=rule_name,
-            action_type=action_type,
-            status=status,
-            **kwargs,
-        )
+        self.logger.error(log_json)
 
 
-# Module-level convenience function
+def log_operation(operation_name: str):
+    """
+    Decorator to automatically log operation start, duration, and completion.
+
+    Usage:
+        @log_operation("get_booking")
+        def get_booking(prefix, phone):
+            ...
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            logger = StructuredLogger(func.__module__)
+
+            # Build context from function signature
+            context = {
+                "function": func.__name__,
+            }
+
+            # Add booking_id/phone if available
+            if len(args) > 0:
+                context["arg_count"] = len(args)
+            if "phone" in kwargs:
+                context["phone_masked"] = mask_phone(kwargs["phone"])
+
+            logger.debug(
+                f"Starting {operation_name}", operation=operation_name, context=context
+            )
+
+            start_time = time.time()
+            try:
+                result = func(*args, **kwargs)
+                duration_ms = (time.time() - start_time) * 1000
+                logger.info(
+                    f"Completed {operation_name}",
+                    operation=operation_name,
+                    context=context,
+                    duration_ms=duration_ms,
+                )
+                return result
+            except Exception as e:
+                duration_ms = (time.time() - start_time) * 1000
+                logger.error(
+                    f"Failed {operation_name}",
+                    operation=operation_name,
+                    context=context,
+                    error=str(e),
+                    duration_ms=duration_ms,
+                )
+                raise
+
+        return wrapper
+
+    return decorator
+
+
 def get_logger(name: str) -> StructuredLogger:
     """
-    Get or create a structured logger.
+    Factory function to get a structured logger instance.
 
     Args:
-        name: Logger name
+        name: Logger name (typically __name__ from calling module)
 
     Returns:
         StructuredLogger instance

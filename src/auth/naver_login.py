@@ -7,6 +7,10 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 
+from ..utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class NaverAuthenticator:
     """Exact extraction of the legacy Naver login flow."""
@@ -31,7 +35,11 @@ class NaverAuthenticator:
         chrome_options.add_argument('--data-path=/tmp/data-path')
         chrome_options.add_argument('--homedir=/tmp')
         chrome_options.add_argument('--disk-cache-dir=/tmp/cache-dir')
-        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        user_agent = (
+            "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        chrome_options.add_argument(user_agent)
 
         service = Service(executable_path='/opt/chromedriver')
 
@@ -48,22 +56,27 @@ class NaverAuthenticator:
         dynamodb_session = self.session_manager
 
         if not cached_cookies:
-            print('로그인')
-            print("쿠키 없음, 로그인 진행")
+            logger.info("Starting fresh Naver login", operation="naver_login")
+            msg = "No cached cookies, proceeding with Selenium login"
+            logger.debug(msg, operation="naver_login")
 
             driver.get('https://nid.naver.com/nidlogin.login')
-            time.sleep(uniform(2,4))
+            time.sleep(uniform(2, 4))
 
-            driver.execute_script(f"document.getElementsByName('id')[0].value='{userid}'")
-            time.sleep(uniform(0.7,1.3))
-            driver.execute_script(f"document.getElementsByName('pw')[0].value='{userpw}'")
-            time.sleep(uniform(0.7,1.3))
+            driver.execute_script(
+                f"document.getElementsByName('id')[0].value='{userid}'"
+            )
+            time.sleep(uniform(0.7, 1.3))
+            driver.execute_script(
+                f"document.getElementsByName('pw')[0].value='{userpw}'"
+            )
+            time.sleep(uniform(0.7, 1.3))
 
             driver.find_element(By.ID, 'log.login').click()
-            time.sleep(uniform(2.5,5))
+            time.sleep(uniform(2.5, 5))
 
             driver.get('https://new.smartplace.naver.com/')
-            time.sleep(uniform(2,4))
+            time.sleep(uniform(2, 4))
             cookies = driver.get_cookies()
 
             session_cookie = json.dumps(cookies)
@@ -75,13 +88,21 @@ class NaverAuthenticator:
                 driver.add_cookie(cookie)
 
             driver.get('https://new.smartplace.naver.com/profile')
-            print("쿠키 로그인 확인중")
-            time.sleep(uniform(1,2.5))
+            logger.debug("Validating cached cookie", operation="naver_login_cached")
+            time.sleep(uniform(1, 2.5))
 
             if 'login' in driver.current_url:
-                print("쿠키 로그인 실패, 쿠키 재발급 진행")
+                msg = "Cookie validation failed, re-authenticating"
+                logger.warning(
+                    msg, operation="naver_login_cached",
+                    error="Cached cookie invalid"
+                )
                 return self.login(None)
             else:
+                logger.info(
+                    "Cached cookie validation successful",
+                    operation="naver_login_cached"
+                )
                 return cached_cookies
 
     def get_session(self):

@@ -8,18 +8,17 @@ session for booking API calls. Credentials are loaded from AWS Secrets Manager.
 import json
 import logging
 import boto3
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from auth.naver_login import NaverAuthenticator
-from auth.session_manager import SessionManager
-from config.settings import (
+from .auth.naver_login import NaverAuthenticator
+from .auth.session_manager import SessionManager
+from .config.settings import (
     get_naver_credentials,
-    get_sens_credentials,
-    get_telegram_credentials,
     setup_logging_redaction,
 )
+from .utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # AWS clients
 dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-2')
@@ -54,15 +53,16 @@ def lambda_handler(event, context):
 
         # 1. Load credentials from Secrets Manager
         naver_creds = get_naver_credentials()
-        
+
         # 2. Initialize session manager (for DynamoDB cookie storage)
         session_mgr = SessionManager(dynamodb)
 
         # 3. Get cached cookies if available
         cached_cookies = session_mgr.get_cookies()
-        logger.info(f"Cached cookies: {len(cached_cookies) if cached_cookies else 0}")
+        ccount = len(cached_cookies) if cached_cookies else 0
+        logger.info(f"Cached cookies: {ccount}")
 
-        # 4. Initialize authenticator with credentials from Secrets Manager
+        # 4. Initialize authenticator
         authenticator = NaverAuthenticator(
             username=naver_creds['username'],
             password=naver_creds['password'],
@@ -71,19 +71,20 @@ def lambda_handler(event, context):
 
         # 5. Authenticate (uses cached cookies or fresh login)
         cookies = authenticator.login(cached_cookies=cached_cookies)
-        logger.info(f"Authentication successful: {len(cookies)} cookies")
+        cookie_count = len(cookies)
+        logger.info(f"Authentication successful: {cookie_count} cookies")
 
         # 6. Get authenticated requests.Session for API calls
         api_session = authenticator.get_session()
 
         # 7. Fetch booking data from Naver API
-        # (Implementation depends on booking API structure)
         user_data = fetch_bookings(api_session)
         logger.info(f"Fetched {len(user_data)} bookings")
 
         # 8. Process bookings and send SMS
         sms_results = process_bookings(user_data)
-        logger.info(f"SMS processing complete: {len(sms_results)} results")
+        result_count = len(sms_results)
+        logger.info(f"SMS processing complete: {result_count} results")
 
         # 9. Cleanup
         authenticator.cleanup()
@@ -101,10 +102,10 @@ def lambda_handler(event, context):
 
     except Exception as e:
         logger.error(f"Error in lambda_handler: {e}", exc_info=True)
-        
+
         # Send error notification
         notify_error(str(e))
-        
+
         return {
             'statusCode': 500,
             'body': json.dumps({
@@ -126,11 +127,11 @@ def fetch_bookings(session):
         list: Booking data from API
     """
     logger.info("Fetching bookings from Naver API")
-    
+
     # TODO: Implement booking API calls
     # Use session.get() for authenticated requests
     # API endpoints documented in architecture.md
-    
+
     return []
 
 
@@ -145,13 +146,13 @@ def process_bookings(user_data):
         list: Processing results
     """
     logger.info(f"Processing {len(user_data)} bookings")
-    
+
     results = []
     for booking in user_data:
         # TODO: Implement booking processing logic
         # Check SMS status, send notifications, update DynamoDB
         pass
-    
+
     return results
 
 
@@ -176,4 +177,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
     result = lambda_handler({}, MockContext())
-    print(json.dumps(result, indent=2))
+    logger.info("Lambda handler result", context={"result": result})
+    # For direct output, use logger instead of print
+    import sys
+    json.dump(result, sys.stdout, indent=2)

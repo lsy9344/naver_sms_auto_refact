@@ -1,0 +1,96 @@
+# Rule Engine Configuration
+# 
+# This file defines all business rules for automated SMS processing.
+# Rules are evaluated in order, and matched rules execute their actions.
+#
+# Rule Structure:
+#   - name: Unique rule identifier
+#   - enabled: true/false to enable/disable the rule
+#   - description: Human-readable purpose
+#   - conditions: List of conditions (ALL must pass - AND logic)
+#   - actions: List of actions to execute (in order)
+
+rules:
+  # Rule 1: New Booking Confirmation
+  # When: A new booking is detected (not in database)
+  # Actions: Create DB record, send confirmation SMS
+  # AC1, AC2, AC3, AC4, AC8
+  - name: "New Booking Confirmation"
+    description: "Send confirmation SMS to new bookings"
+    enabled: true
+    conditions:
+      - type: "booking_not_in_db"
+        params: {}
+    actions:
+      - type: "create_db_record"
+        params: {}
+      - type: "send_sms"
+        params:
+          template: "confirmation"
+
+  # Rule 2: Two Hour Reminder
+  # When: Booking is within 2 hours AND reminder SMS not sent yet
+  # Actions: Send reminder SMS, update flag
+  # AC3, AC4, AC5, AC6, AC8
+  - name: "Two Hour Reminder"
+    description: "Send guide SMS 2 hours before reservation"
+    enabled: true
+    conditions:
+      - type: "time_before_booking"
+        params:
+          hours: 2
+      - type: "flag_not_set"
+        params:
+          flag: "remind_sms"
+    actions:
+      - type: "send_sms"
+        params:
+          template: "guide"
+          store_specific: true
+      - type: "update_flag"
+        params:
+          flag: "remind_sms"
+          value: true
+
+  # Rule 3: Evening Event SMS
+  # When: It's 8 PM AND booking is completed AND option SMS not sent AND booking has options
+  # Actions: Send event SMS, update flag
+  # AC3, AC4, AC5, AC8
+  - name: "Evening Event SMS"
+    description: "Send event SMS at 8 PM for completed bookings with options"
+    enabled: true
+    conditions:
+      - type: "current_hour"
+        params:
+          hour: 20
+      - type: "booking_status"
+        params:
+          status: "RC08"
+      - type: "flag_not_set"
+        params:
+          flag: "option_sms"
+      - type: "has_option_keyword"
+        params: {}
+    actions:
+      - type: "send_sms"
+        params:
+          template: "event"
+      - type: "update_flag"
+        params:
+          flag: "option_sms"
+          value: true
+
+  # Example: Disabled rule (shows how to disable without deleting)
+  # Can be re-enabled by changing enabled: false to enabled: true
+  - name: "Future Feature - Slack Notification"
+    description: "Send Slack notification for high-value bookings"
+    enabled: false
+    conditions:
+      - type: "booking_amount_over"
+        params:
+          amount: 100000
+    actions:
+      - type: "send_slack"
+        params:
+          channel: "#bookings"
+          priority: "high"

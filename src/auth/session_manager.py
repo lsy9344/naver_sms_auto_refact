@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class SessionManager:
     """
     Manages session cookies in DynamoDB.
-    
+
     Handles persistence and retrieval of Naver authentication cookies
     to enable cookie reuse across Lambda invocations.
     """
@@ -74,11 +74,12 @@ class SessionManager:
                 'cookies': cookies_json
             })
 
-            if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+            http_status = response['ResponseMetadata']['HTTPStatusCode']
+            if http_status == 200:
                 logger.info("Cookies saved to DynamoDB successfully")
                 return True
             else:
-                logger.error(f"DynamoDB put_item failed with status {response['ResponseMetadata']['HTTPStatusCode']}")
+                logger.error(f"DynamoDB put_item failed with status {http_status}")
                 return False
         except Exception as e:
             logger.error(f"Error saving cookies: {e}")
