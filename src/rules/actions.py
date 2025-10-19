@@ -328,8 +328,11 @@ def create_db_record(
 
 def update_flag(
     context: ActionContext,
-    flag_name: str,
-    flag_value: bool = True,
+    flag: Optional[str] = None,
+    value: Optional[bool] = None,
+    *,
+    flag_name: Optional[str] = None,
+    flag_value: Optional[bool] = None,
 ) -> None:
     """
     Update a single DynamoDB boolean flag on a booking.
@@ -340,8 +343,10 @@ def update_flag(
 
     Args:
         context: ActionContext with booking and db_repo
-        flag_name: Flag to update ("confirm_sms", "remind_sms", "option_sms")
-        flag_value: New flag value (default True)
+        flag: Flag to update (schema-aligned name, e.g., "remind_sms")
+        value: New flag value (default True when omitted)
+        flag_name: Backwards-compatible alias for `flag`
+        flag_value: Backwards-compatible alias for `value`
 
     Raises:
         ActionExecutionError: Wraps DynamoDB exceptions with context
@@ -349,31 +354,40 @@ def update_flag(
 
     Example:
         context = ActionContext(...)
-        update_flag(context, "confirm_sms", True)
-        update_flag(context, "remind_sms", flag_value=True)
+        update_flag(context, "confirm_sms", True)  # positional usage
+        update_flag(context, flag="remind_sms", value=True)  # YAML schema usage
+        update_flag(context, flag_name="option_sms", flag_value=False)  # legacy alias support
     """
     booking = context.booking
     logger = context.logger
     db_repo = context.db_repo
 
+    effective_flag = flag_name or flag
+    desired_value = (
+        flag_value if flag_value is not None else value if value is not None else True
+    )
+
     operation = "update_flag"
     log_context = {
         "booking_id": booking.booking_num,
         "phone_masked": context.logger.logger.name,
-        "flag": flag_name,
-        "value": flag_value,
+        "flag": effective_flag,
+        "value": desired_value,
     }
 
     try:
+        if effective_flag is None:
+            raise ValueError("update_flag requires `flag` (or `flag_name`) parameter")
+
         # Validate flag name
         valid_flags = {"confirm_sms", "remind_sms", "option_sms"}
-        if flag_name not in valid_flags:
+        if effective_flag not in valid_flags:
             raise ValueError(
-                f"Invalid flag name '{flag_name}'. Must be one of: {valid_flags}"
+                f"Invalid flag name '{effective_flag}'. Must be one of: {valid_flags}"
             )
 
         logger.debug(
-            f"Updating {flag_name} flag",
+            f"Updating {effective_flag} flag",
             operation=operation,
             context=log_context,
         )
@@ -389,14 +403,14 @@ def update_flag(
 
         # Extract flag value from current record (handle both dict and Booking types)
         if isinstance(current, dict):
-            current_value = current.get(flag_name, False)
+            current_value = current.get(effective_flag, False)
         else:
-            current_value = getattr(current, flag_name, False)
+            current_value = getattr(current, effective_flag, False)
 
         # Idempotency check: if already set to desired value, skip update
-        if current_value == flag_value:
+        if current_value == desired_value:
             logger.debug(
-                f"Flag {flag_name} already set to {flag_value}, skipping update",
+                f"Flag {effective_flag} already set to {desired_value}, skipping update",
                 operation=operation,
                 context=log_context,
             )
@@ -406,12 +420,12 @@ def update_flag(
         db_repo.update_flag(
             prefix=booking.booking_num,
             phone=booking.phone,
-            flag_name=flag_name,
-            value=flag_value,
+            flag_name=effective_flag,
+            value=desired_value,
         )
 
         logger.info(
-            f"Flag {flag_name} updated to {flag_value}",
+            f"Flag {effective_flag} updated to {desired_value}",
             operation=operation,
             context=log_context,
         )
@@ -427,7 +441,7 @@ def update_flag(
             executor_name="update_flag",
             booking_id=booking.booking_num,
             original_error=e,
-            context_data={"flag": flag_name, "value": flag_value},
+            context_data={"flag": effective_flag, "value": desired_value},
         ) from e
 
     except Exception as e:
@@ -441,7 +455,7 @@ def update_flag(
             executor_name="update_flag",
             booking_id=booking.booking_num,
             original_error=e,
-            context_data={"flag": flag_name, "value": flag_value},
+            context_data={"flag": effective_flag, "value": desired_value},
         ) from e
 
 

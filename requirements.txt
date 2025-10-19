@@ -5,3 +5,5 @@ pytest==7.4.3
 moto==4.2.14
 PyYAML==6.0.2
 jsonschema==4.20.0
+pytest-cov==4.1.0
+bandit==1.7.5

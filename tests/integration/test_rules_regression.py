@@ -22,7 +22,7 @@ Acceptance Criteria Coverage:
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Tuple
 
 import pytest
 
@@ -54,6 +54,60 @@ from rules.actions import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class InMemoryBookingRepository:
+    """In-memory replacement for BookingRepository to support regression tests."""
+
+    def __init__(self) -> None:
+        """Initialise repository store."""
+        self.records: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+    def seed_record(
+        self, booking_num: str, phone: str, record: Dict[str, Any]
+    ) -> None:
+        """Seed repository with an existing booking record."""
+        base = {
+            "booking_num": booking_num,
+            "phone": phone,
+            "confirm_sms": bool(record.get("confirm_sms", False)),
+            "remind_sms": bool(record.get("remind_sms", False)),
+            "option_sms": bool(record.get("option_sms", False)),
+            "option_time": record.get("option_time", ""),
+        }
+        self.records[(booking_num, phone)] = {**base, **record}
+
+    def remove_record(self, booking_num: str, phone: str) -> None:
+        """Remove record if present."""
+        self.records.pop((booking_num, phone), None)
+
+    def create_booking(self, record: Dict[str, Any]) -> bool:
+        """Create a new booking record."""
+        booking_num = record["booking_num"]
+        phone = record["phone"]
+        self.seed_record(booking_num, phone, record)
+        return True
+
+    def get_booking(self, prefix: str, phone: str) -> Dict[str, Any] | None:
+        """Fetch booking if it exists."""
+        return self.records.get((prefix, phone))
+
+    def update_flag(
+        self, *, prefix: str, phone: str, flag_name: str, value: bool
+    ) -> bool:
+        """Update flag and persist value."""
+        record = self.records.setdefault(
+            (prefix, phone),
+            {
+                "booking_num": prefix,
+                "phone": phone,
+                "confirm_sms": False,
+                "remind_sms": False,
+                "option_sms": False,
+            },
+        )
+        record[flag_name] = value
+        return True
 
 
 class ActionContext:
@@ -126,20 +180,32 @@ class RegressionTestFixture:
 class RegressionTestRunner:
     """Run regression tests against rule engine."""
 
-    def __init__(self, rule_engine: RuleEngine, fixtures: RegressionTestFixture):
+    def __init__(
+        self, rule_engine: RuleEngine, fixtures: RegressionTestFixture
+    ):
         """Initialize test runner."""
         self.engine = rule_engine
         self.fixtures = fixtures
         self.results = []
+        self.db_repo = getattr(rule_engine, "_db_repo_for_tests", None)
 
     def build_context(self, booking: Dict[str, Any]) -> Dict[str, Any]:
         """Build execution context from booking fixture, converting to domain objects."""
         from datetime import datetime
 
-        current_time_str = booking.get("current_time", "")
-        current_time = (
-            datetime.fromisoformat(current_time_str) if current_time_str else None
-        )
+        def parse_datetime(value: str) -> Optional[datetime]:
+            if not value:
+                return None
+            try:
+                return datetime.fromisoformat(value)
+            except ValueError:
+                normalized = value.replace(" ", "T")
+                try:
+                    return datetime.fromisoformat(normalized)
+                except ValueError:
+                    return None
+
+        current_time = parse_datetime(booking.get("current_time", ""))
 
         # Convert fixture booking dict to Booking dataclass
         # Extract and prepare booking data from fixture
@@ -182,6 +248,20 @@ class RegressionTestRunner:
         if extra_fields:
             booking_obj.extra_fields = extra_fields
 
+        reserve_at = parse_datetime(booking_data.get("booking_time", ""))
+        if reserve_at:
+            booking_obj.reserve_at = reserve_at
+
+        option_value = booking_data.get("option")
+        if option_value:
+            # Preserve raw option value and seed keywords for matcher
+            booking_obj.option = option_value
+            booking_obj.option_keywords = (
+                [option_value] if isinstance(option_value, str) else option_value
+            )
+        elif booking_data.get("option_keywords"):
+            booking_obj.option_keywords = booking_data["option_keywords"]
+
         # Get DB record if present
         db_record = booking.get("db_record")
         if db_record:
@@ -209,6 +289,24 @@ class RegressionTestRunner:
         # Build context - pass dict directly to engine (not wrapped)
         context_dict = self.build_context(booking)
 
+        # Seed repository for update_flag parity
+        if self.db_repo is not None:
+            booking_obj: Booking = context_dict["booking"]
+            db_record = context_dict.get("db_record")
+            if db_record:
+                seed_record = {
+                    "booking_num": booking_obj.booking_num,
+                    "phone": booking_obj.phone,
+                    **db_record,
+                }
+                self.db_repo.seed_record(
+                    booking_obj.booking_num, booking_obj.phone, seed_record
+                )
+            else:
+                self.db_repo.remove_record(
+                    booking_obj.booking_num, booking_obj.phone
+                )
+
         # Execute rules
         try:
             results = self.engine.process_booking(context_dict)
@@ -223,30 +321,76 @@ class RegressionTestRunner:
         # Get expected actions
         expected_actions = self.fixtures.get_expected_actions(booking_id)
 
-        # Compare results
-        actual_actions = [
-            {
+        # Compare results in detail
+        actual_actions = []
+        differences: List[Dict[str, Any]] = []
+
+        for r in results:
+            action_entry: Dict[str, Any] = {
                 "rule_name": r.rule_name,
                 "action_type": r.action_type,
                 "success": r.success,
                 "message": r.message,
+                "params": getattr(r, "params", {}),
             }
-            for r in results
-        ]
+            if r.error:
+                action_entry["error"] = r.error
+            actual_actions.append(action_entry)
 
-        # Validate action count
-        actions_match = len(actual_actions) == len(expected_actions)
+        if len(actual_actions) != len(expected_actions):
+            differences.append(
+                {
+                    "type": "count_mismatch",
+                    "expected": len(expected_actions),
+                    "actual": len(actual_actions),
+                }
+            )
+
+        compare_count = min(len(actual_actions), len(expected_actions))
+        for idx in range(compare_count):
+            expected_action = expected_actions[idx]
+            actual_action = actual_actions[idx]
+
+            for field in ("rule_name", "action_type", "success"):
+                if actual_action.get(field) != expected_action.get(field):
+                    differences.append(
+                        {
+                            "type": "field_mismatch",
+                            "index": idx,
+                            "field": field,
+                            "expected": expected_action.get(field),
+                            "actual": actual_action.get(field),
+                        }
+                    )
+
+            expected_params = expected_action.get("params", {})
+            actual_params = actual_action.get("params", {})
+            if expected_params != actual_params:
+                differences.append(
+                    {
+                        "type": "params_mismatch",
+                        "index": idx,
+                        "expected": expected_params,
+                        "actual": actual_params,
+                    }
+                )
 
         result = {
             "booking_id": booking_id,
             "booking_name": booking_name,
-            "success": success and actions_match,
+            "success": success and not differences,
             "error": error,
             "expected_action_count": len(expected_actions),
             "actual_action_count": len(actual_actions),
             "actual_actions": actual_actions,
             "expected_actions": expected_actions,
+            "differences": differences,
         }
+
+        if differences:
+            logger.error(
+                "Action parity mismatch for %s: %s", booking_id, differences
+            )
 
         self.results.append(result)
         return result
@@ -295,8 +439,10 @@ def rule_engine(settings):
     """Initialize rule engine with registered conditions and actions."""
     from unittest.mock import Mock
     from src.utils.logger import StructuredLogger
-    
-    engine = RuleEngine(str(Path(__file__).parent.parent.parent / "src" / "config" / "rules.yaml"))
+
+    engine = RuleEngine(
+        str(Path(__file__).parent.parent.parent / "src" / "config" / "rules.yaml")
+    )
 
     # Register condition evaluators
     engine.register_condition("booking_not_in_db", booking_not_in_db)
@@ -306,36 +452,32 @@ def rule_engine(settings):
     engine.register_condition("booking_status", booking_status)
     engine.register_condition("has_option_keyword", has_option_keyword)
 
-    # Create mocked services for action executors
-    mock_db_repo = Mock()
-    mock_db_repo.create_booking.return_value = None
-    mock_db_repo.get_booking.return_value = None
-    mock_db_repo.update_flag.return_value = None
-    
+    # Create services for action executors
+    db_repo = InMemoryBookingRepository()
+
     mock_sms_service = Mock()
     mock_sms_service.send_confirm_sms.return_value = None
     mock_sms_service.send_guide_sms.return_value = None
     mock_sms_service.send_event_sms.return_value = None
-    
-    # Create mock logger WITHOUT spec to allow attribute assignment
-    mock_logger = Mock()
-    mock_inner_logger = Mock()
-    mock_inner_logger.name = "test_logger"
-    mock_logger.logger = mock_inner_logger
-    mock_logger.debug = Mock(return_value=None)
-    mock_logger.info = Mock(return_value=None)
-    mock_logger.warning = Mock(return_value=None)
-    mock_logger.error = Mock(return_value=None)
-    
+
+    mock_logger = Mock(spec=StructuredLogger)
+    mock_logger.logger = Mock()
+    mock_logger.logger.name = "test_logger"
+    mock_logger.debug = Mock()
+    mock_logger.info = Mock()
+    mock_logger.warning = Mock()
+    mock_logger.error = Mock()
+
     services = ActionServicesBundle(
-        db_repo=mock_db_repo,
+        db_repo=db_repo,
         sms_service=mock_sms_service,
         logger=mock_logger,
-        settings_dict={"slack_enabled": False}
+        settings_dict={"slack_enabled": False},
     )
 
     # Register action executors using register_actions
     register_actions(engine, services)
+    engine._db_repo_for_tests = db_repo
 
     return engine
 

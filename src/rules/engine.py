@@ -64,6 +64,7 @@ class ActionResult:
     success: bool
     message: str
     error: Optional[str] = None
+    params: Dict[str, Any] = field(default_factory=dict)
 
 
 class RuleEngine:
@@ -347,6 +348,7 @@ class RuleEngine:
                         action_type=action.type,
                         success=True,
                         message=f"Action '{action.type}' executed successfully",
+                        params=params,
                     )
                 )
 
@@ -367,6 +369,7 @@ class RuleEngine:
                         success=False,
                         message=f"Action '{action.type}' failed",
                         error=str(e),
+                        params=params,
                     )
                 )
 

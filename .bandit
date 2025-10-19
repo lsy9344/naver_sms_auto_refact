@@ -1,0 +1,6 @@
+[bandit]
+skips = B101,B102
+exclude_dirs = tests,docs,htmlcov,venv,.mypy_cache,.pytest_cache
+
+[bandit.plugins]
+tests = B301,B302,B303,B310,B501

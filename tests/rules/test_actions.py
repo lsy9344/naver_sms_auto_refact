@@ -228,8 +228,24 @@ class TestCreateDbRecord:
 class TestUpdateFlag:
     """Tests for update_flag action executor."""
 
-    def test_update_flag_success(self, action_context, mock_db_repo):
-        """Test successful flag update."""
+    def test_update_flag_success_schema_params(self, action_context, mock_db_repo):
+        """Test successful flag update using schema-aligned parameters."""
+        mock_db_repo.get_booking.return_value = {
+            "booking_num": "1051707_12345",
+            "confirm_sms": False,
+        }
+
+        update_flag(action_context, flag="confirm_sms", value=True)
+
+        mock_db_repo.update_flag.assert_called_once_with(
+            prefix="1051707_12345",
+            phone="010-1234-5678",
+            flag_name="confirm_sms",
+            value=True,
+        )
+
+    def test_update_flag_success_legacy_alias(self, action_context, mock_db_repo):
+        """Test backwards compatibility with legacy flag_name/flag_value kwargs."""
         mock_db_repo.get_booking.return_value = {
             "booking_num": "1051707_12345",
             "confirm_sms": False,
@@ -251,7 +267,7 @@ class TestUpdateFlag:
             "confirm_sms": True,
         }
 
-        update_flag(action_context, flag_name="confirm_sms", flag_value=True)
+        update_flag(action_context, flag="confirm_sms", value=True)
 
         # Should NOT call update_flag since it's already True
         mock_db_repo.update_flag.assert_not_called()
@@ -259,7 +275,7 @@ class TestUpdateFlag:
     def test_update_flag_invalid_flag(self, action_context):
         """Test that invalid flag name raises ActionExecutionError."""
         with pytest.raises(ActionExecutionError) as exc_info:
-            update_flag(action_context, flag_name="invalid_flag", flag_value=True)
+            update_flag(action_context, flag="invalid_flag", value=True)
 
         error = exc_info.value
         assert error.executor_name == "update_flag"
@@ -270,7 +286,7 @@ class TestUpdateFlag:
         mock_db_repo.get_booking.return_value = None
 
         with pytest.raises(ActionExecutionError) as exc_info:
-            update_flag(action_context, flag_name="confirm_sms", flag_value=True)
+            update_flag(action_context, flag="confirm_sms", value=True)
 
         error = exc_info.value
         assert error.executor_name == "update_flag"
@@ -286,11 +302,20 @@ class TestUpdateFlag:
         mock_db_repo.update_flag.side_effect = Exception("DynamoDB error")
 
         with pytest.raises(ActionExecutionError) as exc_info:
-            update_flag(action_context, flag_name="confirm_sms", flag_value=True)
+            update_flag(action_context, flag="confirm_sms", value=True)
 
         error = exc_info.value
         assert error.executor_name == "update_flag"
         assert isinstance(error.original_error, Exception)
+
+    def test_update_flag_missing_flag_parameter(self, action_context):
+        """Test that missing flag parameter raises wrapped ActionExecutionError."""
+        with pytest.raises(ActionExecutionError) as exc_info:
+            update_flag(action_context)
+
+        error = exc_info.value
+        assert error.executor_name == "update_flag"
+        assert isinstance(error.original_error, ValueError)
 
 
 # ============================================================================
