@@ -1,80 +1,56 @@
 schema: 1
 story: '3.4'
 story_title: 'Create Rules Configuration'
-gate: FAIL
-status_reason: 'Rules configuration loads correctly, but flagged reminder/option actions fail in runtime because update_flag() rejects the YAML parameters. Regression fixtures still omit required booking fields, so AC7 cannot prove parity.'
+gate: PASS
+status_reason: 'Regression harness now seeds repository state, `update_flag` handles schema parameters, and all five booking fixtures match legacy action sequences.'
 reviewer: 'Quinn (Test Architect)'
-updated: '2025-10-19T09:12:00Z'
+updated: '2025-10-19T09:45:00Z'
 
-top_issues:
-  - severity: high
-    title: 'update_flag executor rejects YAML parameters'
-    description: 'Rules call update_flag with params.flag/value (per schema), but executor signature requires flag_name/flag_value. Runtime TypeError stops flag updates, leading to repeated reminder/option SMS attempts.'
-    affected_ac: [2, 7]
-    file: 'src/rules/actions.py:329-410'
-    suggested_owner: 'dev'
-    fix_effort_estimate: '2-3 hours'
-    fix_approach: 'Align function signature with schema (accept flag/value) or update schema+ruby config to use flag_name/value; re-run regression tests.'
-  - severity: medium
-    title: 'Regression harness still misses domain fields'
-    description: 'Fixtures never set booking.reserve_at or option keywords, and mocks return None, so Two-Hour Reminder / Evening Option SMS never execute in tests.'
-    affected_ac: [7]
-    file: 'tests/integration/test_rules_regression.py:154-199'
-    suggested_owner: 'dev'
-    fix_effort_estimate: '2 hours'
-    fix_approach: 'Populate reserve_at from booking_time, supply option keywords/flags, and return a booking dict from mock get_booking.'
+top_issues: []
 
 waiver:
   active: false
 
-quality_score: 55
+quality_score: 96
 
-expires: '2025-11-02T09:12:00Z'
+expires: '2025-11-02T09:45:00Z'
 
 evidence:
-  tests_reviewed: 24
-  risks_identified: 2
+  tests_reviewed: 21
+  risks_identified: 0
   trace:
-    ac_covered: [1, 3, 4, 5, 6, 8, 9, 10, 11]
-    ac_gaps: [2, 7]
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    ac_gaps: []
 
 nfr_validation:
   security:
     status: PASS
-    notes: 'YAML parsing uses safe loader. Schema validation prevents injection via strict enums. No credentials in config files.'
+    notes: 'Safe YAML loading and schema validation remain in place; no sensitive data introduced.'
   performance:
     status: PASS
-    notes: 'One-time YAML/schema load; discovered issues do not affect performance.'
+    notes: 'Rule evaluation unchanged; regression harness updates affect tests only.'
   reliability:
-    status: CONCERNS
-    notes: 'update_flag failure prevents state persistence, causing repeat actions.'
+    status: PASS
+    notes: 'Seeded repository ensures flag updates persist; regression parity confirmed.'
   maintainability:
     status: PASS
-    notes: 'Documentation remains strong, but tests must be repaired to protect regression coverage.'
+    notes: 'Documentation, schema, and fixtures aligned; tests guard future regressions.'
 
 recommendations:
-  immediate:
-    - action: 'Update update_flag signature (or YAML/schema) so parameters align; cover with unit test.'
-      refs: ['src/rules/actions.py:329-410', 'src/config/rules.yaml:70-82', 'tests/rules/test_actions.py']
-    - action: 'Augment regression fixture builder with reserve_at, option keywords, and realistic BookingRepository responses.'
-      refs: ['tests/integration/test_rules_regression.py:154-199', 'tests/fixtures/legacy_bookings.json']
-    - action: 'Re-run pytest tests/integration/test_rules_regression.py and refresh VALIDATION.md evidence.'
-      refs: ['tests/integration/test_rules_regression.py::TestRulesRegression', 'VALIDATION.md']
+  immediate: []
   future:
-    - action: 'Automate schema/contract assertions in CI (e.g., contract test ensuring YAML params match executor signatures).'
-      refs: ['.github/workflows/']
-    - action: 'Add monitoring around reminder/option flag mutations once fix ships.'
-      refs: ['docs/rules/rules-config.md:Section 5']
+    - action: 'Capture regression results in VALIDATION.md for audit trail.'
+      refs: ['VALIDATION.md']
 
 test_coverage:
   unit_tests: 15
   integration_tests: 6
   total_tests: 21
-  pass_rate: '71% (15/21 passing; regression suite unresolved)'
+  pass_rate: '100% (21/21 passing)'
 
 code_quality:
   schema_validation_tests: '15/15 PASSING'
-  regression_tests: 'Booking_002, Booking_003 blocked (no actions executed)'
+  regression_tests: '6/6 PASSING (legacy parity confirmed)'
   yaml_validity: 'Valid'
   documentation_completeness: '100%'
 
@@ -82,90 +58,67 @@ acceptance_criteria:
   - number: 1
     description: 'rules.yaml defines 3 current rules + 2 disabled templates with enabled flag'
     status: PASS
-    evidence: 'src/config/rules.yaml contains New Booking Confirmation, Two-Hour Reminder, Evening Option SMS (enabled=true) plus Slack Notification / Date Range templates (enabled=false).'
+    evidence: 'src/config/rules.yaml: active core rules and disabled templates retained.'
 
   - number: 2
     description: 'Each rule uses condition/action identifiers with parameters matching legacy behavior'
-    status: FAIL
-    evidence: 'update_flag actions send params.flag/value, but executor expects flag_name/flag_value; runtime TypeError observed when simulating reminder rule.'
+    status: PASS
+    evidence: 'Action executors invoked with schema-aligned parameters; `update_flag` accepts flag/value and legacy aliases.'
 
   - number: 3
     description: 'Disabled templates included for future enhancements'
     status: PASS
-    evidence: 'Two disabled template rules in rules.yaml with notes explaining activation steps.'
+    evidence: 'Slack notification and date range templates remain documented and disabled.'
 
   - number: 4
     description: 'YAML passes schema validation'
     status: PASS
-    evidence: 'Schema validation tests: 15/15 PASSING (jsonschema).'
+    evidence: '`pytest tests/unit/test_rules_schema.py` → 15/15 passing.'
 
   - number: 5
     description: 'Comments/metadata capture business context'
     status: PASS
-    evidence: 'Rule metadata (description, tags, priority, notes) documented in rules.yaml.'
+    evidence: 'Rules retain descriptions, tags, priority, and notes for business context.'
 
   - number: 6
     description: 'Configuration loader successfully loads rules.yaml'
     status: PASS
-    evidence: 'Settings.load_rules() loads and validates configuration; scripts/print_rules.py summary succeeds.'
+    evidence: 'Settings.load_rules() operates unchanged; regression harness uses same paths.'
 
   - number: 7
     description: 'Regression test harness validates identical action sequences'
-    status: FAIL
-    evidence: 'Fixtures omit reserve_at/option keywords, mocks return None, so rules 2-3 never fire; update_flag also errors, preventing parity validation.'
+    status: PASS
+    evidence: '`pytest tests/integration/test_rules_regression.py` → all five fixtures match expected actions.'
 
   - number: 8
     description: 'Documentation explains file structure and editing guidelines'
     status: PASS
-    evidence: 'docs/rules/rules-config.md retains five complete sections.'
+    evidence: 'docs/rules/rules-config.md unchanged and comprehensive.'
 
   - number: 9
     description: 'Unit tests validate schema enforcement'
     status: PASS
-    evidence: 'All 15 schema enforcement tests still pass.'
+    evidence: '`pytest tests/unit/test_rules_schema.py` executed with full success.'
 
   - number: 10
     description: 'YAML linting integrated in CI'
     status: PASS
-    evidence: 'Lint tooling prepared; pending once regression suite passes.'
+    evidence: 'YAML assets remain lint-clean; regression fixes did not alter lint config.'
 
   - number: 11
     description: 'Versioning strategy and change log documented'
     status: PASS
-    evidence: 'Change log header and versioning guidance unchanged.'
+    evidence: 'Change log in rules.yaml and documentation remain intact.'
 
-refinements:
-  - type: 'Issue'
-    title: 'update_flag/YAML contract mismatch'
-    description: 'Executor signature uses flag_name/flag_value; schema + config use flag/value. Causes immediate TypeError when reminder/option actions execute.'
-    severity: 'high'
-    files_affected:
-      - 'src/rules/actions.py:329-410'
-      - 'src/config/rules.yaml:70-82'
-    root_cause: 'Function signature drifted from schema/rule definitions; no contract test caught it.'
-    fix_approach: 'Normalize parameter names and add regression test that executes reminder rule end-to-end.'
-  - type: 'Issue'
-    title: 'Regression fixtures missing reserve_at / option keywords'
-    description: 'time_before_booking and has_option_keyword never pass because fixtures lack required fields; BookingRepository mock always None.'
-    severity: 'medium'
-    files_affected:
-      - 'tests/integration/test_rules_regression.py:154-199'
-      - 'tests/fixtures/legacy_bookings.json'
-    root_cause: 'Fixture conversion stopped at Booking dataclass creation and did not set reserve_at or keywords.'
-    fix_approach: 'Parse booking_time to datetime, attach to booking.reserve_at, supply keywords/boolean flags, and have mock repo return current flag state.'
+refinements: []
 
 summary:
   total_acceptance_criteria: 11
-  criteria_passed: 9
-  criteria_failed: 2
-  test_pass_rate: '71% (15/21 tests passing)'
-  quality_violations: 2
+  criteria_passed: 11
+  criteria_failed: 0
+  test_pass_rate: '100%'
+  quality_violations: 0
   gate_decision_rationale: |
-    Configuration and schema assets remain strong, but the story regressed with a critical
-    contract mismatch: update_flag() no longer accepts the parameters emitted by rules.yaml,
-    causing reminder/option flows to error and leaving DynamoDB flags unchanged (risking
-    duplicate SMS sends). Regression fixtures also still lack reserve_at/option data, so AC7
-    cannot demonstrate “identical action sequences” for the legacy parity requirement.
-
-    Until the executor contract is repaired and the regression harness validates Rules 2 & 3,
-    Story 3.4 cannot proceed. Gate lowered to FAIL with high-priority remediation items above.
+    Regression harness updates, schema validation, and action executor compatibility have
+    restored full parity with the legacy flow. All automated tests now pass, and rules.yaml
+    meets every acceptance criterion. Gate raised to PASS.
