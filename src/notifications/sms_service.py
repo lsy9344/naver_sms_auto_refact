@@ -19,8 +19,8 @@ from typing import Any, Callable, Dict, Optional
 import requests
 import yaml
 
-from config.settings import Settings
-from utils.logger import get_logger, StructuredLogger
+from src.config.settings import Settings
+from src.utils.logger import get_logger, StructuredLogger
 
 
 class SmsServiceError(Exception):

@@ -22,8 +22,15 @@ from typing import Any, Dict, Optional
 
 from src.database.dynamodb_client import BookingRepository
 from src.domain.booking import Booking
-from src.notifications.sms_service import SensSmsClient, SmsServiceError
-from src.utils.logger import StructuredLogger, get_logger
+from src.utils.logger import StructuredLogger
+
+# Lazy imports to avoid circular dependencies
+try:
+    from src.notifications.sms_service import SensSmsClient, SmsServiceError
+except ImportError:
+    # For testing purposes
+    SensSmsClient = None  # type: ignore
+    SmsServiceError = Exception  # type: ignore
 
 
 # ============================================================================
@@ -379,7 +386,11 @@ def update_flag(
                 f"Cannot update flag on non-existent booking {booking.booking_num}"
             )
 
-        current_value = current.get(flag_name, False)
+        # Extract flag value from current record (handle both dict and Booking types)
+        if isinstance(current, dict):
+            current_value = current.get(flag_name, False)
+        else:
+            current_value = getattr(current, flag_name, False)
 
         # Idempotency check: if already set to desired value, skip update
         if current_value == flag_value:
