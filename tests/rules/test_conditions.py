@@ -27,6 +27,7 @@ from src.rules.conditions import (
     current_hour,
     booking_status,
     has_option_keyword,
+    has_multiple_options,
     date_range,
     register_conditions,
 )
@@ -604,16 +605,153 @@ class TestDateRange:
         assert date_range(context, start_date="2025-10-19", end_date="") is False
 
 
+class TestHasMultipleOptions:
+    """Story 6.4: has_multiple_options - Check if booking has minimum matching option keywords"""
+
+    def test_sufficient_keyword_matches(self):
+        """Test: Returns True when match count >= min_count"""
+        booking = Mock(option_keywords=["네이버 Pay", "원본 방식"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=2)
+        assert result is True
+
+    def test_exact_minimum_matches(self):
+        """Test: Returns True when match count equals min_count"""
+        booking = Mock(option_keywords=["네이버 Pay"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=1)
+        assert result is True
+
+    def test_insufficient_keyword_matches(self):
+        """Test: Returns False when match count < min_count"""
+        booking = Mock(option_keywords=["네이버 Pay"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=2)
+        assert result is False
+
+    def test_no_keyword_matches(self):
+        """Test: Returns False when no keywords match"""
+        booking = Mock(option_keywords=["일반 방식"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=1)
+        assert result is False
+
+    def test_empty_option_keywords(self):
+        """Test: Returns False when booking has no option_keywords"""
+        booking = Mock(option_keywords=[])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=1)
+        assert result is False
+
+    def test_missing_option_keywords_attribute(self):
+        """Test: Returns False when booking has no option_keywords attribute"""
+        booking = Mock(spec=[])  # No option_keywords attribute
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=1)
+        assert result is False
+
+    def test_dict_format_options(self):
+        """Test: Handles dict-format options"""
+        booking = Mock(option_keywords=[{"name": "네이버 Pay"}, {"name": "원본"}])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=2)
+        assert result is True
+
+    def test_mixed_format_options(self):
+        """Test: Handles mixed format options (string, dict, object)"""
+        option_obj = Mock()
+        option_obj.name = "원본 방식"
+        booking = Mock(
+            option_keywords=["네이버 Pay", {"name": "인스타"}, option_obj]
+        )
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=3)
+        assert result is True
+
+    def test_higher_min_count(self):
+        """Test: Supports higher min_count values"""
+        booking = Mock(option_keywords=["네이버", "인스타", "원본"])
+        context = {"booking": booking}
+        assert has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=3) is True
+        assert has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=4) is False
+
+    def test_duplicate_option_names_counted_once(self):
+        """Test: Each option is counted only once even if multiple keywords match"""
+        booking = Mock(option_keywords=["네이버-원본-인스타"])
+        context = {"booking": booking}
+        # Only one option, should count as 1 even though 3 keywords match within it
+        result = has_multiple_options(context, keywords=["네이버", "원본", "인스타"], min_count=1)
+        assert result is True
+        result = has_multiple_options(context, keywords=["네이버", "원본", "인스타"], min_count=2)
+        assert result is False
+
+    def test_missing_booking(self):
+        """Test: Returns False when booking is missing from context"""
+        context = {}
+        result = has_multiple_options(context, keywords=["네이버"], min_count=1)
+        assert result is False
+
+    def test_invalid_min_count_zero(self):
+        """Test: Returns False when min_count is 0"""
+        booking = Mock(option_keywords=["네이버"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버"], min_count=0)
+        assert result is False
+
+    def test_invalid_min_count_negative(self):
+        """Test: Returns False when min_count is negative"""
+        booking = Mock(option_keywords=["네이버"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버"], min_count=-1)
+        assert result is False
+
+    def test_invalid_keywords_empty_list(self):
+        """Test: Returns False when keywords list is empty"""
+        booking = Mock(option_keywords=["네이버"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=[], min_count=1)
+        assert result is False
+
+    def test_invalid_keywords_none(self):
+        """Test: Returns False when keywords is None"""
+        booking = Mock(option_keywords=["네이버"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=None, min_count=1)
+        assert result is False
+
+    def test_case_sensitive_matching(self):
+        """Test: Keyword matching is case-sensitive"""
+        booking = Mock(option_keywords=["NAVER PAY"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버"], min_count=1)
+        assert result is False
+
+    def test_partial_string_matching(self):
+        """Test: Keywords match as substring"""
+        booking = Mock(option_keywords=["My네이버Service"])
+        context = {"booking": booking}
+        result = has_multiple_options(context, keywords=["네이버"], min_count=1)
+        assert result is True
+
+    def test_immutable_context(self):
+        """Test: Does not mutate context dictionary"""
+        booking = Mock(option_keywords=["네이버"])
+        context = {"booking": booking}
+        original_keys = set(context.keys())
+        has_multiple_options(context, keywords=["네이버"], min_count=1)
+        assert set(context.keys()) == original_keys
+
+
 class TestRegisterConditions:
     """Test registry helper function"""
 
     def test_register_all_conditions(self):
-        """Test: Registers all 8 condition evaluators"""
+        """Test: Registers all 9 condition evaluators"""
         engine = Mock()
         register_conditions(engine)
 
-        # Verify all 8 conditions registered (including date_range and has_pro_edit_option)
-        assert engine.register_condition.call_count == 8
+        # Verify all 9 conditions registered (including has_multiple_options)
+        assert engine.register_condition.call_count == 9
 
         # Verify correct names registered
         calls = [call[0][0] for call in engine.register_condition.call_args_list]
@@ -623,6 +761,7 @@ class TestRegisterConditions:
         assert "current_hour" in calls
         assert "booking_status" in calls
         assert "has_option_keyword" in calls
+        assert "has_multiple_options" in calls
         assert "date_range" in calls
         assert "has_pro_edit_option" in calls
 
@@ -642,6 +781,7 @@ class TestRegisterConditions:
         assert registered["current_hour"] == current_hour
         assert registered["booking_status"] == booking_status
         assert registered["has_option_keyword"] == has_option_keyword
+        assert registered["has_multiple_options"] == has_multiple_options
         assert registered["date_range"] == date_range
 
     def test_register_with_settings(self):
@@ -650,11 +790,11 @@ class TestRegisterConditions:
         settings = Mock()
         # Should not raise
         register_conditions(engine, settings)
-        assert engine.register_condition.call_count == 8
+        assert engine.register_condition.call_count == 9
 
     def test_register_without_settings(self):
         """Test: Works without settings parameter"""
         engine = Mock()
         # Should not raise
         register_conditions(engine)
-        assert engine.register_condition.call_count == 8
+        assert engine.register_condition.call_count == 9

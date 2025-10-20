@@ -431,6 +431,99 @@ def date_range(context: Dict[str, Any], start_date: str, end_date: str, **params
         return False
 
 
+def has_multiple_options(context: Dict[str, Any], keywords: list, min_count: int = 1, **params) -> bool:
+    """
+    Evaluate if booking has at least min_count matching option keywords.
+
+    Inspects booking's option keywords against a provided keyword list and
+    ensures at least min_count keywords match. Supports graceful handling of
+    various option formats (string, dict, object).
+
+    Args:
+        context: Dictionary containing:
+            - booking: Booking object with option_keywords attribute
+            - settings: Settings object with configuration (optional)
+        keywords: List of keywords to match against option keywords
+        min_count: Minimum number of keywords to match (default: 1)
+        **params: Additional parameters (unused)
+
+    Returns:
+        bool: True if at least min_count keywords match, False otherwise
+
+    Reference:
+        Story 6.4: Add Multi-Option Condition Evaluator
+        docs/epics/epic-6-post-mvp-enhancements.md#new-condition-evaluators
+
+    Example:
+        >>> booking = Mock(option_keywords=['네이버', '원본'])
+        >>> context = {'booking': booking}
+        >>> has_multiple_options(context, keywords=['네이버', '인스타', '원본'], min_count=2)
+        True  # Matched 2 keywords
+        >>> has_multiple_options(context, keywords=['인스타'], min_count=1)
+        False  # No matches
+    """
+    try:
+        booking = context.get("booking")
+
+        if not booking:
+            logger.debug("has_multiple_options: Missing booking")
+            return False
+
+        # Validate min_count
+        if not isinstance(min_count, int) or min_count < 1:
+            logger.error(f"has_multiple_options: Invalid min_count={min_count}, must be >= 1")
+            return False
+
+        # Validate keywords list
+        if not keywords or not isinstance(keywords, list):
+            logger.debug("has_multiple_options: Invalid keywords parameter")
+            return False
+
+        # Get option keywords from booking
+        booking_options = getattr(booking, "option_keywords", [])
+
+        if not booking_options:
+            logger.debug("has_multiple_options: No option_keywords on booking")
+            return False
+
+        # Count matches: iterate through booking options and check against keyword list
+        match_count = 0
+        for option in booking_options:
+            # Handle both string, dict, and object option formats
+            if isinstance(option, str):
+                option_name = option
+            elif isinstance(option, dict):
+                option_name = option.get("name", "")
+            else:
+                option_name = getattr(option, "name", "")
+
+            if not option_name:
+                continue
+
+            # Check if any keyword matches this option
+            for keyword in keywords:
+                if keyword in option_name:
+                    match_count += 1
+                    logger.debug(
+                        f"has_multiple_options: Matched keyword '{keyword}' "
+                        f"in option '{option_name}' (match_count={match_count})"
+                    )
+                    break  # Count each option only once per keyword match
+
+        # Check if match count meets minimum threshold
+        result = match_count >= min_count
+
+        logger.debug(
+            f"has_multiple_options: keywords={keywords}, min_count={min_count}, "
+            f"match_count={match_count}, result={result}"
+        )
+        return result
+
+    except Exception as e:
+        logger.error(f"has_multiple_options error: {e}", exc_info=True)
+        return False
+
+
 def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     """
     Register all condition evaluators with the rule engine.
@@ -459,6 +552,7 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
         - current_hour: True if current hour matches
         - booking_status: True if booking status matches code
         - has_option_keyword: True if booking has option keywords
+        - has_multiple_options: True if booking has minimum matching option keywords
         - date_range: True if booking falls within date range
         - has_pro_edit_option: True if booking has professional edit option
 
@@ -471,14 +565,15 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     engine.register_condition("current_hour", current_hour)
     engine.register_condition("booking_status", booking_status)
     engine.register_condition("has_option_keyword", has_option_keyword)
+    engine.register_condition("has_multiple_options", has_multiple_options)
     engine.register_condition("date_range", date_range)
     engine.register_condition("has_pro_edit_option", has_pro_edit_option)
 
     logger.info(
-        "Registered 8 condition evaluators with RuleEngine: "
+        "Registered 9 condition evaluators with RuleEngine: "
         "booking_not_in_db, time_before_booking, flag_not_set, "
         "current_hour, booking_status, has_option_keyword, "
-        "date_range, has_pro_edit_option"
+        "has_multiple_options, date_range, has_pro_edit_option"
     )
 
 

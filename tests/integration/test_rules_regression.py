@@ -43,6 +43,7 @@ from rules.conditions import (
     current_hour,
     booking_status,
     has_option_keyword,
+    has_multiple_options,
     date_range,
 )
 from rules.actions import (
@@ -663,3 +664,103 @@ class TestRulesRegression:
         booking = next(b for b in test_fixtures.get_bookings() if b["id"] == "booking_008")
         result = test_runner.test_booking(booking)
         assert result["success"], f"Booking 008 failed: {result}"
+
+    def test_has_multiple_options_sufficient_matches(self):
+        """Story 6.4: has_multiple_options - Sufficient keyword matches."""
+        booking = Booking(
+            booking_num="test_multi_001",
+            phone="01012345678",
+            name="Test User",
+            booking_time="2025-10-20 10:00:00",
+            reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=timezone.utc),
+            status="RC03",
+            biz_id="1051707",
+            extra_fields={"option_keywords": ["네이버 Pay", "원본 방식"]},
+        )
+        # Add option_keywords to booking instance
+        booking.option_keywords = ["네이버 Pay", "원본 방식"]
+
+        context = {
+            "booking": booking,
+            "db_record": None,
+            "current_time": datetime(2025, 10, 20, 8, 0, tzinfo=timezone.utc),
+        }
+        # 2 keywords match against 2 required minimum
+        result = has_multiple_options(
+            context, keywords=["네이버", "원본"], min_count=2
+        )
+        assert result is True
+
+    def test_has_multiple_options_insufficient_matches(self):
+        """Story 6.4: has_multiple_options - Insufficient keyword matches."""
+        booking = Booking(
+            booking_num="test_multi_002",
+            phone="01012345678",
+            name="Test User",
+            booking_time="2025-10-20 10:00:00",
+            reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=timezone.utc),
+            status="RC03",
+            biz_id="1051707",
+        )
+        # Add option_keywords to booking instance
+        booking.option_keywords = ["네이버 Pay"]
+
+        context = {
+            "booking": booking,
+            "db_record": None,
+            "current_time": datetime(2025, 10, 20, 8, 0, tzinfo=timezone.utc),
+        }
+        # Only 1 keyword matches but 2 required
+        result = has_multiple_options(
+            context, keywords=["네이버", "원본"], min_count=2
+        )
+        assert result is False
+
+    def test_has_multiple_options_no_matches(self):
+        """Story 6.4: has_multiple_options - No keyword matches."""
+        booking = Booking(
+            booking_num="test_multi_003",
+            phone="01012345678",
+            name="Test User",
+            booking_time="2025-10-20 10:00:00",
+            reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=timezone.utc),
+            status="RC03",
+            biz_id="1051707",
+        )
+        # Add option_keywords to booking instance
+        booking.option_keywords = ["일반 방식"]
+
+        context = {
+            "booking": booking,
+            "db_record": None,
+            "current_time": datetime(2025, 10, 20, 8, 0, tzinfo=timezone.utc),
+        }
+        result = has_multiple_options(
+            context, keywords=["네이버", "원본"], min_count=1
+        )
+        assert result is False
+
+    def test_has_multiple_options_multiple_options_single_keyword(self):
+        """Story 6.4: has_multiple_options - Multiple option objects match single keyword."""
+        booking = Booking(
+            booking_num="test_multi_004",
+            phone="01012345678",
+            name="Test User",
+            booking_time="2025-10-20 10:00:00",
+            reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=timezone.utc),
+            status="RC03",
+            biz_id="1051707",
+        )
+        # Add option_keywords to booking instance
+        booking.option_keywords = ["네이버 Pay", "네이버 보험", "인스타"]
+
+        context = {
+            "booking": booking,
+            "db_record": None,
+            "current_time": datetime(2025, 10, 20, 8, 0, tzinfo=timezone.utc),
+        }
+        # 2 options match "네이버" keyword + 1 "인스타" = 3 matches
+        result = has_multiple_options(
+            context, keywords=["네이버", "인스타"], min_count=3
+        )
+        assert result is True

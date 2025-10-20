@@ -58,7 +58,7 @@ class TestRulesSchema:
         """Test Case 1: Valid rules.yaml loads successfully without errors."""
         assert settings.rules is not None
         assert len(settings.rules) > 0
-        assert len(settings.rules) == 5  # 3 enabled + 2 disabled templates
+        assert len(settings.rules) == 6  # 3 enabled + 3 disabled templates
 
     def test_missing_name_field(self, schema):
         """Test Case 2: Missing required field 'name' produces ValidationError."""

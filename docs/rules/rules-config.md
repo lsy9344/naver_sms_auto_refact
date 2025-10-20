@@ -192,7 +192,50 @@ conditions:
 
 ---
 
-#### 7. `date_range`
+#### 7. `has_multiple_options`
+
+Checks if booking has at least a minimum number of matching option keywords (Story 6.4).
+
+```yaml
+conditions:
+  - type: "has_multiple_options"
+    params:
+      keywords: ["네이버", "인스타", "원본"]
+      min_count: 2
+```
+
+**Parameters:**
+
+| Name | Type | Range | Description |
+|------|------|-------|-------------|
+| `keywords` | array of strings | min 1 | Keywords to match against booking options |
+| `min_count` | integer | 1+ | Minimum number of keywords that must match |
+
+**Behavior:**
+- Counts each option keyword only once even if multiple keywords match within it
+- Each option in the booking contributes a maximum of 1 to the match count
+- Returns True only when match count >= min_count
+- Returns False if booking has no option_keywords
+- Returns False if keywords list is empty or invalid
+
+**Example Use Case:** Holiday promo requiring customers to select multiple specific options
+
+```yaml
+# Send holiday SMS only for bookings with 2+ special options selected
+conditions:
+  - type: "has_multiple_options"
+    params:
+      keywords: ["네이버 Pay", "원본 방식", "프리미엄"]
+      min_count: 2
+actions:
+  - type: "send_sms"
+    params:
+      template: "custom_promotion"
+```
+
+---
+
+#### 8. `date_range`
 
 Checks if booking falls within a specific calendar date range (Story 6.3).
 

@@ -105,6 +105,7 @@
             "current_hour",
             "booking_status",
             "has_option_keyword",
+            "has_multiple_options",
             "store_id_matches",
             "date_range",
             "has_pro_edit_option"
@@ -272,6 +273,43 @@
                       "type": "string"
                     },
                     "minItems": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "has_multiple_options"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "required": [
+                  "keywords",
+                  "min_count"
+                ],
+                "properties": {
+                  "keywords": {
+                    "type": "array",
+                    "description": "Keywords to match against option keywords",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  },
+                  "min_count": {
+                    "type": "integer",
+                    "description": "Minimum number of keywords to match",
+                    "minimum": 1,
+                    "maximum": 100
                   }
                 },
                 "additionalProperties": false
