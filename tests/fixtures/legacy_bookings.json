@@ -12,7 +12,7 @@
         "status": "confirmed"
       },
       "db_record": null,
-      "current_time": "2025-10-19T14:00:00",
+      "current_time": "2025-10-18T14:00:00",
       "expected_rule_matches": ["New Booking Confirmation"]
     },
     {
@@ -95,6 +95,69 @@
         "option_sms": false
       },
       "current_time": "2025-10-19T20:00:00",
+      "expected_rule_matches": []
+    },
+    {
+      "id": "booking_006",
+      "name": "Date Range - Within Range",
+      "description": "Story 6.3: Test booking with reserve_at within specified date range (2025-10-19 to 2025-10-19)",
+      "booking": {
+        "customer_phone": "01022222222",
+        "customer_name": "호영민",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T15:00:00",
+        "status": "confirmed"
+      },
+      "db_record": {
+        "booking_id": "booking_006",
+        "created_at": "2025-10-19T10:00:00",
+        "confirm_sms": false,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "current_time": "2025-10-19T15:00:00",
+      "expected_rule_matches": []
+    },
+    {
+      "id": "booking_007",
+      "name": "Date Range - Outside Range (Before)",
+      "description": "Story 6.3: Test booking with reserve_at before specified date range",
+      "booking": {
+        "customer_phone": "01033333333",
+        "customer_name": "이순신",
+        "store_id": 1051707,
+        "booking_time": "2025-10-18T10:00:00",
+        "status": "confirmed"
+      },
+      "db_record": {
+        "booking_id": "booking_007",
+        "created_at": "2025-10-18T10:00:00",
+        "confirm_sms": false,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "current_time": "2025-10-18T10:00:00",
+      "expected_rule_matches": []
+    },
+    {
+      "id": "booking_008",
+      "name": "Date Range - Outside Range (After)",
+      "description": "Story 6.3: Test booking with reserve_at after specified date range",
+      "booking": {
+        "customer_phone": "01044444444",
+        "customer_name": "김유신",
+        "store_id": 1051707,
+        "booking_time": "2025-10-20T10:00:00",
+        "status": "confirmed"
+      },
+      "db_record": {
+        "booking_id": "booking_008",
+        "created_at": "2025-10-20T10:00:00",
+        "confirm_sms": false,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "current_time": "2025-10-20T10:00:00",
       "expected_rule_matches": []
     }
   ]

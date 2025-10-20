@@ -85,6 +85,18 @@
     "booking_005": {
       "description": "No Option Keyword - No actions should execute",
       "actions": []
+    },
+    "booking_006": {
+      "description": "Date Range - Within Range (Story 6.3) - Tests date_range condition without rules (rule is disabled)",
+      "actions": []
+    },
+    "booking_007": {
+      "description": "Date Range - Outside Range Before (Story 6.3) - No actions should execute",
+      "actions": []
+    },
+    "booking_008": {
+      "description": "Date Range - Outside Range After (Story 6.3) - No actions should execute",
+      "actions": []
     }
   }
 }

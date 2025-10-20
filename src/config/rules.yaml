@@ -81,6 +81,28 @@ rules:
           flag: "option_sms"
           value: true
 
+  # Rule 4: Date Range Promotion (Story 6.3) - TEMPLATE
+  # Priority: MEDIUM - Time-limited promotional campaigns
+  # Triggers when: Booking date is within specified range
+  # Expected behavior: Create DB record + send promotional SMS
+  - name: "Date Range Promotion - Within Window"
+    enabled: false
+    description: "[TEMPLATE] Send promotional SMS for bookings within specified date range (Story 6.3 - date_range condition evaluator)"
+    tags: ["story-6.3", "promotion", "date-range"]
+    priority: "medium"
+    notes: "Demonstrates date_range condition evaluator functionality. Disabled in base rules to avoid interfering with existing tests."
+    conditions:
+      - type: "date_range"
+        params:
+          start_date: "2025-10-19"
+          end_date: "2025-10-19"
+    actions:
+      - type: "create_db_record"
+      - type: "send_sms"
+        params:
+          template: "guide"
+          store_specific: true
+
   # Template: Slack Notification (DISABLED - Future Enhancement)
   # This rule serves as a template for future implementation
   # When enabled, sends SMS summary to Slack channel daily

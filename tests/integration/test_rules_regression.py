@@ -43,6 +43,7 @@ from rules.conditions import (
     current_hour,
     booking_status,
     has_option_keyword,
+    date_range,
 )
 from rules.actions import (
     send_sms,
@@ -531,6 +532,7 @@ def rule_engine(settings):
     engine.register_condition("current_hour", current_hour)
     engine.register_condition("booking_status", booking_status)
     engine.register_condition("has_option_keyword", has_option_keyword)
+    engine.register_condition("date_range", date_range)
 
     # Create services for action executors
     db_repo = InMemoryBookingRepository()
@@ -551,6 +553,8 @@ def rule_engine(settings):
     services = ActionServicesBundle(
         db_repo=db_repo,
         sms_service=mock_sms_service,
+        slack_service=None,
+        slack_template_loader=None,
         logger=mock_logger,
         settings_dict={"slack_enabled": False},
     )
@@ -641,3 +645,21 @@ class TestRulesRegression:
         booking = next(b for b in test_fixtures.get_bookings() if b["id"] == "booking_005")
         result = test_runner.test_booking(booking)
         assert result["success"], f"Booking 005 failed: {result}"
+
+    def test_booking_006_date_range_within(self, test_runner, test_fixtures):
+        """Test booking 006: Date Range - Booking within date range (Story 6.3)."""
+        booking = next(b for b in test_fixtures.get_bookings() if b["id"] == "booking_006")
+        result = test_runner.test_booking(booking)
+        assert result["success"], f"Booking 006 failed: {result}"
+
+    def test_booking_007_date_range_before(self, test_runner, test_fixtures):
+        """Test booking 007: Date Range - Booking before date range (Story 6.3)."""
+        booking = next(b for b in test_fixtures.get_bookings() if b["id"] == "booking_007")
+        result = test_runner.test_booking(booking)
+        assert result["success"], f"Booking 007 failed: {result}"
+
+    def test_booking_008_date_range_after(self, test_runner, test_fixtures):
+        """Test booking 008: Date Range - Booking after date range (Story 6.3)."""
+        booking = next(b for b in test_fixtures.get_bookings() if b["id"] == "booking_008")
+        result = test_runner.test_booking(booking)
+        assert result["success"], f"Booking 008 failed: {result}"

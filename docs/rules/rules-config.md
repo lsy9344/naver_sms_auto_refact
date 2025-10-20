@@ -192,12 +192,54 @@ conditions:
 
 ---
 
+#### 7. `date_range`
+
+Checks if booking falls within a specific calendar date range (Story 6.3).
+
+```yaml
+conditions:
+  - type: "date_range"
+    params:
+      start_date: "2025-10-19"
+      end_date: "2025-10-21"
+```
+
+**Parameters:**
+
+| Name | Type | Format | Description |
+|------|------|--------|-------------|
+| `start_date` | string | YYYY-MM-DD | Range start date (inclusive) |
+| `end_date` | string | YYYY-MM-DD | Range end date (inclusive) |
+
+**Behavior:**
+- Compares booking's `reserve_at` date (not time) against the range
+- Range is inclusive: both start and end dates match
+- Supports both naive and timezone-aware datetime objects
+- Returns False if `reserve_at` is missing or invalid
+- Returns False if dates cannot be parsed
+
+**Example Use Case:** Send promotional SMS only for bookings within campaign dates
+
+```yaml
+# Thanksgiving promotion: Oct 19-21
+conditions:
+  - type: "date_range"
+    params:
+      start_date: "2025-10-19"
+      end_date: "2025-10-21"
+actions:
+  - type: "send_sms"
+    params:
+      template: "custom_promotion"
+```
+
+---
+
 #### Future Condition Types (Disabled Templates)
 
 The following condition types are defined in schema but not yet implemented:
 
 - `store_id_matches` - Filter by store ID
-- `date_range` - Filter by date range
 
 These are included in the rules template as disabled examples for future enhancement.
 

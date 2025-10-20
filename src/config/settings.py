@@ -30,10 +30,17 @@ class ConfigurationError(Exception):
 NAVER_SECRET_ID = "naver-sms-automation/naver-credentials"  # nosec B105
 SENS_SECRET_ID = "naver-sms-automation/sens-credentials"  # nosec B105
 TELEGRAM_SECRET_ID = "naver-sms-automation/telegram-credentials"  # nosec B105
+SLACK_SECRET_ID = "naver-sms-automation/slack-credentials"  # nosec B105
 
 # For local development with dummy credentials file
 USE_LOCAL_SECRETS = os.getenv("USE_LOCAL_SECRETS_FILE", "false").lower() == "true"
 LOCAL_SECRETS_FILE = os.getenv("LOCAL_SECRETS_FILE_PATH", ".local/secrets.json")
+
+# Slack configuration (Story 6.2)
+# Default: False (Slack disabled) - Requires explicit enable via environment variable
+SLACK_ENABLED = os.getenv("SLACK_ENABLED", "false").lower() == "true"
+SLACK_WEBHOOK_URL_ENV = os.getenv("SLACK_WEBHOOK_URL", None)  # Direct override if provided
+SLACK_CONFIG_FILE = os.getenv("SLACK_CONFIG_FILE", "config/my_slack_webhook.yaml")
 
 # Manual approval gate for SENS SMS delivery (Story 5.4 - AC 10)
 # Default: False (SMS delivery disabled) - Requires explicit owner sign-off
@@ -283,6 +290,50 @@ class Settings:
         return credentials
 
     @staticmethod
+    def load_slack_webhook_url() -> Optional[str]:
+        """
+        Load Slack webhook URL from environment, local config, or Secrets Manager (AC 2, Story 6.2).
+
+        Priority:
+        1. SLACK_WEBHOOK_URL environment variable (direct override)
+        2. config/my_slack_webhook.yaml (local development)
+        3. Secrets Manager (production)
+
+        Returns:
+            Webhook URL string or None if not configured
+
+        Raises:
+            RuntimeError: If loading fails catastrophically
+        """
+        # Priority 1: Direct environment override
+        if SLACK_WEBHOOK_URL_ENV:
+            return SLACK_WEBHOOK_URL_ENV
+
+        # Priority 2: Local config file
+        try:
+            if os.path.exists(SLACK_CONFIG_FILE):
+                with open(SLACK_CONFIG_FILE, "r", encoding="utf-8") as f:
+                    content = yaml.safe_load(f)
+                    if content and isinstance(content, dict):
+                        webhook_url = content.get("slack webhook url")
+                        if webhook_url:
+                            return webhook_url
+        except Exception as e:
+            logger.warning(f"Failed to load Slack webhook from {SLACK_CONFIG_FILE}: {e}")
+
+        # Priority 3: Secrets Manager
+        if not USE_LOCAL_SECRETS:
+            try:
+                credentials = Settings._get_secret_value(SLACK_SECRET_ID)
+                webhook_url = credentials.get("webhook_url")
+                if webhook_url:
+                    return webhook_url
+            except Exception as e:
+                logger.warning(f"Failed to load Slack webhook from Secrets Manager: {e}")
+
+        return None
+
+    @staticmethod
     def _load_from_local_file(filepath: str) -> Dict[str, Any]:
         """
         Load secrets from local JSON file for development.
@@ -403,6 +454,11 @@ def get_sens_credentials() -> Dict[str, str]:
 def get_telegram_credentials() -> Dict[str, str]:
     """Get Telegram credentials."""
     return Settings.load_telegram_credentials()
+
+
+def get_slack_webhook_url() -> Optional[str]:
+    """Get Slack webhook URL (Story 6.2)."""
+    return Settings.load_slack_webhook_url()
 
 
 def setup_logging_redaction() -> None:

@@ -40,14 +40,14 @@ After successful production cutover, implement enhancement features that demonst
 
 ## Stories in This Epic
 
-| Story ID | Title | Priority | Effort | Status |
-|----------|-------|----------|--------|--------|
-| 6.1 | Implement Example Rules from Requirements | P1 | 1d | Draft |
-| 6.2 | Add Slack Integration | P1 | 1.5d | Draft |
-| 6.3 | Add Date-Range Condition Evaluator | P1 | 0.5d | Draft |
-| 6.4 | Add Multi-Option Condition Evaluator | P2 | 0.5d | Draft |
-| 6.5 | Performance Optimization | P2 | 1d | Draft |
-| 6.6 | Create Rule Management Documentation | P1 | 0.5d | Draft |
+| Story ID | Title | Priority | Effort | Status | Planned Order |
+|----------|-------|----------|--------|--------|---------------|
+| 6.2 | Add Slack Integration | P1 | 1.5d | Draft | 1 |
+| 6.3 | Add Date-Range Condition Evaluator | P1 | 0.5d | Draft | 2 |
+| 6.4 | Add Multi-Option Condition Evaluator | P2 | 0.5d | Draft | 3 |
+| 6.1 | Implement Example Rules from Requirements | P1 | 1d | Draft | 4 *(depends on 6.2–6.4)* |
+| 6.6 | Create Rule Management Documentation | P1 | 0.5d | Draft | 5 |
+| 6.5 | Performance Optimization | P2 | 1d | Draft | 6 |
 
 **Total Estimated Effort:** 5 days
 
@@ -94,15 +94,15 @@ After successful production cutover, implement enhancement features that demonst
 
 **Example Rule 3:** (Already exists - new booking confirmation)
 
-**Example Rule 4:** Date range + multi-option + Slack
+**Example Rule 4:** Date range + multi-option + Slack *(requires Stories 6.2–6.4)*
 ```yaml
   - name: "Holiday Event Customer List"
     enabled: true
     conditions:
       - type: "date_range"
         params:
-          start: "2025-12-20"
-          end: "2025-12-31"
+          start_date: "2025-12-20"
+          end_date: "2025-12-31"
       - type: "has_multiple_options"
         params:
           keywords: ["원본", "네이버"]  # b options
@@ -113,6 +113,10 @@ After successful production cutover, implement enhancement features that demonst
           channel: "#marketing"
           message: "Holiday booking: {{booking.name}} - {{booking.phone}} - {{booking.store_id}}"
 ```
+
+### Delivery Sequencing Notes
+- Complete Stories **6.2–6.4** before beginning 6.1; the Slack executor and new condition evaluators are prerequisites for the configuration-only rules.
+- Story **6.6** documents the newly delivered capabilities while they are fresh; tackle **6.5** performance tuning only after rules and documentation are stable to obtain meaningful baselines.
 
 ### Slack Integration
 

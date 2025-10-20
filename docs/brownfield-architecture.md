@@ -1439,9 +1439,9 @@ CMD ["main.lambda_handler"]
 #### Phase 5: Deployment (Week 4)
 - [ ] Deploy container to ECR
 - [ ] Create new Lambda function (don't replace existing yet)
-- [ ] Run parallel for 1 week (both old and new)
+- [ ] Execute offline validation campaign (golden dataset replay + telemetry review)
 - [ ] Compare results, fix discrepancies
-- [ ] Switch EventBridge trigger to new Lambda
+- [ ] Switch EventBridge trigger to new Lambda after go/no-go approval
 - [ ] Monitor for 1 week
 - [ ] Decommission old Lambda
 
@@ -1941,8 +1941,8 @@ When refactoring, **DO NOT MODIFY** these components:
 
 5. **Phase 4 (Deployment):**
    - Build ECR container
-   - Deploy alongside existing Lambda
-   - Run parallel for 1 week
+   - Deploy validation-ready Lambda
+   - Execute offline validation campaign
    - Cutover after validation
 
 ### Success Criteria

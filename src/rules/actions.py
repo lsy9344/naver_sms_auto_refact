@@ -32,6 +32,128 @@ except ImportError:
     SensSmsClient = None  # type: ignore
     SmsServiceError = Exception  # type: ignore
 
+try:
+    from src.notifications.slack_service import SlackWebhookClient, SlackServiceError
+except ImportError:
+    # For testing purposes
+    SlackWebhookClient = None  # type: ignore
+    SlackServiceError = Exception  # type: ignore
+
+try:
+    import jinja2
+except ImportError:
+    jinja2 = None  # type: ignore
+
+
+# ============================================================================
+# Template Loader (AC 3)
+# ============================================================================
+
+
+class SlackTemplateLoader:
+    """
+    Loader for Slack message templates from YAML configuration.
+
+    Supports Jinja2 template rendering with variable substitution.
+    Templates are cached in memory after first load.
+    """
+
+    def __init__(
+        self,
+        template_path: str = "config/slack_templates.yaml",
+        logger: Optional[StructuredLogger] = None,
+    ):
+        """
+        Initialize template loader.
+
+        Args:
+            template_path: Path to slack_templates.yaml file
+            logger: Optional structured logger instance
+        """
+        self.template_path = template_path
+        self.logger = logger
+        self._templates: Dict[str, str] = {}
+        self._loaded = False
+
+    def load_templates(self) -> None:
+        """Load all templates from YAML file."""
+        if self._loaded:
+            return
+
+        try:
+            import yaml
+
+            with open(self.template_path, "r", encoding="utf-8") as f:
+                content = yaml.safe_load(f) or {}
+                self._templates = content
+                self._loaded = True
+                if self.logger:
+                    self.logger.debug(
+                        f"Loaded {len(self._templates)} Slack templates",
+                        operation="load_slack_templates",
+                    )
+        except FileNotFoundError as e:
+            if self.logger:
+                self.logger.error(
+                    f"Slack templates file not found: {self.template_path}",
+                    operation="load_slack_templates",
+                    error=str(e),
+                )
+            raise
+        except Exception as e:
+            if self.logger:
+                self.logger.error(
+                    "Failed to load Slack templates",
+                    operation="load_slack_templates",
+                    error=str(e),
+                )
+            raise
+
+    def render(self, template_name: str, **context: Any) -> str:
+        """
+        Render a template with context variables.
+
+        Args:
+            template_name: Name of template (key in slack_templates.yaml)
+            **context: Variables to inject into template
+
+        Returns:
+            Rendered template string
+
+        Raises:
+            ValueError: If template not found
+            jinja2.TemplateError: If template rendering fails
+        """
+        if not self._loaded:
+            self.load_templates()
+
+        if template_name not in self._templates:
+            raise ValueError(
+                f"Template '{template_name}' not found. Available: {list(self._templates.keys())}"
+            )
+
+        if not jinja2:
+            raise RuntimeError("jinja2 is required for template rendering")
+
+        template_str = self._templates[template_name]
+        try:
+            template = jinja2.Template(template_str)
+            return template.render(**context)
+        except jinja2.TemplateError as e:
+            if self.logger:
+                self.logger.error(
+                    f"Failed to render Slack template '{template_name}'",
+                    operation="render_slack_template",
+                    error=str(e),
+                )
+            raise
+
+    def get_template_names(self) -> list:
+        """Get list of available template names."""
+        if not self._loaded:
+            self.load_templates()
+        return list(self._templates.keys())
+
 
 # ============================================================================
 # Exception Classes
@@ -93,6 +215,8 @@ class ActionContext:
         settings_dict: Configuration dict with runtime settings
         db_repo: BookingRepository for DynamoDB operations
         sms_service: SensSmsClient for SMS sending
+        slack_service: SlackWebhookClient for Slack notifications (AC 1, 2)
+        slack_template_loader: SlackTemplateLoader for message templates (AC 3)
         logger: StructuredLogger for logging operations
     """
 
@@ -100,6 +224,8 @@ class ActionContext:
     settings_dict: Dict[str, Any]
     db_repo: BookingRepository
     sms_service: SensSmsClient
+    slack_service: Optional[Any]
+    slack_template_loader: Optional[Any]
     logger: StructuredLogger
 
 
@@ -115,12 +241,16 @@ class ActionServicesBundle:
     Attributes:
         db_repo: BookingRepository for DynamoDB operations
         sms_service: SensSmsClient for SMS via SENS API
+        slack_service: SlackWebhookClient for Slack notifications (AC 1, 2)
+        slack_template_loader: SlackTemplateLoader for message templates (AC 3)
         logger: StructuredLogger for structured logging with redaction
         settings_dict: Configuration dictionary
     """
 
     db_repo: BookingRepository
     sms_service: SensSmsClient
+    slack_service: Optional[Any]
+    slack_template_loader: Optional[Any]
     logger: StructuredLogger
     settings_dict: Dict[str, Any]
 
@@ -525,39 +655,52 @@ def send_telegram(
 
 def send_slack(
     context: ActionContext,
-    message: str,
-    template_params: Optional[Dict[str, str]] = None,
+    message: Optional[str] = None,
+    channel: Optional[str] = None,
+    template_name: Optional[str] = None,
+    template_params: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
-    Send message via Slack webhook service.
+    Send message via Slack webhook service with template support (AC 1, 2, 3).
 
-    Posts messages to Slack with support for template variable substitution.
-    This executor is a no-op if Slack is disabled in settings (AC5 requirement).
+    Posts messages to Slack webhook with optional Jinja2 template rendering.
+    - If template_name is provided, renders template from config/slack_templates.yaml
+    - Falls back to message parameter if template_name not provided
+    - Short-circuits gracefully if Slack is disabled (AC 2)
+    - Surfaces failures via ActionExecutionError (AC 1)
 
     Args:
-        context: ActionContext with logger and settings_dict
-        message: Message text to send
-        template_params: Optional dict for variable substitution in message
+        context: ActionContext with logger, slack_service, slack_template_loader, settings_dict
+        message: Static message text (used if template_name not provided)
+        channel: Optional Slack channel to post to (future use)
+        template_name: Optional template name from config/slack_templates.yaml (AC 3)
+        template_params: Optional dict for template variable substitution (AC 3)
 
-    Note:
-        This is a placeholder for AC5 (future requirement). Full Slack service
-        integration will be completed when SlackService is available.
-        Currently checks if Slack is enabled via settings_dict["slack_enabled"].
+    Raises:
+        ActionExecutionError: Wraps failures with context (AC 1)
+        ValueError: If neither message nor template_name provided, or template not found
 
     Example:
-        context = ActionContext(...)
-        send_slack(context, "Booking event occurred for {{booking.phone}}")
+        # Using static message
+        send_slack(context, message="Booking confirmed")
+
+        # Using template rendering
+        send_slack(context,
+                   template_name="expert_correction_digest",
+                   template_params={"users": [...], "today_date": "2025-10-22"})
     """
     logger = context.logger
+    booking = context.booking
     operation = "send_slack"
 
     log_context = {
-        "booking_id": context.booking.booking_num,
-        "message_length": len(message),
+        "booking_id": booking.booking_num,
+        "template_name": template_name,
+        "has_params": template_params is not None,
     }
 
     try:
-        # Check if Slack is enabled
+        # Check if Slack is enabled (AC 2)
         slack_enabled = context.settings_dict.get("slack_enabled", False)
 
         if not slack_enabled:
@@ -568,21 +711,81 @@ def send_slack(
             )
             return
 
+        # Validate inputs
+        if not message and not template_name:
+            raise ValueError("Either 'message' or 'template_name' must be provided")
+
+        # Render template if template_name provided (AC 3)
+        final_message = message
+        if template_name:
+            if not context.slack_template_loader:
+                raise RuntimeError("SlackTemplateLoader not configured in ActionContext")
+
+            template_params = template_params or {}
+            try:
+                final_message = context.slack_template_loader.render(
+                    template_name, **template_params
+                )
+                logger.debug(
+                    f"Rendered Slack template '{template_name}'",
+                    operation=operation,
+                    context=log_context,
+                )
+            except (ValueError, Exception) as e:
+                logger.error(
+                    f"Failed to render template '{template_name}'",
+                    operation=operation,
+                    context=log_context,
+                    error=str(e),
+                )
+                raise
+
+        # Send via webhook client (AC 1)
+        if not context.slack_service:
+            raise RuntimeError("SlackWebhookClient not configured in ActionContext")
+
         logger.debug(
             "Sending Slack notification",
             operation=operation,
-            context=log_context,
+            context={**log_context, "message_length": len(final_message)},
         )
 
-        # TODO: Integration with SlackService when available
-        # For now, just log the action
+        # Build Slack payload (webhook format)
+        payload = {
+            "text": final_message,
+        }
+        if channel:
+            payload["channel"] = channel
+
+        # Dispatch via webhook with retry handling
+        context.slack_service._dispatch(
+            {"text": final_message}, action="send_slack_from_rule_engine"
+        )
+
         logger.info(
             "Slack notification sent",
             operation=operation,
             context=log_context,
         )
 
-    except Exception as e:
+    except ValueError as e:
+        logger.error(
+            "Validation error in send_slack",
+            operation=operation,
+            context=log_context,
+            error=str(e),
+        )
+        raise ActionExecutionError(
+            executor_name="send_slack",
+            booking_id=booking.booking_num,
+            original_error=e,
+            context_data={
+                "template_name": template_name,
+                "has_message": message is not None,
+            },
+        ) from e
+
+    except (RuntimeError, SlackServiceError) as e:
         logger.error(
             "Failed to send Slack notification",
             operation=operation,
@@ -591,12 +794,26 @@ def send_slack(
         )
         raise ActionExecutionError(
             executor_name="send_slack",
-            booking_id=context.booking.booking_num,
+            booking_id=booking.booking_num,
             original_error=e,
             context_data={
-                "message": message[:100],
-                "has_params": template_params is not None,
+                "template_name": template_name,
+                "message_preview": (final_message[:100] if final_message else None),
             },
+        ) from e
+
+    except Exception as e:
+        logger.error(
+            "Unexpected error in send_slack",
+            operation=operation,
+            context=log_context,
+            error=str(e),
+        )
+        raise ActionExecutionError(
+            executor_name="send_slack",
+            booking_id=booking.booking_num,
+            original_error=e,
+            context_data={"template_name": template_name},
         ) from e
 
 
@@ -683,12 +900,18 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
 
     Example:
         from src.rules.engine import RuleEngine
-        from src.rules.actions import register_actions, ActionServicesBundle
+        from src.rules.actions import register_actions, ActionServicesBundle, SlackTemplateLoader
+        from src.notifications.slack_service import SlackWebhookClient
 
         engine = RuleEngine("config/rules.yaml")
+        slack_service = SlackWebhookClient(webhook_url=config_dict.get("slack_webhook_url"))
+        slack_loader = SlackTemplateLoader(logger=logger)
+
         services = ActionServicesBundle(
             db_repo=booking_repo,
             sms_service=sms_client,
+            slack_service=slack_service,
+            slack_template_loader=slack_loader,
             logger=logger,
             settings_dict=config_dict,
         )
@@ -699,6 +922,7 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
     operation = "register_actions"
     log_context = {
         "action_count": 6,
+        "slack_enabled": services.settings_dict.get("slack_enabled", False),
     }
 
     try:
@@ -719,6 +943,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 settings_dict=services.settings_dict,
                 db_repo=services.db_repo,
                 sms_service=services.sms_service,
+                slack_service=services.slack_service,
+                slack_template_loader=services.slack_template_loader,
                 logger=services.logger,
             )
             send_sms(action_context, **params)
@@ -733,6 +959,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 settings_dict=services.settings_dict,
                 db_repo=services.db_repo,
                 sms_service=services.sms_service,
+                slack_service=services.slack_service,
+                slack_template_loader=services.slack_template_loader,
                 logger=services.logger,
             )
             create_db_record(action_context, **params)
@@ -747,6 +975,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 settings_dict=services.settings_dict,
                 db_repo=services.db_repo,
                 sms_service=services.sms_service,
+                slack_service=services.slack_service,
+                slack_template_loader=services.slack_template_loader,
                 logger=services.logger,
             )
             update_flag(action_context, **params)
@@ -761,6 +991,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 settings_dict=services.settings_dict,
                 db_repo=services.db_repo,
                 sms_service=services.sms_service,
+                slack_service=services.slack_service,
+                slack_template_loader=services.slack_template_loader,
                 logger=services.logger,
             )
             send_telegram(action_context, **params)
@@ -775,6 +1007,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 settings_dict=services.settings_dict,
                 db_repo=services.db_repo,
                 sms_service=services.sms_service,
+                slack_service=services.slack_service,
+                slack_template_loader=services.slack_template_loader,
                 logger=services.logger,
             )
             send_slack(action_context, **params)
@@ -789,6 +1023,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 settings_dict=services.settings_dict,
                 db_repo=services.db_repo,
                 sms_service=services.sms_service,
+                slack_service=services.slack_service,
+                slack_template_loader=services.slack_template_loader,
                 logger=services.logger,
             )
             # Inject rule_name and action_name from context if not provided

@@ -18,9 +18,9 @@ This document describes the comprehensive test suite for the SMS automation rule
 tests/
 ├── unit/
 │   ├── test_rule_engine.py          # 36 tests - RuleEngine core
-│   ├── test_rules_schema.py         # 15 tests - Schema validation
+│   ├── test_rules_schema.py         # 19 tests - Schema validation (includes date_range)
 ├── rules/
-│   ├── test_conditions.py           # 61 tests - Condition evaluators
+│   ├── test_conditions.py           # 82 tests - Condition evaluators (includes 21 for date_range)
 │   ├── test_actions.py              # 28 tests - Action executors
 ├── integration/
 │   ├── test_rule_actions.py         # 11 tests - Full action workflows
@@ -137,8 +137,28 @@ Tests all 6 condition evaluators with 61 test cases:
 - ✓ Empty option keywords
 - ✓ Dict, string, and object option formats
 
+#### TestDateRange (21 tests, Story 6.3)
+- ✓ Booking within range → True
+- ✓ At start boundary (inclusive) → True
+- ✓ At end boundary (inclusive) → True
+- ✓ Before range → False
+- ✓ After range → False
+- ✓ Single-day range (start_date == end_date)
+- ✓ Naive datetime support
+- ✓ Timezone-aware datetime support (KST, UTC)
+- ✓ Invalid date format (non-ISO) → False
+- ✓ Out-of-range date values (month 13, day 30 in Feb) → False
+- ✓ Missing booking → False
+- ✓ Missing reserve_at → False
+- ✓ Non-datetime reserve_at → False
+- ✓ Leap year dates (Feb 29)
+- ✓ Year boundary crossing
+- ✓ Empty string dates → False
+- ✓ Context immutability preserved
+- ✓ Exception handling (graceful fallback)
+
 #### TestRegisterConditions (4 tests)
-- ✓ All 6 conditions registered
+- ✓ All 8 conditions registered (including date_range, has_pro_edit_option)
 - ✓ Registered functions are correct
 - ✓ Works with and without settings
 

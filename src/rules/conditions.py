@@ -355,6 +355,82 @@ def has_option_keyword(context: Dict[str, Any], **params) -> bool:
         return False
 
 
+def date_range(context: Dict[str, Any], start_date: str, end_date: str, **params) -> bool:
+    """
+    Evaluate if a booking falls within an inclusive date range.
+
+    Checks if booking.reserve_at date falls within [start_date, end_date] (inclusive).
+    Supports both naive and timezone-aware datetime objects.
+
+    Args:
+        context: Dictionary containing:
+            - booking: Booking object with reserve_at datetime
+            - current_time: Current datetime (optional, for reference)
+        start_date: Start date as ISO string (YYYY-MM-DD)
+        end_date: End date as ISO string (YYYY-MM-DD)
+        **params: Additional parameters (unused)
+
+    Returns:
+        bool: True if booking.reserve_at.date() is within [start_date, end_date], False otherwise
+
+    Reference:
+        Story 6.3: Add Date-Range Condition Evaluator
+        docs/epics/epic-6-post-mvp-enhancements.md#new-condition-evaluators
+
+    Example:
+        >>> from datetime import datetime
+        >>> import pytz
+        >>> booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=pytz.timezone('Asia/Seoul')))
+        >>> context = {'booking': booking}
+        >>> date_range(context, start_date='2025-10-19', end_date='2025-10-21')
+        True  # 2025-10-20 is within range
+        >>> date_range(context, start_date='2025-10-21', end_date='2025-10-22')
+        False  # 2025-10-20 is before start
+    """
+    try:
+        from datetime import datetime as dt
+
+        booking = context.get("booking")
+
+        # Short-circuit on missing inputs
+        if not booking:
+            logger.debug("date_range: Missing booking")
+            return False
+
+        reserve_at = getattr(booking, "reserve_at", None)
+        if not reserve_at:
+            logger.debug("date_range: Booking has no reserve_at")
+            return False
+
+        # Parse start and end dates
+        try:
+            start_dt = dt.strptime(start_date, "%Y-%m-%d").date()
+            end_dt = dt.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError as e:
+            logger.error(f"date_range: Invalid date format - {e}")
+            return False
+
+        # Convert reserve_at to date (handles both naive and timezone-aware)
+        if hasattr(reserve_at, "date"):
+            booking_date = reserve_at.date()
+        else:
+            logger.error(f"date_range: reserve_at is not a datetime object: {type(reserve_at)}")
+            return False
+
+        # Check if booking_date is within [start_dt, end_dt] (inclusive)
+        result = start_dt <= booking_date <= end_dt
+
+        logger.debug(
+            f"date_range: start={start_date}, end={end_date}, "
+            f"booking_date={booking_date}, result={result}"
+        )
+        return result
+
+    except Exception as e:
+        logger.error(f"date_range error: {e}", exc_info=True)
+        return False
+
+
 def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     """
     Register all condition evaluators with the rule engine.
@@ -383,6 +459,8 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
         - current_hour: True if current hour matches
         - booking_status: True if booking status matches code
         - has_option_keyword: True if booking has option keywords
+        - date_range: True if booking falls within date range
+        - has_pro_edit_option: True if booking has professional edit option
 
     Reference:
         Integration pattern: docs/brownfield-architecture.md:1070-1145
@@ -393,13 +471,14 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     engine.register_condition("current_hour", current_hour)
     engine.register_condition("booking_status", booking_status)
     engine.register_condition("has_option_keyword", has_option_keyword)
+    engine.register_condition("date_range", date_range)
     engine.register_condition("has_pro_edit_option", has_pro_edit_option)
 
     logger.info(
-        "Registered 7 condition evaluators with RuleEngine: "
+        "Registered 8 condition evaluators with RuleEngine: "
         "booking_not_in_db, time_before_booking, flag_not_set, "
         "current_hour, booking_status, has_option_keyword, "
-        "has_pro_edit_option"
+        "date_range, has_pro_edit_option"
     )
 
 

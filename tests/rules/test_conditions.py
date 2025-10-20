@@ -10,11 +10,12 @@ Coverage Targets:
 - AC4: current_hour
 - AC5: booking_status
 - AC6: has_option_keyword
+- AC7: date_range (Story 6.3)
 - AC9: Immutability and no external state changes
 - AC10: >85% coverage for src/rules/conditions.py
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from unittest.mock import Mock
 
 import pytz
@@ -26,6 +27,7 @@ from src.rules.conditions import (
     current_hour,
     booking_status,
     has_option_keyword,
+    date_range,
     register_conditions,
 )
 
@@ -459,16 +461,159 @@ class TestHasOptionKeyword:
         assert set(context.keys()) == original_keys
 
 
+class TestDateRange:
+    """AC7: date_range - Date range validation"""
+
+    def test_booking_within_range(self):
+        """Test: Returns True when booking date is within range"""
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is True
+
+    def test_booking_at_start_boundary(self):
+        """Test: Returns True when booking date equals start date (inclusive)"""
+        booking = Mock(reserve_at=datetime(2025, 10, 19, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is True
+
+    def test_booking_at_end_boundary(self):
+        """Test: Returns True when booking date equals end date (inclusive)"""
+        booking = Mock(reserve_at=datetime(2025, 10, 21, 23, 59, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is True
+
+    def test_booking_before_range(self):
+        """Test: Returns False when booking date is before start date"""
+        booking = Mock(reserve_at=datetime(2025, 10, 18, 23, 59, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is False
+
+    def test_booking_after_range(self):
+        """Test: Returns False when booking date is after end date"""
+        booking = Mock(reserve_at=datetime(2025, 10, 22, 0, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is False
+
+    def test_single_day_range(self):
+        """Test: Works with single-day range (start_date == end_date)"""
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 12, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-20", end_date="2025-10-20") is True
+        assert date_range(context, start_date="2025-10-20", end_date="2025-10-21") is True
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-20") is True
+
+    def test_naive_datetime(self):
+        """Test: Works with naive (non-timezone-aware) datetime"""
+        # Naive datetime (no timezone info)
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is True
+
+    def test_timezone_aware_datetime(self):
+        """Test: Works with timezone-aware datetime"""
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is True
+
+    def test_different_timezones(self):
+        """Test: Works regardless of timezone on reserve_at"""
+        utc = pytz.UTC
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 1, 0, tzinfo=utc))  # 10:00 KST
+        context = {"booking": booking}
+        # Date comparison uses just the date part, so timezone doesn't affect comparison
+        assert date_range(context, start_date="2025-10-20", end_date="2025-10-20") is True
+
+    def test_invalid_start_date_format(self):
+        """Test: Returns False when start_date format is invalid"""
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="20-10-2025", end_date="2025-10-21") is False
+        assert date_range(context, start_date="2025/10/20", end_date="2025-10-21") is False
+
+    def test_invalid_end_date_format(self):
+        """Test: Returns False when end_date format is invalid"""
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="21-10-2025") is False
+
+    def test_out_of_range_date_values(self):
+        """Test: Returns False when date values are out of range"""
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        # Invalid month
+        assert date_range(context, start_date="2025-13-01", end_date="2025-10-21") is False
+        # Invalid day
+        assert date_range(context, start_date="2025-02-30", end_date="2025-10-21") is False
+
+    def test_missing_booking(self):
+        """Test: Returns False when booking is missing"""
+        context = {}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is False
+
+    def test_booking_without_reserve_at(self):
+        """Test: Returns False when booking has no reserve_at"""
+        booking = Mock(spec=[])  # No reserve_at attribute
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is False
+
+    def test_booking_with_none_reserve_at(self):
+        """Test: Returns False when reserve_at is None"""
+        booking = Mock(reserve_at=None)
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is False
+
+    def test_reserve_at_not_datetime(self):
+        """Test: Returns False when reserve_at is not a datetime"""
+        booking = Mock(reserve_at="2025-10-20")  # String, not datetime
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is False
+
+    def test_immutable_context(self):
+        """Test: Does not mutate context dictionary"""
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        original_keys = set(context.keys())
+        date_range(context, start_date="2025-10-19", end_date="2025-10-21")
+        assert set(context.keys()) == original_keys
+
+    def test_exception_handling(self):
+        """Test: Gracefully handles unexpected exceptions"""
+        booking = Mock(side_effect=Exception("Mock error"))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2025-10-19", end_date="2025-10-21") is False
+
+    def test_leap_year_date(self):
+        """Test: Works with leap year dates (Feb 29)"""
+        booking = Mock(reserve_at=datetime(2024, 2, 29, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2024-02-28", end_date="2024-03-01") is True
+        assert date_range(context, start_date="2024-02-29", end_date="2024-02-29") is True
+
+    def test_year_boundary(self):
+        """Test: Works across year boundaries"""
+        booking = Mock(reserve_at=datetime(2025, 1, 1, 0, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="2024-12-31", end_date="2025-01-01") is True
+        assert date_range(context, start_date="2025-01-01", end_date="2025-01-02") is True
+
+    def test_empty_string_dates(self):
+        """Test: Returns False with empty string dates"""
+        booking = Mock(reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=KST))
+        context = {"booking": booking}
+        assert date_range(context, start_date="", end_date="2025-10-21") is False
+        assert date_range(context, start_date="2025-10-19", end_date="") is False
+
+
 class TestRegisterConditions:
     """Test registry helper function"""
 
     def test_register_all_conditions(self):
-        """Test: Registers all 6 condition evaluators"""
+        """Test: Registers all 8 condition evaluators"""
         engine = Mock()
         register_conditions(engine)
 
-        # Verify all 6 conditions registered
-        assert engine.register_condition.call_count == 6
+        # Verify all 8 conditions registered (including date_range and has_pro_edit_option)
+        assert engine.register_condition.call_count == 8
 
         # Verify correct names registered
         calls = [call[0][0] for call in engine.register_condition.call_args_list]
@@ -478,6 +623,8 @@ class TestRegisterConditions:
         assert "current_hour" in calls
         assert "booking_status" in calls
         assert "has_option_keyword" in calls
+        assert "date_range" in calls
+        assert "has_pro_edit_option" in calls
 
     def test_registered_functions_are_correct(self):
         """Test: Registered functions are the actual evaluators"""
@@ -495,6 +642,7 @@ class TestRegisterConditions:
         assert registered["current_hour"] == current_hour
         assert registered["booking_status"] == booking_status
         assert registered["has_option_keyword"] == has_option_keyword
+        assert registered["date_range"] == date_range
 
     def test_register_with_settings(self):
         """Test: Accepts settings parameter"""
@@ -502,11 +650,11 @@ class TestRegisterConditions:
         settings = Mock()
         # Should not raise
         register_conditions(engine, settings)
-        assert engine.register_condition.call_count == 6
+        assert engine.register_condition.call_count == 8
 
     def test_register_without_settings(self):
         """Test: Works without settings parameter"""
         engine = Mock()
         # Should not raise
         register_conditions(engine)
-        assert engine.register_condition.call_count == 6
+        assert engine.register_condition.call_count == 8

@@ -264,7 +264,7 @@ Must preserve 100% exactly:
 - Code follows Python PEP 8 style
 
 **NFR6: Deployability**
-- Zero-downtime deployment via parallel Lambda
+- Minimize downtime via controlled cutover with pre-validated artifacts
 - Rollback capability within 5 minutes
 - Automated deployment via CI/CD
 - Infrastructure as Code (Terraform/CloudFormation)
@@ -281,7 +281,7 @@ Must preserve 100% exactly:
 - ✅ All DynamoDB updates identical
 - ✅ All Telegram notifications identical
 - ✅ No customer complaints or missed notifications
-- ✅ 1-week parallel deployment with zero discrepancies
+- ✅ Offline validation campaign achieves 100% parity with signed go/no-go approval
 
 **MSC2: Technical Debt Elimination**
 - ✅ Python 3.11+ runtime in production
@@ -305,7 +305,7 @@ Must preserve 100% exactly:
 
 **MSC5: Production Readiness**
 - ✅ CloudWatch monitoring and alarms operational
-- ✅ Rollback procedures documented and tested
+- ✅ Rollback procedures documented and tested (cutover rehearsal + rollback drill)
 - ✅ Runbook created for incident response
 - ✅ Team trained on new system
 - ✅ Zero production incidents during migration
@@ -357,8 +357,8 @@ Must preserve 100% exactly:
 - Test infrastructure setup (pytest, mocks)
 
 **✅ Deployment**
-- Parallel deployment (old + new Lambda)
-- 1-week comparison period
+- Offline validation campaign with golden datasets
+- Controlled cutover playbook with rapid rollback path
 - Cutover procedure
 - Rollback documentation
 
@@ -567,7 +567,7 @@ Must preserve 100% exactly:
 - **Mitigation:**
   - >80% coverage requirement
   - Comparison testing for comprehensive validation
-  - 1-week parallel deployment catches issues
+  - Offline validation campaign catches issues before go-live
   - Gradual cutover if issues found
 
 **R7: Documentation Gaps**
@@ -612,12 +612,12 @@ Must preserve 100% exactly:
 
 **Week 4: Deployment & Validation**
 - Epic 5: Deployment
-- Deliverables: ECR deployment, parallel Lambda setup, 1-week monitoring
-- Gate: Zero discrepancies in parallel mode
+- Deliverables: ECR deployment, offline validation campaign, readiness evidence pack
+- Gate: Validation suite reports 100% parity and risks signed off
 
 **Week 5: Cutover & Monitoring**
 - Epic 5 continued: Cutover
-- Deliverables: Traffic switched to new Lambda, old Lambda decommissioned
+- Deliverables: Production traffic switched to new Lambda, legacy assets archived after verification window
 - Gate: 1 week zero production incidents
 
 **Week 6: Post-MVP Enhancements (Optional)**
@@ -640,8 +640,8 @@ Must preserve 100% exactly:
 - **Go/No-Go:** Proceed to deployment if quality gates met
 
 **Decision Point 3 (End of Week 4):** Production Deployment Safe?
-- 1-week parallel deployment successful
-- Zero discrepancies detected
+- Offline validation campaign successful (100% parity, risks mitigated)
+- Zero unresolved discrepancies
 - Monitoring and rollback ready
 - **Go/No-Go:** Cutover to new Lambda if validation passes
 
