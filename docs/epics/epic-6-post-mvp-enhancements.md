@@ -75,21 +75,19 @@ After successful production cutover, implement enhancement features that demonst
 
 **Implementing as Rules:**
 
-**Example Rule 1:** Store-specific option-based SMS
+**Example Rule 1:** Expert Correction Slack Digest *(updated from the earlier SMS promotion example)*
 ```yaml
-  - name: "Store 1051707 Option Promotion"
+  - name: "Expert Correction Slack Digest"
     enabled: true
     conditions:
-      - type: "store_id_matches"
-        params:
-          store_ids: ["1051707"]
       - type: "has_option_keyword"
         params:
-          keywords: ["네이버"]  # Option 1
+          keywords: ["전문가 보정"]
     actions:
-      - type: "send_sms"
+      - type: "send_slack"
         params:
-          template: "naver_option_promo"  # aa format (NEW template)
+          message: |
+            전문가 보정 선택 고객: {{booking.name}} ({{booking.phone_masked}}) — 수량 {{booking.pro_edit_count}}건
 ```
 
 **Example Rule 2:** (Already exists - 2-hour reminder)

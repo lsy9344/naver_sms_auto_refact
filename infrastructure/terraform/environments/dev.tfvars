@@ -13,12 +13,18 @@ ecr_image_tag_mutability      = "MUTABLE"
 ecr_lifecycle_max_image_count = 5
 
 # CloudWatch Configuration
-log_retention_days            = 30 # Shorter retention for dev
-alarm_email                   = "" # Set to email if needed
-error_alarm_threshold         = 2  # More lenient threshold for dev
-login_failure_alarm_threshold = 5
-lambda_function_name          = "naver-sms-automation-dev"
-cloudwatch_namespace          = "NaverSMSAutomationDev"
+log_retention_days               = 30 # Shorter retention for dev
+alarm_email                      = "" # Set to email if needed
+error_alarm_threshold            = 2  # More lenient threshold for dev
+login_failure_alarm_threshold    = 5
+lambda_function_name             = "naver-sms-automation-dev"
+cloudwatch_namespace             = "NaverSMSAutomationDev"
+comparison_namespace             = "naver-sms/comparison"
+comparison_metrics_enabled       = true
+discrepancy_alarm_threshold      = 0
+match_percentage_alarm_threshold = 100
+slack_webhook_url                = "" # Provide dev Slack webhook URL when available
+telegram_webhook_url             = "" # Provide dev Telegram webhook URL when available
 
 # IAM Role ARNs
 lambda_role_arn        = "arn:aws:iam::654654307503:role/naver-sms-automation-lambda-role"

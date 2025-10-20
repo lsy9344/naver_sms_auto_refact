@@ -13,12 +13,18 @@ ecr_image_tag_mutability      = "IMMUTABLE" # Immutable tags in production
 ecr_lifecycle_max_image_count = 20          # Keep more images for rollback capability
 
 # CloudWatch Configuration
-log_retention_days            = 90 # Longer retention for production
-alarm_email                   = "" # MUST set to email for production alerts
-error_alarm_threshold         = 1  # Strict threshold for production
-login_failure_alarm_threshold = 3
-lambda_function_name          = "naver-sms-automation-prod"
-cloudwatch_namespace          = "NaverSMSAutomationProd"
+log_retention_days               = 90 # Longer retention for production
+alarm_email                      = "" # MUST set to email for production alerts
+error_alarm_threshold            = 1  # Strict threshold for production
+login_failure_alarm_threshold    = 3
+lambda_function_name             = "naver-sms-automation-prod"
+cloudwatch_namespace             = "NaverSMSAutomationProd"
+comparison_namespace             = "naver-sms/comparison"
+comparison_metrics_enabled       = true
+discrepancy_alarm_threshold      = 0
+match_percentage_alarm_threshold = 100
+slack_webhook_url                = "" # Populate with production Slack webhook prior to deployment
+telegram_webhook_url             = "" # Populate with production Telegram webhook prior to deployment
 
 # IAM Role ARNs
 lambda_role_arn        = "arn:aws:iam::654654307503:role/naver-sms-automation-lambda-role"

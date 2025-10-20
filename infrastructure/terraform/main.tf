@@ -33,13 +33,19 @@ module "secrets_manager" {
 module "cloudwatch" {
   source = "./modules/cloudwatch"
 
-  log_retention_days            = var.log_retention_days
-  alarm_email                   = var.alarm_email
-  lambda_role_arn               = var.lambda_role_arn
-  environment                   = var.environment
-  error_alarm_threshold         = var.error_alarm_threshold
-  login_failure_alarm_threshold = var.login_failure_alarm_threshold
-  aws_region                    = var.aws_region
-  lambda_function_name          = var.lambda_function_name
-  cloudwatch_namespace          = var.cloudwatch_namespace
+  log_retention_days               = var.log_retention_days
+  alarm_email                      = var.alarm_email
+  lambda_role_arn                  = var.lambda_role_arn
+  environment                      = var.environment
+  error_alarm_threshold            = var.error_alarm_threshold
+  login_failure_alarm_threshold    = var.login_failure_alarm_threshold
+  aws_region                       = var.aws_region
+  lambda_function_name             = var.lambda_function_name
+  cloudwatch_namespace             = var.cloudwatch_namespace
+  comparison_namespace             = var.comparison_namespace
+  comparison_metrics_enabled       = var.comparison_metrics_enabled
+  discrepancy_alarm_threshold      = var.discrepancy_alarm_threshold
+  match_percentage_alarm_threshold = var.match_percentage_alarm_threshold
+  slack_webhook_url                = var.slack_webhook_url
+  telegram_webhook_url             = var.telegram_webhook_url
 }

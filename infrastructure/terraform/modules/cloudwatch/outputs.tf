@@ -51,6 +51,11 @@ output "cloudwatch_logs_policy_arn" {
   value       = aws_iam_policy.lambda_cloudwatch_logs.arn
 }
 
+output "metrics_and_notifications_policy_arn" {
+  description = "ARN of the IAM policy granting CloudWatch PutMetricData and SNS Publish permissions"
+  value       = aws_iam_policy.lambda_metrics_and_notifications.arn
+}
+
 # Story 5.4: Comparison monitoring outputs
 output "comparison_namespace" {
   description = "CloudWatch namespace for comparison metrics (Story 5.4)"

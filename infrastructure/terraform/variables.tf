@@ -146,3 +146,41 @@ variable "cloudwatch_namespace" {
   type        = string
   default     = "NaverSMSAutomation"
 }
+
+variable "comparison_namespace" {
+  description = "CloudWatch namespace dedicated to Story 5.4 comparison metrics"
+  type        = string
+  default     = "naver-sms/comparison"
+}
+
+variable "comparison_metrics_enabled" {
+  description = "Toggle Story 5.4 comparison dashboards, alarms, and metric filters"
+  type        = bool
+  default     = true
+}
+
+variable "discrepancy_alarm_threshold" {
+  description = "Threshold for triggering comparison discrepancy alarms (Story 5.4)"
+  type        = number
+  default     = 0
+}
+
+variable "match_percentage_alarm_threshold" {
+  description = "Minimum acceptable comparison match percentage before alarming"
+  type        = number
+  default     = 100
+}
+
+variable "slack_webhook_url" {
+  description = "Slack webhook URL for comparison alarm notifications (Story 5.4)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "telegram_webhook_url" {
+  description = "Telegram webhook URL for comparison alarm notifications (Story 5.4)"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

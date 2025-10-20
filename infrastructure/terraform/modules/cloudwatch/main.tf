@@ -1,6 +1,6 @@
 ###############################################################################
 # CloudWatch Logging and Monitoring Module
-# 
+#
 # Provisions:
 # - CloudWatch Log Group for Lambda logs
 # - Metric Filters for key operational events
@@ -8,6 +8,10 @@
 # - CloudWatch Alarms for error conditions
 # - SNS Topic for alarm notifications
 ###############################################################################
+
+locals {
+  lambda_role_name = element(split("/", var.lambda_role_arn), length(split("/", var.lambda_role_arn)) - 1)
+}
 
 ###############################################################################
 # CloudWatch Log Group
@@ -193,10 +197,10 @@ resource "aws_sns_topic_subscription" "alerts_email" {
 # SNS Topic Subscription (Slack via HTTP endpoint)
 # Note: Configure Slack webhook URL in terraform.tfvars or environment variable TF_VAR_slack_webhook_url
 resource "aws_sns_topic_subscription" "alerts_slack" {
-  count             = var.slack_webhook_url != "" ? 1 : 0
-  topic_arn         = aws_sns_topic.alerts.arn
-  protocol          = "https"
-  endpoint          = var.slack_webhook_url
+  count                  = var.slack_webhook_url != "" ? 1 : 0
+  topic_arn              = aws_sns_topic.alerts.arn
+  protocol               = "https"
+  endpoint               = var.slack_webhook_url
   endpoint_auto_confirms = true
 
   depends_on = [aws_sns_topic.alerts]
@@ -205,10 +209,10 @@ resource "aws_sns_topic_subscription" "alerts_slack" {
 # SNS Topic Subscription (Telegram via HTTP endpoint)
 # Note: Configure Telegram bot webhook URL in terraform.tfvars or environment variable TF_VAR_telegram_webhook_url
 resource "aws_sns_topic_subscription" "alerts_telegram" {
-  count             = var.telegram_webhook_url != "" ? 1 : 0
-  topic_arn         = aws_sns_topic.alerts.arn
-  protocol          = "https"
-  endpoint          = var.telegram_webhook_url
+  count                  = var.telegram_webhook_url != "" ? 1 : 0
+  topic_arn              = aws_sns_topic.alerts.arn
+  protocol               = "https"
+  endpoint               = var.telegram_webhook_url
   endpoint_auto_confirms = true
 
   depends_on = [aws_sns_topic.alerts]
@@ -296,7 +300,7 @@ resource "aws_cloudwatch_metric_alarm" "comparison_discrepancies" {
   evaluation_periods  = 1
   metric_name         = "SMSMismatchCount"
   namespace           = var.comparison_namespace
-  period              = 300  # 5 minutes
+  period              = 300 # 5 minutes
   statistic           = "Sum"
   threshold           = var.discrepancy_alarm_threshold
   alarm_description   = "Alert when discrepancies detected during SMS comparison (Story 5.4)"
@@ -320,7 +324,7 @@ resource "aws_cloudwatch_metric_alarm" "comparison_db_mismatches" {
   evaluation_periods  = 1
   metric_name         = "DBMismatchCount"
   namespace           = var.comparison_namespace
-  period              = 300  # 5 minutes
+  period              = 300 # 5 minutes
   statistic           = "Sum"
   threshold           = var.discrepancy_alarm_threshold
   alarm_description   = "Alert when DynamoDB operation mismatches detected (Story 5.4)"
@@ -344,7 +348,7 @@ resource "aws_cloudwatch_metric_alarm" "comparison_telegram_mismatches" {
   evaluation_periods  = 1
   metric_name         = "TelegramMismatchCount"
   namespace           = var.comparison_namespace
-  period              = 300  # 5 minutes
+  period              = 300 # 5 minutes
   statistic           = "Sum"
   threshold           = var.discrepancy_alarm_threshold
   alarm_description   = "Alert when Telegram event mismatches detected (Story 5.4)"
@@ -368,7 +372,7 @@ resource "aws_cloudwatch_metric_alarm" "comparison_match_percentage" {
   evaluation_periods  = 2
   metric_name         = "ComparisonMatchPercentage"
   namespace           = var.comparison_namespace
-  period              = 300  # 5 minutes
+  period              = 300 # 5 minutes
   statistic           = "Average"
   threshold           = var.match_percentage_alarm_threshold
   alarm_description   = "Alert when match percentage drops below threshold (Story 5.4)"
@@ -392,7 +396,7 @@ resource "aws_cloudwatch_metric_alarm" "comparison_any_discrepancies" {
   evaluation_periods  = 1
   metric_name         = "DiscrepanciesDetected"
   namespace           = var.comparison_namespace
-  period              = 300  # 5 minutes
+  period              = 300 # 5 minutes
   statistic           = "Maximum"
   threshold           = 0
   alarm_description   = "Alert when any comparison discrepancies detected (Story 5.4)"
@@ -624,4 +628,49 @@ resource "aws_iam_policy" "lambda_cloudwatch_logs" {
     Name        = "${var.lambda_function_name}-cloudwatch-logs"
     Environment = var.environment
   }
+}
+
+data "aws_iam_policy_document" "lambda_metrics_and_notifications" {
+  statement {
+    sid    = "AllowPutMetricData"
+    effect = "Allow"
+
+    actions = [
+      "cloudwatch:PutMetricData"
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowSnsPublish"
+    effect = "Allow"
+
+    actions = [
+      "sns:Publish"
+    ]
+
+    resources = [aws_sns_topic.alerts.arn]
+  }
+}
+
+resource "aws_iam_policy" "lambda_metrics_and_notifications" {
+  name        = "${var.lambda_function_name}-metrics-and-alerts"
+  description = "Policy to allow Lambda to publish CloudWatch metrics and SNS alerts"
+  policy      = data.aws_iam_policy_document.lambda_metrics_and_notifications.json
+
+  tags = {
+    Name        = "${var.lambda_function_name}-metrics-and-alerts"
+    Environment = var.environment
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_cloudwatch_logs_attachment" {
+  role       = local.lambda_role_name
+  policy_arn = aws_iam_policy.lambda_cloudwatch_logs.arn
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_metrics_and_notifications_attachment" {
+  role       = local.lambda_role_name
+  policy_arn = aws_iam_policy.lambda_metrics_and_notifications.arn
 }

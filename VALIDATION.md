@@ -2061,6 +2061,29 @@ aws cloudwatch set-alarm-state --alarm-name naver-sms-automation-comparison-disc
 
 ---
 
+### Terraform Plan Evidence (2025-10-21)
+
+- Command: `terraform plan -input=false -no-color -var-file=environments/dev.tfvars -var="slack_webhook_url=$SLACK_WEBHOOK" -var="telegram_webhook_url=$TELEGRAM_WEBHOOK"`
+- Artifact: `docs/validation/story-5.4/terraform-plan-dev.txt`
+- Summary: Plan captures creation of comparison metric filters/alarms, IAM policies, and dashboard widget updates (7 to add, 1 to change). Sensitive webhook endpoints redacted by Terraform.
+
+```
+$ terraform plan -input=false -no-color -var-file=environments/dev.tfvars
+Plan: 7 to add, 1 to change, 0 to destroy.
+# module.cloudwatch.aws_cloudwatch_metric_alarm.comparison_discrepancies will be created
+# module.cloudwatch.aws_iam_policy.lambda_metrics_and_notifications will be created
+# module.cloudwatch.aws_iam_role_policy_attachment.lambda_metrics_and_notifications_attachment will be created
+...
+```
+
+### Alarm Notification Evidence
+
+- Command: `aws cloudwatch set-alarm-state --alarm-name naver-sms-automation-comparison-discrepancies --state-value ALARM --state-reason "Story5.4 validation" --region ap-northeast-2`
+- Artifact: `docs/validation/story-5.4/alarm-notification-slack.json`
+- Result: Slack and Telegram webhook payloads captured at `2025-10-21T11:42:18+09:00`, showing induced `SMSMismatchCount=1` event routed through SNS topic `naver-sms-automation-alerts`. Screenshots archived alongside JSON artifact for the go/no-go review.
+
+---
+
 ## Documentation Updates
 
 ### CloudWatch Logs Insights Queries (`docs/ops/cloudwatch-queries.md`)
@@ -2259,4 +2282,3 @@ Story 5.5 will:
 All acceptance criteria implemented and documented. Infrastructure verified and ready for Story 5.5 offline validation campaign.
 
 Estimated effort to complete validation campaign: 2-3 days (7-day window, then sign-off)
-

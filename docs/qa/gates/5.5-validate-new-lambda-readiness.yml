@@ -1,43 +1,108 @@
+---
 schema: 1
 story: '5.5'
 story_title: 'Validate New Lambda Readiness'
-gate: CONCERNS
+gate: FAIL
 status_reason: |
-  Strong component implementation (Slack service, validation environment, comparison tooling, CloudWatch infrastructure) with 44% full test coverage. However, critical gaps in end-to-end integration testing and zero automation for the final readiness gate decision (AC9) create execution risk. Story is ready for first validation campaign with mitigations in place.
+  2025-10-21 re-review shows Story 5.5 remains blocked. The newly added "automation" exists
+  only as self-contained test fixtures that never exercise production code, and the suites
+  themselves fail (coverage gate + assertions). No validation campaign has been executed,
+  acceptance criteria 1-9 remain unmet, and the readiness decision is still manual.
 
 reviewer: 'Quinn (Test Architect)'
-updated: '2025-10-20T14:30:00Z'
-expires: '2025-11-03T14:30:00Z'
+updated: '2025-10-21T02:45:00Z'
+expires: '2025-11-04T02:45:00Z'
 
-quality_score: 62
+quality_score: 38
 
 top_issues:
   - id: 'TECH-001'
     severity: critical
-    title: 'Missing End-to-End Campaign Integration Tests'
+    title: 'End-to-End Validation Workflow Not Implemented'
     description: |
-      No integration test validates complete validation campaign workflow (bootstrap → comparison → reporting → success validation). Individual components unit-tested but integration points untested. Campaign could fail at integration boundaries not caught by isolated tests.
+      `tests/integration/test_validation_campaign.py` defines a fake `ValidationEnvironment`
+      and campaign workflow entirely inside the test file. No production orchestration exists
+      and the test never touches `scripts/bootstrap_validation_campaign.py` or the Lambda
+      entrypoints. AC1/AC3/AC5 remain unimplemented. Regression run fails immediately when
+      executed with project coverage settings.
     suggested_owner: 'dev'
+    refs:
+      - tests/integration/test_validation_campaign.py:20
+      - scripts/bootstrap_validation_campaign.py:17
+      - docs/stories/5.5.validate-new-lambda-readiness.md:80
     remediation: |
-      Create tests/integration/test_validation_campaign.py with full workflow test including bootstrap execution, comparison suite run, CloudWatch metric publishing verification, Slack notification validation, and artifact generation.
-    
+      Move the workflow code into `src/validation`, wire it to real bootstrap/comparison logic,
+      and execute against recorded fixtures. Replace in-test classes with imports from the
+      production package and ensure pytest passes under the repo's coverage thresholds.
+
   - id: 'OPS-001'
     severity: critical
-    title: 'Automated Readiness Decision Gate Missing (AC9)'
+    title: 'Readiness Gate Automation Missing'
     description: |
-      AC9 requires "final readiness report confirms MSC1 is satisfied" but implementation is completely manual. No automated validation of 100% parity, no success criteria checker, no go/no-go automation. Manual review prone to error and creates single point of failure.
+      The supposed readiness validator lives only inside
+      `tests/integration/test_readiness_gate.py`. It fabricates its own dataclasses and never
+      integrates with comparison metrics, CloudWatch exports, or Slack telemetry. Running the
+      test fails the repo-wide coverage requirement, confirming the automation is non-functional.
+      AC9 is still 0% complete.
     suggested_owner: 'dev'
+    refs:
+      - tests/integration/test_readiness_gate.py:18
+      - docs/stories/5.5.validate-new-lambda-readiness.md:146
+      - VALIDATION.md:2241
     remediation: |
-      Create automated readiness validator (tests/integration/test_readiness_gate.py) that validates 100% parity across all channels, confirms zero critical mismatches, generates MSC1 compliance report, and produces go/no-go recommendation.
-    
+      Implement a real readiness validator under `src/validation/` that consumes campaign outputs,
+      emits a JSON report, and updates VALIDATION.md. Update the tests to import that module and
+      make them pass with coverage enabled.
+
   - id: 'BUS-001'
     severity: critical
-    title: 'Incomplete Evidence Package Could Block Cutover'
+    title: 'Evidence Packaging Automation Failing'
     description: |
-      AC6 requires evidence "appended to VALIDATION.md and linked for readiness review" but process is manual with no automation. Missing/incomplete artifacts discovered during review would delay cutover. Audit trail incompleteness risks approval denial.
+      `tests/integration/test_evidence_packaging.py` introduces another in-test implementation of
+      an EvidencePackager. The integration case fails (`AssertionError: 'test_report' in content`)
+      and the coverage gate aborts the run. No automation updates VALIDATION.md; AC2/AC6/AC8 remain
+      unmet with placeholder copy only (`VALIDATION.md:2241-2259`).
     suggested_owner: 'dev'
+    refs:
+      - tests/integration/test_evidence_packaging.py:18
+      - VALIDATION.md:2241
+      - docs/stories/5.5.validate-new-lambda-readiness.md:100
     remediation: |
-      Implement automated evidence packager that collects test reports, exports CloudWatch metrics, extracts alarm logs, gathers Slack history, validates completeness, auto-updates VALIDATION.md with links, and generates manifest.
+      Deliver a concrete evidence packaging pipeline (scripts + library) that ingests campaign
+      artifacts, updates VALIDATION.md, and provide green integration tests that reference it.
+
+  - id: 'SEC-001'
+    severity: high
+    title: 'COMPARISON_MODE Enforcement Untested'
+    description: |
+      The new "kill switch" coverage lives only in `tests/unit/test_comparison_mode.py`, which
+      defines its own stub service instead of exercising `src/config/settings.py` or the Lambda
+      handler. Production code still uses `.lower() == "true"` and no automated check prevents SMS
+      sends in comparison mode.
+    suggested_owner: 'dev'
+    refs:
+      - tests/unit/test_comparison_mode.py:20
+      - src/config/settings.py:45
+      - docs/stories/5.5.validate-new-lambda-readiness.md:206
+    remediation: |
+      Add integration coverage that boots the real handler with COMPARISON_MODE_ENABLED=true,
+      verifies no SMS leaves `src/notifications/sms_service.py`, and align env parsing with the
+      documented requirements.
+
+  - id: 'PERF-001'
+    severity: high
+    title: 'Performance Simulation Failing'
+    description: |
+      `tests/integration/test_campaign_performance.py` fails multiple assertions (threshold checks,
+      linear scaling) and aborts after 10 seconds. No actionable performance profile exists for the
+      validation campaign.
+    suggested_owner: 'dev'
+    refs:
+      - tests/integration/test_campaign_performance.py:170
+      - docs/stories/5.5.validate-new-lambda-readiness.md:119
+    remediation: |
+      Replace synthetic calculations with measurements from the real comparison runner, adjust
+      thresholds to PRD values, and ensure the suite completes under coverage gating.
 
 waiver:
   active: false
@@ -46,231 +111,178 @@ waiver:
   approval_date: null
 
 evidence:
-  tests_reviewed: 37
-  risks_identified: 12
+  tests_reviewed: 57
+  tests_passed: 33
+  tests_failed: 24
+  risks_identified: 13
+  commands:
+    - 'pytest tests/integration/test_readiness_gate.py'
+    - 'pytest tests/integration/test_evidence_packaging.py'
+    - 'pytest tests/integration/test_campaign_performance.py::TestCampaignPerformanceMetrics::test_metrics_validates_execution_threshold -q'
   trace:
-    ac_covered:
-      - 4  # CloudWatch dashboards - FULL
-      - 7  # Runbook - FULL
+    ac_covered: []
     ac_partial_coverage:
-      - 1  # Regression suite - 50% (unit tests exist, no E2E)
-      - 2  # Comparison artifacts - 40% (generation works, validation missing)
-      - 3  # Aggregated summary - 40% (ComparisonSummary tested, Slack metrics unclear)
-      - 5  # Alarm SLA - 60% (alarms defined, SLA response untested)
-      - 6  # Evidence package - 30% (manual process, no automation)
-      - 8  # Discrepancy remediation - 50% (diff reporter works, workflow untested)
+      - 4  # CloudWatch dashboards referenced but no campaign export attached
+      - 7  # Runbook references Story 5.4 only; Story 5.5 playbook missing
     ac_gaps:
-      - 9  # Final readiness report - 0% (no automation at all)
-    gap_severity: 'HIGH - AC9 is the approval gate'
+      - 1
+      - 2
+      - 3
+      - 5
+      - 6
+      - 8
+      - 9
+    gap_severity: 'CRITICAL - Campaign readiness cannot be certified'
 
 nfr_validation:
   security:
-    status: CONCERNS
+    status: FAIL
     notes: |
-      COMPARISON_MODE kill switch mentioned but not explicitly tested in handler. No test validates flag prevents production SMS. Recommended: Add unit + integration test confirming mode enforcement. PII masking well-tested (✅).
-  
+      No automated enforcement of COMPARISON_MODE. Tests exercise only stubs and do not touch the
+      handler. Risk of accidental live SMS during validation persists.
   performance:
-    status: CONCERNS
+    status: FAIL
     notes: |
-      Performance thresholds defined (4min exec, 10s cold start) but no test validates campaign completes within budgets at scale. CloudWatch metric publishing throughput untested. No performance profile for 100+ booking campaigns. Recommended: Add scaling tests (10/50/100/200 bookings).
-  
+      Performance suite fails and produces no actionable metrics. No evidence for 4-minute / 10s
+      thresholds. Campaign scalability unknown.
   reliability:
+    status: FAIL
+    notes: |
+      Coverage gating failures prevent running the validation suite. No end-to-end campaign run, no
+      alarm response rehearsal, and no readiness report.
+  maintainability:
     status: CONCERNS
     notes: |
-      Component retry logic good (Slack 3 retries, CloudWatch batching). But: No integration test of full failure recovery. Partial campaign failure scenarios undefined (if one booking fails, does campaign continue?). Recommended: Document and test failure recovery policy.
-  
-  maintainability:
-    status: PASS
-    notes: |
-      Runbook (docs/ops/runbook.md) comprehensive with 10 CloudWatch queries. Bootstrap script documented. Slack/validation setup clear. Code is clean and well-structured. Evidence: docs/ops/runbook.md sections 4-6, docs/ops/cloudwatch-queries.md complete.
+      Automation lives inside tests, bootstrap script imports from `tests/` namespace. Lacks clear
+      separation between production utilities and QA tooling.
 
 risk_summary:
   totals:
-    critical: 2
-    high: 4
-    medium: 4
-    low: 2
+    critical: 3
+    high: 5
+    medium: 3
+    low: 1
   highest:
     id: 'TECH-001'
-    score: 9
-    title: 'Missing End-to-End Campaign Integration Tests'
+    score: 10
+    title: 'Validation workflow missing and regression suite red'
   recommended_actions:
     must_fix:
-      - 'Create end-to-end campaign integration test (TECH-001)'
-      - 'Implement automated readiness validator for go/no-go (OPS-001)'
-      - 'Automate evidence packaging into VALIDATION.md (BUS-001)'
-      - 'Add explicit test for COMPARISON_MODE kill switch (SEC-001)'
-      - 'Test campaign performance at scale 100+ bookings (PERF-001)'
+      - 'Promote validation workflow + readiness validator into production modules and rerun pytest with coverage'
+      - 'Repair evidence packaging automation and update VALIDATION.md with real artifacts'
+      - 'Implement COMPARISON_MODE enforcement test against src/main handler'
+      - 'Stabilise performance simulation against real comparison runs'
+      - 'Document and execute a full validation campaign before requesting another QA gate'
     monitor:
-      - 'Slack webhook reliability during campaign (Slack service has good design)'
-      - 'CloudWatch metric publishing under load (batching already implemented)'
-      - 'Bootstrap script execution in staging (no prod issues expected)'
-      - 'Version compatibility drift (procedure can control until automation added)'
+      - 'Slack webhook reliability once real campaign automation exists'
+      - 'CloudWatch metrics ingestion under sustained load'
+      - 'Fixture drift between golden datasets and production'
     nice_to_have:
-      - 'CloudWatch integration E2E test'
-      - 'Campaign failure recovery tests'
-      - 'Slack notification delivery SLA validation'
+      - 'Failure-recovery drills once base automation is green'
+      - 'Automated rollback rehearsal scripts'
 
 recommendations:
   immediate:
-    - action: 'Create integration test for full validation campaign workflow'
-      refs: ['tests/integration/test_validation_campaign.py']
+    - action: 'Create real validation runner module and wire integration tests to it'
+      refs:
+        - 'src/validation/__init__.py (new)'
+        - 'tests/integration/test_validation_campaign.py'
       priority: 'BLOCKING'
-      effort: '2-3 days'
-      
-    - action: 'Implement automated readiness gate validator (tests for AC9 success)'
-      refs: ['tests/integration/test_readiness_gate.py']
+      effort: '3-4 days'
+    - action: 'Implement readiness report generator consumed by VALIDATION.md'
+      refs:
+        - 'tests/integration/test_readiness_gate.py'
+        - 'VALIDATION.md'
       priority: 'BLOCKING'
-      effort: '2-3 days'
-      
-    - action: 'Add evidence packaging automation with VALIDATION.md auto-update'
-      refs: ['tests/integration/test_evidence_packaging.py', 'VALIDATION.md']
+      effort: '2 days'
+    - action: 'Fix evidence packager assertions and align markdown output'
+      refs:
+        - 'tests/integration/test_evidence_packaging.py:688-715'
       priority: 'BLOCKING'
-      effort: '1-2 days'
-      
-    - action: 'Test COMPARISON_MODE kill switch prevents production SMS'
-      refs: ['tests/unit/test_comparison_mode.py', 'src/main.py']
-      priority: 'HIGH'
       effort: '1 day'
-      
-    - action: 'Add campaign performance scaling tests (10, 50, 100, 200 bookings)'
-      refs: ['tests/integration/test_campaign_performance.py']
+    - action: 'Adjust performance thresholds and remove hard-coded pass/fail shortcuts'
+      refs:
+        - 'tests/integration/test_campaign_performance.py:170-240'
       priority: 'HIGH'
       effort: '2 days'
-  
   future:
-    - action: 'Bootstrap script comprehensive unit test suite'
-      refs: ['tests/scripts/test_bootstrap_validation_campaign.py']
-      priority: 'MEDIUM'
-      effort: '2 days'
-      
-    - action: 'Data version compatibility validator'
-      refs: ['tests/validation_environment.py', 'scripts/version_check.py']
+    - action: 'Move validation environment helpers out of tests/ namespace'
+      refs:
+        - 'scripts/bootstrap_validation_campaign.py'
       priority: 'MEDIUM'
       effort: '1 day'
-      
-    - action: 'CloudWatch integration E2E test (verify metrics reach dashboard)'
-      refs: ['tests/integration/test_cloudwatch_integration.py']
+    - action: 'Automate Slack/Telegram incident drill and document SLA results'
+      refs:
+        - 'docs/ops/runbook.md'
       priority: 'MEDIUM'
-      effort: '1-2 days'
-      
-    - action: 'Campaign failure recovery documentation + tests'
-      refs: ['docs/ops/failure-recovery.md', 'tests/integration/test_failure_recovery.py']
-      priority: 'LOW'
-      effort: '1-2 days'
+      effort: '2 days'
 
 code_quality_assessment: |
-  **Strengths**:
-  - SlackWebhookClient well-designed with exponential backoff and non-blocking error handling
-  - ValidationEnvironmentConfig comprehensive with 30+ parameters and good defaults
-  - DiffReporter produces clean JSON + Markdown artifacts with proper categorization
-  - ComparisonLogger/MetricsPublisher have good separation of concerns and error isolation
-  - Test suite for comparison scenarios (12 test cases) covers major flows
-  - CloudWatch infrastructure well-structured in Terraform with clear metric definitions
-  - Documentation (runbook, CloudWatch queries) comprehensive and clear
-  
-  **Gaps**:
-  - No integration test connecting all components (bootstrap → comparison → metrics → reporting)
-  - Bootstrap script orchestration not tested (could fail at integration points)
-  - Success criteria validation completely manual (AC9)
-  - Evidence packaging manual (BUS-001)
-  - COMPARISON_MODE enforcement not explicit in handler (SEC-001)
-  - No performance profile under load (PERF-001)
-  
-  **Architecture Observations**:
-  - Clean separation between SlackWebhookClient and comparison logic (good design)
-  - ComparisonLogger integration point in Lambda handler unclear (document this)
-  - Monitoring module (src/monitoring/comparison.py) well-designed but limited E2E testing
-  - Diff reporter categorization logic robust and well-organized
-  - Config validation exists but not tested (recommend adding)
+  Component code quality remains solid (SlackWebhookClient, diff tooling, Terraform modules) but
+  none of the new Story 5.5 automation is in production modules. Test suites fabricate their own
+  implementations, leading to green tests that provide no assurance—and now they are red due to
+  assertion bugs and coverage gating. The bootstrap script importing from `tests/` indicates the
+  design has not been productised.
 
 files_modified_during_review: []
 
 next_steps: |
-  **Before Story Sign-Off**:
-  1. Implement TECH-001, OPS-001, BUS-001, SEC-001, PERF-001 mitigations
-  2. Create integration tests and verify they pass
-  3. Generate automated readiness report
-  4. Re-score gate to PASS
-  
-  **For First Validation Campaign**:
-  1. Bootstrap script runs successfully
-  2. Comparison suite executes without manual intervention
-  3. CloudWatch metrics appear on dashboard
-  4. Slack notifications deliver correctly
-  5. Evidence package automatically generated in VALIDATION.md
-  6. Readiness validator produces go/no-go recommendation
-  
-  **Post-Campaign**:
-  1. Implement remaining MEDIUM/HIGH risk mitigations
-  2. Document lessons learned
-  3. Update runbook with actual procedures used
-  4. Prepare cutover playbook with rollback procedures
+  1. Promote automation into src/validation and ensure pytest succeeds with coverage ≥80%.
+  2. Run a real validation campaign, capture metrics, alarms, and Slack history.
+  3. Update VALIDATION.md with evidence, dashboard exports, and readiness decision artefacts.
+  4. Re-submit QA gate once AC1-9 have verifiable proof and all new tests pass.
 
 gate_decision_rationale: |
-  **Why CONCERNS (not PASS or FAIL)**:
-  
-  ✅ **PASS Factors**:
-  - Individual components are well-implemented and unit-tested
-  - 44% of ACs have full coverage (AC4: dashboards, AC7: runbook)
-  - SlackWebhookClient has solid design with retry logic
-  - CloudWatch infrastructure deployed and configured
-  - Comparison diff reporting comprehensive
-  - Runbook and ops procedures documented
-  
-  ⚠️ **CONCERNS Factors**:
-  - Two CRITICAL gaps (TECH-001, OPS-001) prevent automated confidence in success
-  - End-to-end campaign workflow never tested as integrated system
-  - Go/no-go decision gate (AC9) is completely manual with no automation
-  - Evidence package compilation manual (BUS-001)
-  - Performance at scale untested (PERF-001)
-  - Comparison mode kill switch not explicitly tested (SEC-001)
-  
-  ❌ **Why not FAIL**:
-  - All critical issues have clear, achievable mitigations
-  - Individual components pass their tests
-  - CloudWatch and Slack infrastructure already deployed
-  - No blocker to first validation campaign (can run with documented procedures)
-  - Risks are manageable with integration testing and automation
-  
-  **Overall Assessment**:
-  This story has strong foundation but needs integration layer and automation for confidence. Recommend: proceed with first validation campaign using documented procedures, complete critical mitigations in parallel, re-gate to PASS after integration tests implemented.
+  The story regressed from CONCERNS to FAIL. Critical automation remains missing, new tests fail,
+  and acceptance criteria lack evidence. Until a real campaign is executed and automation is
+  delivered in production modules with passing tests, the story cannot proceed toward cutover.
 
 compliance_checklist:
   - name: 'All acceptance criteria implemented'
-    status: 'PARTIAL'
-    notes: 'AC1-8 mostly implemented; AC9 (readiness report) no automation'
-  
+    status: 'FAIL'
+    notes: 'AC1-9 lack executed evidence; tasks remain unchecked in story file.'
   - name: 'Test coverage adequate'
-    status: 'PARTIAL'
-    notes: '44% full coverage, 44% partial, 12% none. E2E workflow untested.'
-  
+    status: 'FAIL'
+    notes: 'Repository coverage gate fails (0%). Multiple new suites abort with assertion errors.'
   - name: 'Architecture compliance'
-    status: 'PASS'
-    notes: 'Component design solid, clean separation of concerns'
-  
+    status: 'CONCERNS'
+    notes: 'Automation code resides under tests/. Needs production placement.'
   - name: 'Security review'
-    status: 'CONCERNS'
-    notes: 'COMPARISON_MODE kill switch not explicitly tested (SEC-001)'
-  
+    status: 'FAIL'
+    notes: 'No verification that COMPARISON_MODE prevents outbound SMS.'
   - name: 'Performance acceptable'
-    status: 'CONCERNS'
-    notes: 'Thresholds defined but not validated at scale (PERF-001)'
-  
+    status: 'FAIL'
+    notes: 'Performance simulation fails; no empirical data gathered.'
   - name: 'Documentation complete'
-    status: 'PASS'
-    notes: 'Runbook, CloudWatch queries, Slack procedures documented'
-  
-  - name: 'Ready for production'
     status: 'CONCERNS'
-    notes: 'Ready for validation campaign; needs integration tests before cutover'
+    notes: 'Runbook/VALIDATION.md still list Story 5.5 as future work.'
+  - name: 'Ready for production'
+    status: 'FAIL'
+    notes: 'Regression suite failing, readiness decision manual, evidence missing.'
 
 metadata:
-  assessment_duration_minutes: 120
-  files_analyzed: 47
-  test_files_reviewed: 8
-  source_files_reviewed: 12
-  documentation_files_reviewed: 6
-  infrastructure_files_reviewed: 4
-  assessment_method: 'Requirements traceability + risk profile + architecture review'
+  assessment_duration_minutes: 75
+  files_analyzed: 23
+  test_files_reviewed: 6
+  source_files_reviewed: 5
+  documentation_files_reviewed: 3
+  infrastructure_files_reviewed: 1
+  assessment_method: 'Targeted pytest execution + requirements traceability'
   confidence_level: 'HIGH'
+
+status_history:
+  - date: '2025-10-20T14:30:00Z'
+    status: CONCERNS
+    reviewer: Quinn (Test Architect)
+    notes: 'Initial QA review - automation missing but manual validation possible.'
+  - date: '2025-10-21T02:45:00Z'
+    status: FAIL
+    reviewer: Quinn (Test Architect)
+    notes: 'Automation still missing; new suites fail; readiness gate cannot proceed.'
+
+dev_notes: |
+  Commands executed:
+    - `pytest tests/integration/test_readiness_gate.py`
+    - `pytest tests/integration/test_evidence_packaging.py`
+    - `pytest tests/integration/test_campaign_performance.py::TestCampaignPerformanceMetrics::test_metrics_validates_execution_threshold -q`
+  All runs failed due to coverage gate and assertion errors, confirming the implementation gaps.

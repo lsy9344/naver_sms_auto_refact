@@ -1,0 +1,130 @@
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # module.cloudwatch.aws_cloudwatch_log_metric_filter.comparison_summary will be created
+  + resource "aws_cloudwatch_log_metric_filter" "comparison_summary" {
+      + id                 = (known after apply)
+      + log_group_name     = "/aws/lambda/naver-sms-automation-dev"
+      + metric_transformation {
+          + name      = "ComparisonRun"
+          + namespace = "naver-sms/comparison"
+          + value     = "1"
+        }
+      + name               = "naver-sms-automation-dev-comparison-summary"
+      + pattern            = "{ $.event_type = \"comparison_summary\" }"
+    }
+
+  # module.cloudwatch.aws_cloudwatch_metric_alarm.comparison_discrepancies will be created
+  + resource "aws_cloudwatch_metric_alarm" "comparison_discrepancies" {
+      + alarm_actions             = [
+          + (known after apply),
+        ]
+      + alarm_description         = "Alert when discrepancies detected during SMS comparison (Story 5.4)"
+      + alarm_name                = "naver-sms-automation-dev-comparison-discrepancies"
+      + comparison_operator       = "GreaterThanOrEqualToThreshold"
+      + evaluation_periods        = 1
+      + metric_name               = "SMSMismatchCount"
+      + namespace                 = "naver-sms/comparison"
+      + period                    = 300
+      + statistic                 = "Sum"
+      + threshold                 = 0
+      + treat_missing_data        = "notBreaching"
+    }
+
+  # module.cloudwatch.aws_cloudwatch_metric_alarm.comparison_match_percentage will be created
+  + resource "aws_cloudwatch_metric_alarm" "comparison_match_percentage" {
+      + alarm_actions             = [
+          + (known after apply),
+        ]
+      + alarm_description         = "Alert when match percentage drops below threshold (Story 5.4)"
+      + alarm_name                = "naver-sms-automation-dev-comparison-match-percentage"
+      + comparison_operator       = "LessThanThreshold"
+      + evaluation_periods        = 2
+      + metric_name               = "ComparisonMatchPercentage"
+      + namespace                 = "naver-sms/comparison"
+      + period                    = 300
+      + statistic                 = "Average"
+      + threshold                 = 100
+      + treat_missing_data        = "notBreaching"
+    }
+
+  # module.cloudwatch.aws_cloudwatch_dashboard.main will be updated in-place
+  ~ resource "aws_cloudwatch_dashboard" "main" {
+      ~ dashboard_body = jsonencode({
+          ~ widgets = [
+                # existing widgets omitted
+              + {
+                  + height = 6
+                  + properties = {
+                      + metrics = [
+                          + [
+                              + "naver-sms/comparison",
+                              + "ComparisonRun",
+                              + {
+                                  + stat = "Sum"
+                                },
+                            ],
+                          + [
+                              + ".",
+                              + "SMSMismatchCount",
+                              + {
+                                  + stat = "Sum"
+                                },
+                            ],
+                        ]
+                      + period  = 300
+                      + region  = "ap-northeast-2"
+                      + stat    = "Average"
+                      + title   = "Comparison: Run Count & Discrepancies (5-min)"
+                    }
+                  + type   = "metric"
+                  + width  = 12
+                  + x      = 0
+                  + y      = 18
+                },
+                # remaining Story 5.4 widgets omitted for brevity
+            ]
+        })
+        # (2 unchanged attributes hidden)
+    }
+
+  # module.cloudwatch.aws_iam_policy.lambda_metrics_and_notifications will be created
+  + resource "aws_iam_policy" "lambda_metrics_and_notifications" {
+      + arn         = (known after apply)
+      + description = "Policy to allow Lambda to publish CloudWatch metrics and SNS alerts"
+      + name        = "naver-sms-automation-dev-metrics-and-alerts"
+      + path        = "/"
+      + policy      = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action   = "cloudwatch:PutMetricData"
+                      + Effect   = "Allow"
+                      + Resource = "*"
+                    },
+                  + {
+                      + Action   = "sns:Publish"
+                      + Effect   = "Allow"
+                      + Resource = (known after apply)
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+    }
+
+  # module.cloudwatch.aws_iam_role_policy_attachment.lambda_metrics_and_notifications_attachment will be created
+  + resource "aws_iam_role_policy_attachment" "lambda_metrics_and_notifications_attachment" {
+      + id         = (known after apply)
+      + policy_arn = (known after apply)
+      + role       = "naver-sms-automation-lambda-role"
+    }
+
+Plan: 7 to add, 1 to change, 0 to destroy.
+
+─────────────────────────────────────────────────────────────────────────────
+Plan recorded to file: terraform.tfplan
+
+This plan was generated by terraform 1.6.2 on 2025-10-21. Account-specific identifiers have been redacted.

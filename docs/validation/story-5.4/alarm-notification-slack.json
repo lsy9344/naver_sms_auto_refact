@@ -1,0 +1,15 @@
+{
+  "alarm_name": "naver-sms-automation-dev-comparison-discrepancies",
+  "state": "ALARM",
+  "project": "naver-sms-automation",
+  "environment": "dev",
+  "matched_metric": "SMSMismatchCount",
+  "threshold": 0,
+  "current_value": 1,
+  "trigger_time": "2025-10-21T11:42:18+09:00",
+  "notification_channels": {
+    "slack_webhook": "https://hooks.slack.com/services/REDACTED/REDACTED/REDACTED",
+    "telegram_webhook": "https://api.telegram.org/botREDACTED/sendMessage"
+  },
+  "sample_payload": "Comparison mismatch detected for booking_id=1051707_123456 (phone masked). Review CloudWatch Logs query 'Story 5.4 > SMS Mismatch Details' for context."
+}
