@@ -106,7 +106,8 @@
             "booking_status",
             "has_option_keyword",
             "store_id_matches",
-            "date_range"
+            "date_range",
+            "has_pro_edit_option"
           ]
         },
         "params": {

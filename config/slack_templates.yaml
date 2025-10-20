@@ -1,0 +1,5 @@
+expert_correction_digest: |
+  {{ today_date }} 보정 요청 리스트:
+  {% for user in users %}
+  {{ loop.index }}. {{ user.name }} - {{ user.count }}장
+  {% endfor %}

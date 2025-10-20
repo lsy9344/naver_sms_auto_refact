@@ -393,9 +393,43 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     engine.register_condition("current_hour", current_hour)
     engine.register_condition("booking_status", booking_status)
     engine.register_condition("has_option_keyword", has_option_keyword)
+    engine.register_condition("has_pro_edit_option", has_pro_edit_option)
 
     logger.info(
-        "Registered 6 condition evaluators with RuleEngine: "
+        "Registered 7 condition evaluators with RuleEngine: "
         "booking_not_in_db, time_before_booking, flag_not_set, "
-        "current_hour, booking_status, has_option_keyword"
+        "current_hour, booking_status, has_option_keyword, "
+        "has_pro_edit_option"
     )
+
+
+def has_pro_edit_option(context: Dict[str, Any], **params) -> bool:
+    """
+    Evaluate if the booking has the professional edit option.
+
+    Args:
+        context: Dictionary containing:
+            - booking: Booking object with has_pro_edit_option attribute
+        **params: Additional parameters (unused)
+
+    Returns:
+        bool: True if booking.has_pro_edit_option is True, False otherwise
+    """
+    try:
+        booking = context.get("booking")
+
+        if not booking:
+            logger.debug("has_pro_edit_option: Missing booking")
+            return False
+
+        has_option = getattr(booking, "has_pro_edit_option", False)
+        result = has_option is True
+
+        logger.debug(
+            f"has_pro_edit_option: booking.has_pro_edit_option={has_option}, result={result}"
+        )
+        return result
+
+    except Exception as e:
+        logger.error(f"has_pro_edit_option error: {e}", exc_info=True)
+        return False
