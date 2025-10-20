@@ -49,7 +49,7 @@ pytest tests/integration/test_slack_integration.py -v
 **Purpose:** Store webhook URL for local testing (DO NOT commit real webhook URLs)
 
 ```yaml
-slack webhook url: https://hooks.slack.com/services/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
+slack webhook url: https://hooks.slack.com/services/T0958M20H2R****************************************
 ```
 
 **Format:** Single key `slack webhook url` with YAML value
