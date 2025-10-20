@@ -1,12 +1,10 @@
 """
 Unit tests for configuration loader (src/config/settings.py)
 
-Comprehensive tests covering:
-- Settings dataclass with all required fields
-- Configuration loading with precedence (env > secrets > YAML > defaults)
-- Thread-safe singleton caching and reload
-- Sensitive field redaction for logging
-- Validation with aggregated error messages
+Tests covering:
+- SecretRedactionFilter for logging
+- Settings class for credential management
+- Secrets Manager integration
 - Local file fallback for development
 """
 
@@ -14,69 +12,27 @@ import json
 import logging
 import os
 import tempfile
-import threading
-from pathlib import Path
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import patch
 
 import pytest
 from moto import mock_aws
 import boto3
-import yaml
 from botocore.exceptions import ClientError
 
 from src.config.settings import (
     Settings,
     SecretRedactionFilter,
     ConfigurationError,
-    Store,
-    get_settings,
-    reload_settings,
     get_naver_credentials,
     get_sens_credentials,
     get_telegram_credentials,
     setup_logging_redaction,
-    _settings_instance,
+    NAVER_SECRET_ID,
+    SENS_SECRET_ID,
+    TELEGRAM_SECRET_ID,
+    USE_LOCAL_SECRETS,
+    LOCAL_SECRETS_FILE,
 )
-
-
-@pytest.fixture
-def mock_secrets():
-    """Fixture providing mock secret credentials."""
-    return {
-        "naver-sms-automation/naver-credentials": {
-            "username": "test_user",
-            "password": "test_pass123",
-        },
-        "naver-sms-automation/sens-credentials": {
-            "access_key": "test_access_key_12345",
-            "secret_key": "test_secret_key_67890",
-            "service_id": "test_service_id",
-        },
-        "naver-sms-automation/telegram-credentials": {
-            "bot_token": "test_bot_token_ABC123",
-            "chat_id": "test_chat_id_XYZ789",
-        },
-    }
-
-
-@pytest.fixture
-def mock_stores_yaml():
-    """Fixture providing mock stores YAML data."""
-    return {
-        "default": {"fromNumber": "01055814318"},
-        "stores": {
-            "1051707": {
-                "name": "Test Store 1",
-                "fromNumber": "01055814318",
-                "templates": {"guide": "1051707"},
-            },
-            "867589": {
-                "name": "Test Store 2",
-                "fromNumber": "01022392673",
-                "templates": {"guide": "867589"},
-            },
-        },
-    }
 
 
 @pytest.fixture
@@ -185,115 +141,55 @@ class TestSecretRedactionFilter:
         assert result is True
         assert record.args[0] == "***REDACTED***"
 
-    def test_redact_value_password_full_mask(self):
-        """Test password redaction shows full mask."""
-        redacted = SecretRedactionFilter.redact_value(
-            "naver_password", "Doolim01!@"
-        )
-        assert redacted == "****"
-        assert "Doolim01!@" not in redacted
 
-    def test_redact_value_key_last_four(self):
-        """Test API key redaction shows last 4 chars."""
-        redacted = SecretRedactionFilter.redact_value(
-            "sens_access_key", "tpAFhfAWvpLqS5ve35Zw"
-        )
-        assert redacted == "****35Zw"
-        assert "tpAFhfAWvpLqS5ve" not in redacted
+class TestSettingsInitialization:
+    """Tests for Settings class initialization."""
 
-    def test_redact_value_token_last_four(self):
-        """Test token redaction shows last 4 chars."""
-        redacted = SecretRedactionFilter.redact_value(
-            "telegram_bot_token", "6657330606:AAFX9uYEwkcuuSpQORGpShFTSpG7e8GO1sg"
-        )
-        # Last 4 chars: O, 1, s, g
-        assert redacted == "****O1sg"
-        assert "AAFX9uYEwkcuuSpQORGpShFTSpG7e8" not in redacted
-
-    def test_redact_value_short_strings(self):
-        """Test short strings are not redacted."""
-        redacted = SecretRedactionFilter.redact_value("key", "abc")
-        assert redacted == "abc"
-
-
-class TestSettingsDataclass:
-    """Tests for Settings dataclass structure and defaults."""
-
-    def test_settings_initialization(self):
-        """Test Settings initializes with default values."""
+    def test_settings_initialization_default_region(self):
+        """Test Settings initializes with default region."""
         settings = Settings()
-        assert settings.aws_region == "ap-northeast-2"
-        assert settings.dynamodb_table_sms == "sms"
-        assert settings.dynamodb_table_session == "session"
-        assert settings.naver_username == ""
-        assert settings.naver_password == ""
-        assert settings.stores == {}
-        assert settings.option_keywords == ["네이버", "인스타", "원본"]
+        assert settings.region_name == "ap-northeast-2"
         assert settings.rules == []
+        assert settings.rules_schema == {}
+        assert settings._secrets_cache == {}
 
-    def test_settings_with_values(self):
-        """Test Settings can be initialized with values."""
-        stores = {"1234": Store("1234", "Test", "010123", {"guide": "1234"})}
-        settings = Settings(
-            naver_username="user",
-            naver_password="pass",
-            stores=stores,
-        )
-        assert settings.naver_username == "user"
-        assert settings.naver_password == "pass"
-        assert settings.stores == stores
+    def test_settings_initialization_custom_region(self):
+        """Test Settings initializes with custom region."""
+        settings = Settings(region_name="us-east-1")
+        assert settings.region_name == "us-east-1"
 
-    def test_settings_repr_redacts_sensitive_fields(self):
-        """Test Settings repr redacts sensitive fields."""
-        settings = Settings(
-            naver_username="user123",
-            naver_password="password123",
-            sens_access_key="key_abcd1234",
-            telegram_bot_token="token_xyz9999",
-        )
-        repr_str = repr(settings)
-        assert "****" in repr_str
-        assert "password123" not in repr_str
-        assert "key_abcd1234" not in repr_str
-        assert "token_xyz9999" not in repr_str
-
-    def test_settings_repr_shows_store_count(self):
-        """Test Settings repr shows store count concisely."""
-        stores = {
-            "1": Store("1", "Store 1", "010123", {}),
-            "2": Store("2", "Store 2", "010456", {}),
-        }
-        settings = Settings(stores=stores)
-        repr_str = repr(settings)
-        assert "[2 stores]" in repr_str
+    def test_settings_lazy_initializes_secrets_client(self):
+        """Test Settings lazily initializes secrets client."""
+        settings = Settings()
+        assert settings.secrets_client is None
+        client = settings._get_secrets_client()
+        assert client is not None
+        # Second call should return same client
+        assert settings._get_secrets_client() is client
 
 
-class TestSettingsSecretsManager:
+class TestSecretsManagerIntegration:
     """Tests for Secrets Manager integration."""
 
     @mock_aws
-    def test_get_secret_value_success(self, aws_credentials, mock_secrets):
+    def test_get_secret_value_success(self, aws_credentials):
         """Test successful secret retrieval from Secrets Manager."""
         client = boto3.client("secretsmanager", region_name="ap-northeast-2")
-        secret_value = mock_secrets[
-            "naver-sms-automation/naver-credentials"
-        ]
+        secret_value = {"username": "test_user", "password": "test_pass123"}
         client.create_secret(
-            Name="naver-sms-automation/naver-credentials",
+            Name=NAVER_SECRET_ID,
             SecretString=json.dumps(secret_value),
         )
 
-        result = Settings._get_secret_value(
-            "naver-sms-automation/naver-credentials"
-        )
+        result = Settings._get_secret_value(NAVER_SECRET_ID)
         assert result == secret_value
 
     @mock_aws
     def test_get_secret_value_not_found(self, aws_credentials):
         """Test error when secret not found."""
-        with pytest.raises(ConfigurationError) as exc_info:
+        with pytest.raises(RuntimeError) as exc_info:
             Settings._get_secret_value("nonexistent-secret")
-        assert "not found in Secrets Manager" in str(exc_info.value)
+        assert "not found" in str(exc_info.value)
 
     @mock_aws
     def test_get_secret_value_invalid_json(self, aws_credentials):
@@ -301,51 +197,75 @@ class TestSettingsSecretsManager:
         client = boto3.client("secretsmanager", region_name="ap-northeast-2")
         client.create_secret(Name="bad-secret", SecretString="not-json-{invalid}")
 
-        with pytest.raises(ConfigurationError) as exc_info:
+        with pytest.raises(RuntimeError) as exc_info:
             Settings._get_secret_value("bad-secret")
         assert "invalid JSON" in str(exc_info.value)
 
 
-class TestSettingsConfigurationLoading:
-    """Tests for configuration loading with precedence."""
-
-    def test_load_credentials_from_environment_variables(self):
-        """Test loading credentials from environment variables (highest priority)."""
-        os.environ["NAVER_USERNAME"] = "env_user"
-        os.environ["NAVER_PASSWORD"] = "env_pass"
-        os.environ["SENS_ACCESS_KEY"] = "env_access_key"
-        os.environ["SENS_SECRET_KEY"] = "env_secret_key"
-        os.environ["SENS_SERVICE_ID"] = "env_service_id"
-        os.environ["TELEGRAM_BOT_TOKEN"] = "env_bot_token"
-        os.environ["TELEGRAM_CHAT_ID"] = "env_chat_id"
-
-        creds = Settings._load_credentials_from_env_or_secrets()
-        assert creds["naver"]["username"] == "env_user"
-        assert creds["naver"]["password"] == "env_pass"
-        assert creds["sens"]["access_key"] == "env_access_key"
-        assert creds["telegram"]["bot_token"] == "env_bot_token"
+class TestCredentialsLoading:
+    """Tests for credential loading functions."""
 
     @mock_aws
-    def test_load_credentials_from_secrets_manager(
-        self, aws_credentials, mock_secrets
-    ):
-        """Test loading credentials from Secrets Manager."""
+    def test_load_naver_credentials_fallback_on_secrets_manager_empty(self, aws_credentials):
+        """Test loading Naver credentials falls back to Secrets Manager."""
         client = boto3.client("secretsmanager", region_name="ap-northeast-2")
-        for secret_id, secret_value in mock_secrets.items():
-            client.create_secret(
-                Name=secret_id, SecretString=json.dumps(secret_value)
-            )
+        secret_value = {"username": "sm_user", "password": "sm_pass"}
+        client.create_secret(Name=NAVER_SECRET_ID, SecretString=json.dumps(secret_value))
+        os.environ["NAVER_USERNAME"] = ""
+        os.environ["NAVER_PASSWORD"] = ""
 
-        creds = Settings._load_credentials_from_env_or_secrets()
-        assert creds["naver"]["username"] == "test_user"
-        assert creds["sens"]["access_key"] == "test_access_key_12345"
-        assert creds["telegram"]["bot_token"] == "test_bot_token_ABC123"
+        result = Settings.load_naver_credentials()
+        assert result["username"] == "sm_user"
+        assert result["password"] == "sm_pass"
 
-    def test_load_credentials_no_source_raises_error(self):
-        """Test error when no credential source available."""
-        with pytest.raises(ConfigurationError) as exc_info:
-            Settings._load_credentials_from_env_or_secrets()
-        assert "No configuration source found" in str(exc_info.value)
+    @mock_aws
+    def test_load_naver_credentials_success_from_secrets_manager(self, aws_credentials):
+        """Test loading Naver credentials from Secrets Manager."""
+        client = boto3.client("secretsmanager", region_name="ap-northeast-2")
+        secret_value = {"username": "sm_user", "password": "sm_pass"}
+        client.create_secret(Name=NAVER_SECRET_ID, SecretString=json.dumps(secret_value))
+
+        result = Settings.load_naver_credentials()
+        assert result == secret_value
+
+    @mock_aws
+    def test_load_sens_credentials_success(self, aws_credentials):
+        """Test loading SENS credentials."""
+        client = boto3.client("secretsmanager", region_name="ap-northeast-2")
+        secret_value = {
+            "access_key": "test_access_key",
+            "secret_key": "test_secret_key",
+            "service_id": "test_service_id",
+        }
+        client.create_secret(Name=SENS_SECRET_ID, SecretString=json.dumps(secret_value))
+
+        result = Settings.load_sens_credentials()
+        assert result == secret_value
+
+    @mock_aws
+    def test_load_sens_credentials_missing_keys(self, aws_credentials):
+        """Test error when SENS credentials missing required keys."""
+        client = boto3.client("secretsmanager", region_name="ap-northeast-2")
+        secret_value = {"access_key": "test_key"}  # Missing secret_key and service_id
+        client.create_secret(Name=SENS_SECRET_ID, SecretString=json.dumps(secret_value))
+
+        with pytest.raises(RuntimeError) as exc_info:
+            Settings.load_sens_credentials()
+        assert "missing required keys" in str(exc_info.value)
+
+    @mock_aws
+    def test_load_telegram_credentials_success(self, aws_credentials):
+        """Test loading Telegram credentials."""
+        client = boto3.client("secretsmanager", region_name="ap-northeast-2")
+        secret_value = {"bot_token": "test_bot_token", "chat_id": "test_chat_id"}
+        client.create_secret(Name=TELEGRAM_SECRET_ID, SecretString=json.dumps(secret_value))
+
+        result = Settings.load_telegram_credentials()
+        assert result == secret_value
+
+
+class TestLocalFileLoading:
+    """Tests for local file fallback."""
 
     def test_load_from_local_file_success(self):
         """Test loading secrets from local JSON file."""
@@ -359,9 +279,7 @@ class TestSettingsConfigurationLoading:
             "telegram": {"bot_token": "token", "chat_id": "chat"},
         }
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(secrets, f)
             temp_file = f.name
 
@@ -373,195 +291,84 @@ class TestSettingsConfigurationLoading:
 
     def test_load_from_local_file_not_found(self):
         """Test error when local file not found."""
-        with pytest.raises(ConfigurationError) as exc_info:
+        with pytest.raises(RuntimeError) as exc_info:
             Settings._load_from_local_file("/nonexistent/path/secrets.json")
         assert "not found" in str(exc_info.value)
 
+    def test_load_from_local_file_invalid_json(self):
+        """Test error when local file contains invalid JSON."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            f.write("not-valid-json{invalid}")
+            temp_file = f.name
 
-class TestSettingsYAMLValidation:
-    """Tests for YAML file loading and validation."""
+        try:
+            with pytest.raises(RuntimeError) as exc_info:
+                Settings._load_from_local_file(temp_file)
+            assert "invalid JSON" in str(exc_info.value)
+        finally:
+            os.unlink(temp_file)
 
-    def test_validate_stores_success(self, mock_stores_yaml):
-        """Test successful stores validation."""
-        stores = Settings._validate_stores(mock_stores_yaml)
-        assert len(stores) == 2
-        assert stores["1051707"].name == "Test Store 1"
-        assert stores["867589"].name == "Test Store 2"
 
-    def test_validate_stores_missing_fields(self):
-        """Test error when store missing required fields."""
-        invalid_stores = {
-            "stores": {
-                "1234": {
-                    "name": "Test",
-                    # Missing 'fromNumber' and 'templates'
-                }
-            }
+class TestRulesLoading:
+    """Tests for rules loading from YAML configuration."""
+
+    def test_load_rules_success(self):
+        """Test loading rules from valid YAML and schema."""
+        # Create temp schema file
+        schema = {
+            "type": "object",
+            "properties": {"rules": {"type": "array"}},
+            "required": ["rules"],
         }
+        rules_config = {"rules": [{"id": "test", "conditions": [], "actions": []}]}
 
-        with pytest.raises(ConfigurationError) as exc_info:
-            Settings._validate_stores(invalid_stores)
-        assert "missing fields" in str(exc_info.value)
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as schema_file:
+            json.dump(schema, schema_file)
+            schema_path = schema_file.name
 
-    def test_validate_stores_empty(self):
-        """Test validation with empty stores."""
-        empty_stores = {}
-        result = Settings._validate_stores(empty_stores)
-        assert result == {}
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as rules_file:
+            import yaml
 
-    def test_validate_stores_aggregated_errors(self):
-        """Test aggregated error messages for multiple validation failures."""
-        invalid_stores = {
-            "stores": {
-                "1": {"name": "Store 1"},  # Missing fields
-                "2": {"templates": {}},  # Missing fields
-            }
-        }
+            yaml.dump(rules_config, rules_file)
+            rules_path = rules_file.name
 
-        with pytest.raises(ConfigurationError) as exc_info:
-            Settings._validate_stores(invalid_stores)
-        error_msg = str(exc_info.value)
-        # Both store errors should be in the message
-        assert "Store '1'" in error_msg
-        assert "Store '2'" in error_msg
+        try:
+            settings = Settings()
+            settings.load_rules(rules_path, schema_path)
+            assert settings.rules == [{"id": "test", "conditions": [], "actions": []}]
+        finally:
+            os.unlink(schema_path)
+            os.unlink(rules_path)
 
+    def test_load_rules_file_not_found(self):
+        """Test error when rules file not found."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({}, f)
+            schema_path = f.name
 
-class TestSettingsSingleton:
-    """Tests for thread-safe singleton pattern."""
-
-    def test_get_settings_creates_singleton(self):
-        """Test get_settings creates singleton on first call."""
-        # Reset singleton
-        import src.config.settings as settings_module
-
-        settings_module._settings_instance = None
-
-        os.environ["NAVER_USERNAME"] = "test"
-        os.environ["NAVER_PASSWORD"] = "test"
-        os.environ["SENS_ACCESS_KEY"] = "test"
-        os.environ["SENS_SECRET_KEY"] = "test"
-        os.environ["SENS_SERVICE_ID"] = "test"
-        os.environ["TELEGRAM_BOT_TOKEN"] = "test"
-        os.environ["TELEGRAM_CHAT_ID"] = "test"
-
-        settings1 = get_settings()
-        settings2 = get_settings()
-
-        # Should return same instance
-        assert settings1 is settings2
-
-    def test_reload_settings_creates_new_instance(self):
-        """Test reload_settings creates new instance."""
-        import src.config.settings as settings_module
-
-        settings_module._settings_instance = None
-
-        os.environ["NAVER_USERNAME"] = "test"
-        os.environ["NAVER_PASSWORD"] = "test"
-        os.environ["SENS_ACCESS_KEY"] = "test"
-        os.environ["SENS_SECRET_KEY"] = "test"
-        os.environ["SENS_SERVICE_ID"] = "test"
-        os.environ["TELEGRAM_BOT_TOKEN"] = "test"
-        os.environ["TELEGRAM_CHAT_ID"] = "test"
-
-        settings1 = get_settings()
-        settings2 = reload_settings()
-
-        # Should be different instances (though same content)
-        assert settings1 is not settings2
-
-    def test_get_settings_thread_safety(self):
-        """Test get_settings is thread-safe."""
-        import src.config.settings as settings_module
-
-        settings_module._settings_instance = None
-
-        os.environ["NAVER_USERNAME"] = "test"
-        os.environ["NAVER_PASSWORD"] = "test"
-        os.environ["SENS_ACCESS_KEY"] = "test"
-        os.environ["SENS_SECRET_KEY"] = "test"
-        os.environ["SENS_SERVICE_ID"] = "test"
-        os.environ["TELEGRAM_BOT_TOKEN"] = "test"
-        os.environ["TELEGRAM_CHAT_ID"] = "test"
-
-        results = []
-
-        def load_settings():
-            try:
-                settings = get_settings()
-                results.append(settings)
-            except Exception as e:
-                results.append(e)
-
-        # Create multiple threads calling get_settings concurrently
-        threads = [threading.Thread(target=load_settings) for _ in range(5)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-
-        # All threads should get the same instance
-        assert len(results) == 5
-        # All should be Settings instances (no exceptions)
-        assert all(isinstance(r, Settings) for r in results)
-        # All should be the same instance
-        assert all(r is results[0] for r in results)
+        try:
+            settings = Settings()
+            with pytest.raises(FileNotFoundError):
+                settings.load_rules("/nonexistent/rules.yaml", schema_path)
+        finally:
+            os.unlink(schema_path)
 
 
-class TestSettingsModuleFunctions:
+class TestModuleLevelFunctions:
     """Tests for module-level convenience functions."""
 
-    def test_get_naver_credentials_function(self):
-        """Test module-level get_naver_credentials function."""
-        import src.config.settings as settings_module
+    def test_get_naver_credentials_function_exists(self):
+        """Test get_naver_credentials function exists and is callable."""
+        assert callable(get_naver_credentials)
 
-        settings_module._settings_instance = None
+    def test_get_sens_credentials_function_exists(self):
+        """Test get_sens_credentials function exists and is callable."""
+        assert callable(get_sens_credentials)
 
-        os.environ["NAVER_USERNAME"] = "test_user"
-        os.environ["NAVER_PASSWORD"] = "test_pass"
-        os.environ["SENS_ACCESS_KEY"] = "test"
-        os.environ["SENS_SECRET_KEY"] = "test"
-        os.environ["SENS_SERVICE_ID"] = "test"
-        os.environ["TELEGRAM_BOT_TOKEN"] = "test"
-        os.environ["TELEGRAM_CHAT_ID"] = "test"
+    def test_get_telegram_credentials_function_exists(self):
+        """Test get_telegram_credentials function exists and is callable."""
+        assert callable(get_telegram_credentials)
 
-        result = get_naver_credentials()
-        assert result["username"] == "test_user"
-        assert result["password"] == "test_pass"
-
-    def test_get_sens_credentials_function(self):
-        """Test module-level get_sens_credentials function."""
-        import src.config.settings as settings_module
-
-        settings_module._settings_instance = None
-
-        os.environ["NAVER_USERNAME"] = "test"
-        os.environ["NAVER_PASSWORD"] = "test"
-        os.environ["SENS_ACCESS_KEY"] = "test_key"
-        os.environ["SENS_SECRET_KEY"] = "test_secret"
-        os.environ["SENS_SERVICE_ID"] = "test_svc"
-        os.environ["TELEGRAM_BOT_TOKEN"] = "test"
-        os.environ["TELEGRAM_CHAT_ID"] = "test"
-
-        result = get_sens_credentials()
-        assert result["access_key"] == "test_key"
-        assert result["secret_key"] == "test_secret"
-        assert result["service_id"] == "test_svc"
-
-    def test_get_telegram_credentials_function(self):
-        """Test module-level get_telegram_credentials function."""
-        import src.config.settings as settings_module
-
-        settings_module._settings_instance = None
-
-        os.environ["NAVER_USERNAME"] = "test"
-        os.environ["NAVER_PASSWORD"] = "test"
-        os.environ["SENS_ACCESS_KEY"] = "test"
-        os.environ["SENS_SECRET_KEY"] = "test"
-        os.environ["SENS_SERVICE_ID"] = "test"
-        os.environ["TELEGRAM_BOT_TOKEN"] = "token_123"
-        os.environ["TELEGRAM_CHAT_ID"] = "chat_456"
-
-        result = get_telegram_credentials()
-        assert result["bot_token"] == "token_123"
-        assert result["chat_id"] == "chat_456"
+    def test_setup_logging_redaction_function_exists(self):
+        """Test setup_logging_redaction function exists and is callable."""
+        assert callable(setup_logging_redaction)

@@ -365,6 +365,177 @@ fields @timestamp
 
 ---
 
+## Story 5.4: Comparison Monitoring Queries
+
+These queries support monitoring the comparison validation campaign for dual-Lambda deployment readiness.
+
+### Query 1: Comparison Summary Statistics (Last 24h)
+
+```sql
+fields @timestamp, event_type, sms_sent_old, sms_sent_new, match_percentage, sms_match_old, sms_match_new
+| filter event_type = "comparison_summary"
+| stats count() as runs, avg(match_percentage) as avg_match, min(match_percentage) as min_match, max(match_percentage) as max_match by bin(1h)
+```
+
+**Use:** Track overall comparison health over time. 100% match_percentage indicates full parity.
+
+**Output Example:**
+```
+Time (bin)  | runs | avg_match | min_match | max_match
+------------|------|-----------|-----------|----------
+1h ago      | 3    | 100       | 100       | 100
+2h ago      | 3    | 100       | 100       | 100
+```
+
+---
+
+### Query 2: All Detected Mismatches (Last 24h)
+
+```sql
+fields @timestamp, event_type, booking_id, phone_masked, match, sample_diffs
+| filter match = false
+| sort @timestamp desc
+| limit 500
+```
+
+**Use:** Review all discrepancies found during comparison. Each row = one mismatch.
+
+**Output Columns:**
+- `event_type` - Type of mismatch (sms_comparison, db_operation_comparison, telegram_comparison)
+- `booking_id` - Booking ID that triggered mismatch
+- `phone_masked` - Customer phone (masked for security)
+- `sample_diffs` - Up to 10 sample differences for debugging
+
+---
+
+### Query 3: Mismatch Count by Type (Last 24h)
+
+```sql
+fields event_type
+| filter event_type like /comparison_/ and match = false
+| stats count() as mismatches by event_type
+```
+
+**Use:** Identify which comparison types have issues (SMS, DB, Telegram).
+
+**Output Example:**
+```
+event_type             | mismatches
+-----------------------|----------
+sms_comparison         | 5
+db_operation_comparison| 2
+telegram_comparison    | 0
+```
+
+---
+
+### Query 4: SMS Mismatch Details (Last 24h)
+
+```sql
+fields @timestamp, booking_id, phone_masked, sms_old, sms_new, sample_diffs
+| filter event_type = "sms_comparison" and match = false
+| sort @timestamp desc
+| limit 100
+```
+
+**Use:** Debug SMS payload differences between old and new Lambda.
+
+**Fields:**
+- `sms_old` - SMS text from old Lambda
+- `sms_new` - SMS text from new Lambda
+- `sample_diffs` - Up to 10 differing character positions
+
+---
+
+### Query 5: Database Operation Mismatches (Last 24h)
+
+```sql
+fields @timestamp, booking_id, operation_type, db_old, db_new, sample_diffs
+| filter event_type = "db_operation_comparison" and match = false
+| sort @timestamp desc
+| limit 100
+```
+
+**Use:** Track DynamoDB write/update discrepancies.
+
+**Fields:**
+- `operation_type` - DynamoDB operation (put_item, update_item, etc.)
+- `db_old` - Old Lambda DynamoDB output
+- `db_new` - New Lambda DynamoDB output
+
+---
+
+### Query 6: Telegram Event Comparison (Last 24h)
+
+```sql
+fields @timestamp, booking_id, telegram_action_old, telegram_action_new, match
+| filter event_type = "telegram_comparison"
+| stats count() as total, sum(case when match = true then 1 else 0 end) as matched by match
+```
+
+**Use:** Verify Telegram notification parity.
+
+**Output Example:**
+```
+match | total | matched
+------|-------|--------
+true  | 150   | 150
+false | 2     | 0
+```
+
+---
+
+### Query 7: Match Percentage Trend (Last 7 Days)
+
+```sql
+fields @timestamp, match_percentage
+| filter event_type = "comparison_summary"
+| stats avg(match_percentage) as avg_match by bin(6h)
+| sort @timestamp desc
+```
+
+**Use:** Monitor validation campaign progress. Expect 100% for go/no-go approval.
+
+---
+
+### Query 8: Recent Failures in Comparison (Last 24h)
+
+```sql
+fields @timestamp, level, message, status
+| filter (event_type like /comparison_/ or level = "ERROR") and status = "failure"
+| sort @timestamp desc
+| limit 50
+```
+
+**Use:** Identify any errors in the comparison system itself.
+
+---
+
+### Query 9: Comparison Configuration Audit (Last 7 Days)
+
+```sql
+fields @timestamp, comparison_mode, sms_send_enabled, event_type
+| filter event_type = "comparison_summary"
+| stats values(comparison_mode) as mode, values(sms_send_enabled) as sms_enabled by bin(1h)
+| limit 100
+```
+
+**Use:** Verify comparison mode remained in test (SMS sending disabled) throughout validation campaign.
+
+---
+
+### Query 10: Performance: Comparison Duration (Last 24h)
+
+```sql
+fields @timestamp, duration_ms
+| filter event_type = "comparison_summary"
+| stats avg(duration_ms) as avg_duration, max(duration_ms) as max_duration, pct(duration_ms, 95) as p95_duration
+```
+
+**Use:** Monitor comparison processing performance (should complete <10s per invocation).
+
+---
+
 ## Tips & Tricks
 
 ### Exporting Results

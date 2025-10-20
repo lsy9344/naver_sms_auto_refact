@@ -67,11 +67,7 @@ rules:
         slack_calls = []
 
         def send_slack(ctx, channel, message, **p):
-            slack_calls.append({
-                "channel": channel,
-                "message": message,
-                "params": p
-            })
+            slack_calls.append({"channel": channel, "message": message, "params": p})
 
         engine.register_action("send_slack", send_slack)
 
@@ -92,11 +88,7 @@ rules:
         slack_payloads = []
 
         def send_slack(ctx, channel, message, **p):
-            payload = {
-                "channel": channel,
-                "text": message,
-                "extra_params": p
-            }
+            payload = {"channel": channel, "text": message, "extra_params": p}
             # Validate required fields
             assert "channel" in payload
             assert len(payload["channel"]) > 0
@@ -431,11 +423,9 @@ rules:
 
         def send_slack(ctx, channel, message, severity, **p):
             if severity == "critical":
-                critical_alerts.append({
-                    "channel": channel,
-                    "message": message,
-                    "severity": severity
-                })
+                critical_alerts.append(
+                    {"channel": channel, "message": message, "severity": severity}
+                )
 
         engine.register_action("send_slack", send_slack)
 
@@ -458,11 +448,9 @@ rules:
 
         def send_slack(ctx, channel, message, severity, **p):
             if severity == "warning":
-                warning_alerts.append({
-                    "channel": channel,
-                    "message": message,
-                    "severity": severity
-                })
+                warning_alerts.append(
+                    {"channel": channel, "message": message, "severity": severity}
+                )
 
         engine.register_action("send_slack", send_slack)
 

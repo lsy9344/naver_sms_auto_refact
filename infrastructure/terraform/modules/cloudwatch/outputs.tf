@@ -50,3 +50,9 @@ output "cloudwatch_logs_policy_arn" {
   description = "ARN of the IAM policy for Lambda CloudWatch Logs access"
   value       = aws_iam_policy.lambda_cloudwatch_logs.arn
 }
+
+# Story 5.4: Comparison monitoring outputs
+output "comparison_namespace" {
+  description = "CloudWatch namespace for comparison metrics (Story 5.4)"
+  value       = var.comparison_namespace
+}

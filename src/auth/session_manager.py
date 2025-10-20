@@ -24,7 +24,7 @@ class SessionManager:
             dynamodb_resource: boto3 DynamoDB resource
         """
         self.dynamodb = dynamodb_resource
-        self.table = self.dynamodb.Table('session')
+        self.table = self.dynamodb.Table("session")
 
     def get_cookies(self):
         """
@@ -34,8 +34,8 @@ class SessionManager:
             List of cookie dicts or None if no cookies exist
         """
         try:
-            response = self.table.get_item(Key={'id': '1'})
-            cookies_json = response['Item']['cookies']
+            response = self.table.get_item(Key={"id": "1"})
+            cookies_json = response["Item"]["cookies"]
             cookies = json.loads(cookies_json)
             logger.info(f"Retrieved {len(cookies)} cookies from DynamoDB")
             return cookies
@@ -69,12 +69,9 @@ class SessionManager:
             True if successful, False otherwise
         """
         try:
-            response = self.put_item({
-                'id': '1',
-                'cookies': cookies_json
-            })
+            response = self.put_item({"id": "1", "cookies": cookies_json})
 
-            http_status = response['ResponseMetadata']['HTTPStatusCode']
+            http_status = response["ResponseMetadata"]["HTTPStatusCode"]
             if http_status == 200:
                 logger.info("Cookies saved to DynamoDB successfully")
                 return True

@@ -94,6 +94,78 @@ resource "aws_cloudwatch_log_metric_filter" "secrets_error_total" {
 }
 
 ###############################################################################
+# Story 5.4: Comparison Monitoring Metric Filters
+###############################################################################
+
+# Comparison Summary Events
+resource "aws_cloudwatch_log_metric_filter" "comparison_summary" {
+  count          = var.comparison_metrics_enabled ? 1 : 0
+  name           = "${var.lambda_function_name}-comparison-summary"
+  log_group_name = aws_cloudwatch_log_group.lambda.name
+  pattern        = "{ $.event_type = \"comparison_summary\" }"
+
+  metric_transformation {
+    name          = "ComparisonRun"
+    namespace     = var.comparison_namespace
+    value         = "1"
+    default_value = 0
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda]
+}
+
+# SMS Comparison Mismatches
+resource "aws_cloudwatch_log_metric_filter" "sms_comparison_mismatch" {
+  count          = var.comparison_metrics_enabled ? 1 : 0
+  name           = "${var.lambda_function_name}-sms-comparison-mismatch"
+  log_group_name = aws_cloudwatch_log_group.lambda.name
+  pattern        = "{ $.event_type = \"sms_comparison\" && $.match = false }"
+
+  metric_transformation {
+    name          = "SMSMismatchCount"
+    namespace     = var.comparison_namespace
+    value         = "1"
+    default_value = 0
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda]
+}
+
+# DynamoDB Operation Comparison Mismatches
+resource "aws_cloudwatch_log_metric_filter" "db_comparison_mismatch" {
+  count          = var.comparison_metrics_enabled ? 1 : 0
+  name           = "${var.lambda_function_name}-db-comparison-mismatch"
+  log_group_name = aws_cloudwatch_log_group.lambda.name
+  pattern        = "{ $.event_type = \"db_operation_comparison\" && $.match = false }"
+
+  metric_transformation {
+    name          = "DBMismatchCount"
+    namespace     = var.comparison_namespace
+    value         = "1"
+    default_value = 0
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda]
+}
+
+# Telegram Event Comparison Mismatches
+resource "aws_cloudwatch_log_metric_filter" "telegram_comparison_mismatch" {
+  count          = var.comparison_metrics_enabled ? 1 : 0
+  name           = "${var.lambda_function_name}-telegram-comparison-mismatch"
+  log_group_name = aws_cloudwatch_log_group.lambda.name
+  pattern        = "{ $.event_type = \"telegram_comparison\" && $.match = false }"
+
+  metric_transformation {
+    name          = "TelegramMismatchCount"
+    namespace     = var.comparison_namespace
+    value         = "1"
+    default_value = 0
+  }
+
+  depends_on = [aws_cloudwatch_log_group.lambda]
+}
+
+###############################################################################
 # SNS Topic for Alarm Notifications
 ###############################################################################
 
@@ -114,6 +186,30 @@ resource "aws_sns_topic_subscription" "alerts_email" {
   topic_arn = aws_sns_topic.alerts.arn
   protocol  = "email"
   endpoint  = var.alarm_email
+
+  depends_on = [aws_sns_topic.alerts]
+}
+
+# SNS Topic Subscription (Slack via HTTP endpoint)
+# Note: Configure Slack webhook URL in terraform.tfvars or environment variable TF_VAR_slack_webhook_url
+resource "aws_sns_topic_subscription" "alerts_slack" {
+  count             = var.slack_webhook_url != "" ? 1 : 0
+  topic_arn         = aws_sns_topic.alerts.arn
+  protocol          = "https"
+  endpoint          = var.slack_webhook_url
+  endpoint_auto_confirms = true
+
+  depends_on = [aws_sns_topic.alerts]
+}
+
+# SNS Topic Subscription (Telegram via HTTP endpoint)
+# Note: Configure Telegram bot webhook URL in terraform.tfvars or environment variable TF_VAR_telegram_webhook_url
+resource "aws_sns_topic_subscription" "alerts_telegram" {
+  count             = var.telegram_webhook_url != "" ? 1 : 0
+  topic_arn         = aws_sns_topic.alerts.arn
+  protocol          = "https"
+  endpoint          = var.telegram_webhook_url
+  endpoint_auto_confirms = true
 
   depends_on = [aws_sns_topic.alerts]
 }
@@ -189,6 +285,126 @@ resource "aws_cloudwatch_metric_alarm" "login_failures" {
     Environment = var.environment
     Component   = "alerting"
     Severity    = "medium"
+  }
+}
+
+# Story 5.4: Comparison - Discrepancies Detected
+resource "aws_cloudwatch_metric_alarm" "comparison_discrepancies" {
+  count               = var.comparison_metrics_enabled ? 1 : 0
+  alarm_name          = "${var.lambda_function_name}-comparison-discrepancies"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "SMSMismatchCount"
+  namespace           = var.comparison_namespace
+  period              = 300  # 5 minutes
+  statistic           = "Sum"
+  threshold           = var.discrepancy_alarm_threshold
+  alarm_description   = "Alert when discrepancies detected during SMS comparison (Story 5.4)"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  tags = {
+    Name        = "${var.lambda_function_name}-comparison-discrepancies"
+    Environment = var.environment
+    Component   = "alerting"
+    Story       = "5.4"
+    Severity    = "high"
+  }
+}
+
+# Story 5.4: Comparison - Database Operation Mismatches
+resource "aws_cloudwatch_metric_alarm" "comparison_db_mismatches" {
+  count               = var.comparison_metrics_enabled ? 1 : 0
+  alarm_name          = "${var.lambda_function_name}-comparison-db-mismatches"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "DBMismatchCount"
+  namespace           = var.comparison_namespace
+  period              = 300  # 5 minutes
+  statistic           = "Sum"
+  threshold           = var.discrepancy_alarm_threshold
+  alarm_description   = "Alert when DynamoDB operation mismatches detected (Story 5.4)"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  tags = {
+    Name        = "${var.lambda_function_name}-comparison-db-mismatches"
+    Environment = var.environment
+    Component   = "alerting"
+    Story       = "5.4"
+    Severity    = "high"
+  }
+}
+
+# Story 5.4: Comparison - Telegram Event Mismatches
+resource "aws_cloudwatch_metric_alarm" "comparison_telegram_mismatches" {
+  count               = var.comparison_metrics_enabled ? 1 : 0
+  alarm_name          = "${var.lambda_function_name}-comparison-telegram-mismatches"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 1
+  metric_name         = "TelegramMismatchCount"
+  namespace           = var.comparison_namespace
+  period              = 300  # 5 minutes
+  statistic           = "Sum"
+  threshold           = var.discrepancy_alarm_threshold
+  alarm_description   = "Alert when Telegram event mismatches detected (Story 5.4)"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  tags = {
+    Name        = "${var.lambda_function_name}-comparison-telegram-mismatches"
+    Environment = var.environment
+    Component   = "alerting"
+    Story       = "5.4"
+    Severity    = "medium"
+  }
+}
+
+# Story 5.4: Comparison - Match Percentage Below Threshold
+resource "aws_cloudwatch_metric_alarm" "comparison_match_percentage" {
+  count               = var.comparison_metrics_enabled ? 1 : 0
+  alarm_name          = "${var.lambda_function_name}-comparison-match-percentage"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "ComparisonMatchPercentage"
+  namespace           = var.comparison_namespace
+  period              = 300  # 5 minutes
+  statistic           = "Average"
+  threshold           = var.match_percentage_alarm_threshold
+  alarm_description   = "Alert when match percentage drops below threshold (Story 5.4)"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  tags = {
+    Name        = "${var.lambda_function_name}-comparison-match-percentage"
+    Environment = var.environment
+    Component   = "alerting"
+    Story       = "5.4"
+    Severity    = "high"
+  }
+}
+
+# Story 5.4: Comparison - Any Discrepancies Detected
+resource "aws_cloudwatch_metric_alarm" "comparison_any_discrepancies" {
+  count               = var.comparison_metrics_enabled ? 1 : 0
+  alarm_name          = "${var.lambda_function_name}-comparison-any-discrepancies"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "DiscrepanciesDetected"
+  namespace           = var.comparison_namespace
+  period              = 300  # 5 minutes
+  statistic           = "Maximum"
+  threshold           = 0
+  alarm_description   = "Alert when any comparison discrepancies detected (Story 5.4)"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  tags = {
+    Name        = "${var.lambda_function_name}-comparison-any-discrepancies"
+    Environment = var.environment
+    Component   = "alerting"
+    Story       = "5.4"
+    Severity    = "high"
   }
 }
 
@@ -301,6 +517,69 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         x      = 12
         y      = 12
+      },
+      # Story 5.4: Comparison Monitoring Widgets
+      # Row 3: Comparison Results Overview
+      {
+        type = "metric"
+        properties = {
+          metrics = [
+            [var.comparison_namespace, "ComparisonRun", { stat = "Sum" }],
+            [".", "SMSMismatchCount", { stat = "Sum" }],
+            [".", "DBMismatchCount", { stat = "Sum" }],
+            [".", "TelegramMismatchCount", { stat = "Sum" }]
+          ]
+          period = 300
+          stat   = "Average"
+          region = var.aws_region
+          title  = "Comparison: Run Count & Discrepancies (5-min)"
+          yAxis = {
+            left = {
+              min = 0
+            }
+          }
+        }
+        width  = 12
+        height = 6
+        x      = 0
+        y      = 18
+      },
+      {
+        type = "log"
+        properties = {
+          query  = "SOURCE '${aws_cloudwatch_log_group.lambda.name}'\n| filter event_type = 'comparison_summary'\n| fields @timestamp, sms_sent_old, sms_sent_new, match_percentage\n| stats avg(match_percentage) as avg_match, max(match_percentage) as max_match, min(match_percentage) as min_match"
+          region = var.aws_region
+          title  = "Comparison: Match Percentage Stats (Last 1h)"
+        }
+        width  = 12
+        height = 6
+        x      = 12
+        y      = 18
+      },
+      # Row 4: Detailed Comparison Analysis
+      {
+        type = "log"
+        properties = {
+          query  = "SOURCE '${aws_cloudwatch_log_group.lambda.name}'\n| filter event_type like /comparison_/\n| stats count() as total_events, sum(case when match = false then 1 else 0 end) as mismatches by event_type\n| fields event_type, total_events, mismatches"
+          region = var.aws_region
+          title  = "Comparison: Event-Type Breakdown (Last 1h)"
+        }
+        width  = 12
+        height = 6
+        x      = 0
+        y      = 24
+      },
+      {
+        type = "log"
+        properties = {
+          query  = "SOURCE '${aws_cloudwatch_log_group.lambda.name}'\n| filter event_type = 'sms_comparison' && match = false\n| fields @timestamp, booking_id, phone_masked, sample_diffs\n| sort @timestamp desc\n| limit 100"
+          region = var.aws_region
+          title  = "Comparison: Recent SMS Mismatches (Last 1h)"
+        }
+        width  = 12
+        height = 6
+        x      = 12
+        y      = 24
       }
     ]
   })
@@ -309,7 +588,8 @@ resource "aws_cloudwatch_dashboard" "main" {
     aws_cloudwatch_log_metric_filter.sms_sent_total,
     aws_cloudwatch_log_metric_filter.sms_failed_total,
     aws_cloudwatch_log_metric_filter.login_failure_total,
-    aws_cloudwatch_log_metric_filter.secrets_error_total
+    aws_cloudwatch_log_metric_filter.secrets_error_total,
+    aws_cloudwatch_log_metric_filter.comparison_summary
   ]
 }
 

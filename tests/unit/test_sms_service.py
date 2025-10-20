@@ -12,7 +12,9 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 from notifications.sms_service import SensSmsClient, SmsServiceError  # noqa: E402
 
 
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "sens" / "legacy_payloads.json"
+FIXTURE_PATH = (
+    Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "sens" / "legacy_payloads.json"
+)
 TEMPLATES_PATH = Path(__file__).resolve().parents[2] / "config" / "sms_templates.yaml"
 STORES_PATH = Path(__file__).resolve().parents[2] / "config" / "stores.yaml"
 

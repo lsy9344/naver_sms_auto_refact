@@ -59,6 +59,11 @@ class Booking:
     option: bool = False
     reserve_at: Optional[datetime] = None
     status: str = ""
+    coupon_name: Optional[str] = None
+    has_pro_edit_option: bool = False
+    pro_edit_count: int = 0
+    has_edit_add_person_option: bool = False
+    edit_add_person_count: int = 0
     extra_fields: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -90,6 +95,11 @@ class Booking:
             "option",
             "reserve_at",
             "status",
+            "coupon_name",
+            "has_pro_edit_option",
+            "pro_edit_count",
+            "has_edit_add_person_option",
+            "edit_add_person_count",
         }
 
         # Extract core fields
@@ -164,6 +174,11 @@ class Booking:
             "option",
             "reserve_at",
             "status",
+            "coupon_name",
+            "has_pro_edit_option",
+            "pro_edit_count",
+            "has_edit_add_person_option",
+            "edit_add_person_count",
         }
 
         if field_name in core_fields:

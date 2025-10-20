@@ -151,13 +151,9 @@ class RuleEngine:
         if "name" not in rule_data:
             raise ValueError("Rule missing required field: 'name'")
         if "conditions" not in rule_data:
-            raise ValueError(
-                f"Rule '{rule_data['name']}' missing required field: 'conditions'"
-            )
+            raise ValueError(f"Rule '{rule_data['name']}' missing required field: 'conditions'")
         if "actions" not in rule_data:
-            raise ValueError(
-                f"Rule '{rule_data['name']}' missing required field: 'actions'"
-            )
+            raise ValueError(f"Rule '{rule_data['name']}' missing required field: 'actions'")
 
         name = rule_data["name"]
 
@@ -173,13 +169,9 @@ class RuleEngine:
         conditions = []
         for cond_idx, cond_data in enumerate(rule_data["conditions"]):
             if not isinstance(cond_data, dict):
-                raise ValueError(
-                    f"Rule '{name}': condition [{cond_idx}] must be a dictionary"
-                )
+                raise ValueError(f"Rule '{name}': condition [{cond_idx}] must be a dictionary")
             if "type" not in cond_data:
-                raise ValueError(
-                    f"Rule '{name}': condition [{cond_idx}] missing 'type' field"
-                )
+                raise ValueError(f"Rule '{name}': condition [{cond_idx}] missing 'type' field")
 
             conditions.append(
                 ConditionConfig(
@@ -192,13 +184,9 @@ class RuleEngine:
         actions = []
         for action_idx, action_data in enumerate(rule_data["actions"]):
             if not isinstance(action_data, dict):
-                raise ValueError(
-                    f"Rule '{name}': action [{action_idx}] must be a dictionary"
-                )
+                raise ValueError(f"Rule '{name}': action [{action_idx}] must be a dictionary")
             if "type" not in action_data:
-                raise ValueError(
-                    f"Rule '{name}': action [{action_idx}] missing 'type' field"
-                )
+                raise ValueError(f"Rule '{name}': action [{action_idx}] missing 'type' field")
 
             actions.append(
                 ActionConfig(
@@ -227,9 +215,7 @@ class RuleEngine:
             TypeError: If evaluator is not callable
         """
         if not callable(evaluator):
-            raise TypeError(
-                f"Condition evaluator must be callable, got {type(evaluator)}"
-            )
+            raise TypeError(f"Condition evaluator must be callable, got {type(evaluator)}")
 
         self.condition_evaluators[name] = evaluator
         logger.debug(f"Registered condition evaluator: {name}")
@@ -275,9 +261,7 @@ class RuleEngine:
 
             # Unknown condition type fails the rule
             if not evaluator:
-                logger.error(
-                    f"Unknown condition type in rule '{rule.name}': {condition.type}"
-                )
+                logger.error(f"Unknown condition type in rule '{rule.name}': {condition.type}")
                 return False
 
             try:
@@ -302,9 +286,7 @@ class RuleEngine:
         logger.info(f"Rule '{rule.name}' conditions all met")
         return True
 
-    def execute_rule(
-        self, rule: RuleConfig, context: Dict[str, Any]
-    ) -> List[ActionResult]:
+    def execute_rule(self, rule: RuleConfig, context: Dict[str, Any]) -> List[ActionResult]:
         """
         Execute all actions for a rule in sequence.
 
@@ -324,9 +306,7 @@ class RuleEngine:
 
             # Unknown action type is recorded as failure
             if not executor:
-                logger.error(
-                    f"Unknown action type in rule '{rule.name}': {action.type}"
-                )
+                logger.error(f"Unknown action type in rule '{rule.name}': {action.type}")
                 results.append(
                     ActionResult(
                         rule_name=rule.name,
@@ -352,9 +332,7 @@ class RuleEngine:
                     )
                 )
 
-                logger.debug(
-                    f"Action '{action.type}' in rule '{rule.name}' executed successfully"
-                )
+                logger.debug(f"Action '{action.type}' in rule '{rule.name}' executed successfully")
 
             except Exception as e:
                 logger.error(

@@ -211,9 +211,7 @@ def current_hour(context: Dict[str, Any], hour: int, **params) -> bool:
         current_h = current_time.hour
         result = current_h == hour
 
-        logger.debug(
-            f"current_hour({hour}): current_time.hour={current_h}, result={result}"
-        )
+        logger.debug(f"current_hour({hour}): current_time.hour={current_h}, result={result}")
         return result
 
     except Exception as e:
@@ -264,8 +262,7 @@ def booking_status(context: Dict[str, Any], status: str, **params) -> bool:
         result = booking_status_code == status
 
         logger.debug(
-            f"booking_status({status}): booking.status={booking_status_code}, "
-            f"result={result}"
+            f"booking_status({status}): booking.status={booking_status_code}, " f"result={result}"
         )
         return result
 

@@ -83,9 +83,7 @@ rules:
         engine = RuleEngine(str(realistic_rules))
 
         # Setup condition evaluators
-        engine.register_condition(
-            "booking_not_in_db", lambda ctx, **p: ctx["db_record"] is None
-        )
+        engine.register_condition("booking_not_in_db", lambda ctx, **p: ctx["db_record"] is None)
         engine.register_condition(
             "time_before_booking", lambda ctx, hours, **p: True
         )  # Won't match for new bookings
@@ -137,9 +135,7 @@ rules:
         engine = RuleEngine(str(realistic_rules))
 
         # Setup conditions
-        engine.register_condition(
-            "booking_not_in_db", lambda ctx, **p: False
-        )  # Existing booking
+        engine.register_condition("booking_not_in_db", lambda ctx, **p: False)  # Existing booking
 
         def time_before_booking(ctx, hours, **p):
             # Booking is within the time window
@@ -245,9 +241,7 @@ rules:
         booking.option = True
 
         db_record = Mock()
-        db_record.get = lambda key, default=None: {"option_sms": False}.get(
-            key, default
-        )
+        db_record.get = lambda key, default=None: {"option_sms": False}.get(key, default)
 
         # Create 8 PM context
         now_8pm = datetime.now().replace(hour=20, minute=0, second=0)
@@ -276,9 +270,7 @@ rules:
         engine.register_condition(
             "time_before_booking", lambda ctx, hours, **p: False
         )  # Outside time window
-        engine.register_condition(
-            "current_hour", lambda ctx, hour, **p: False
-        )  # Not 8 PM
+        engine.register_condition("current_hour", lambda ctx, hour, **p: False)  # Not 8 PM
         engine.register_condition("booking_status", lambda ctx, status, **p: False)
         engine.register_condition("flag_not_set", lambda ctx, flag, **p: False)
         engine.register_condition("has_option_keyword", lambda ctx, **p: False)

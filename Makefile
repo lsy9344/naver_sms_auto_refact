@@ -37,7 +37,7 @@ fmt:
 
 lint:
 	@echo "Running linting and type checks..."
-	$(PYTHON) -m flake8 src/ tests/comparison --max-line-length=100 --ignore=E501,W503
+	$(PYTHON) -m flake8 src/ tests/comparison --max-line-length=100 --ignore=E501,W503,E203
 	$(PYTHON) -m mypy src/ --ignore-missing-imports --no-error-summary 2>/dev/null || true
 	@echo "✅ Linting passed"
 

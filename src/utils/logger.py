@@ -155,9 +155,7 @@ class StructuredLogger:
         duration_ms: Optional[float] = None,
     ):
         """Log error message."""
-        log_json = self._format_log(
-            "ERROR", message, operation, context, duration_ms, error
-        )
+        log_json = self._format_log("ERROR", message, operation, context, duration_ms, error)
         self.logger.error(log_json)
 
 
@@ -187,9 +185,7 @@ def log_operation(operation_name: str):
             if "phone" in kwargs:
                 context["phone_masked"] = mask_phone(kwargs["phone"])
 
-            logger.debug(
-                f"Starting {operation_name}", operation=operation_name, context=context
-            )
+            logger.debug(f"Starting {operation_name}", operation=operation_name, context=context)
 
             start_time = time.time()
             try:

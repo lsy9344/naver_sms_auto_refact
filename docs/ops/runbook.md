@@ -153,6 +153,148 @@ This runbook documents how to respond to CloudWatch alarms, interpret dashboards
 
 ---
 
+## Story 5.4: Comparison Monitoring (Validation Campaign)
+
+**Status:** Active during offline validation phase before production cutover
+
+**Purpose:** Monitor functional parity between old and new Lambda implementations to validate readiness for production.
+
+### Dashboard Widgets (Comparison Section)
+
+1. **Comparison: Run Count & Discrepancies (5-min)**
+   - ComparisonRun: Number of comparison invocations
+   - SMSMismatchCount: SMS payload differences detected
+   - DBMismatchCount: DynamoDB operation differences detected
+   - TelegramMismatchCount: Telegram notification differences detected
+   - Goal: All mismatch counts at 0
+   - Success Criterion: Run count >0, all mismatches = 0 for 7 days
+
+2. **Comparison: Match Percentage Stats (Last 1h)**
+   - Tracks percentage match between old and new Lambda outputs
+   - Goal: 100% match (avg, min, max all = 100)
+   - Success Criterion: 100% parity maintained throughout validation window
+
+3. **Comparison: Event-Type Breakdown (Last 1h)**
+   - Displays mismatch count by type (SMS, DB, Telegram)
+   - Helps identify which subsystem needs investigation
+   - Goal: All counts = 0
+
+4. **Comparison: Recent SMS Mismatches (Last 1h)**
+   - Shows latest SMS discrepancies with booking ID, phone (masked), and sample diffs
+   - Allows engineers to investigate specific mismatches
+   - Goal: Empty table (no mismatches)
+
+### Key CloudWatch Queries for Troubleshooting
+
+**Quick Health Check (Run this daily):**
+```sql
+fields @timestamp, event_type, match_percentage
+| filter event_type = "comparison_summary"
+| stats avg(match_percentage) as avg_match, count() as runs
+```
+Expected: avg_match = 100, runs > 0
+
+**Find Recent Mismatches:**
+```sql
+fields @timestamp, event_type, booking_id, match
+| filter match = false
+| sort @timestamp desc
+| limit 50
+```
+Expected: Empty result
+
+**Verify Comparison Configuration:**
+```sql
+fields @timestamp, comparison_mode, sms_send_enabled
+| filter event_type = "comparison_summary"
+| stats values(comparison_mode) as mode, values(sms_send_enabled) as enabled
+| limit 1
+```
+Expected: mode = "comparison", sms_send_enabled = false (never send actual SMS during validation)
+
+See [CloudWatch Queries Guide](cloudwatch-queries.md#story-54-comparison-monitoring-queries) for additional queries.
+
+### Alarms: Comparison Monitoring
+
+**🔴 Alarm: Comparison Discrepancies Detected (Severity: HIGH)**
+- **Threshold:** SMSMismatchCount ≥ 0 (triggers on any mismatch)
+- **Meaning:** Old and new Lambda produced different SMS content
+- **Action:**
+  1. Check dashboard "Comparison: Recent SMS Mismatches" widget
+  2. Run query: `fields @timestamp, booking_id, sms_old, sms_new | filter event_type = "sms_comparison" and match = false`
+  3. Compare old vs new SMS content
+  4. Identify logic difference in new Lambda
+  5. File issue with specific booking ID for reproduction
+
+**🔴 Alarm: DB Operation Mismatches (Severity: HIGH)**
+- **Threshold:** DBMismatchCount ≥ 0
+- **Meaning:** Old and new Lambda wrote different data to DynamoDB
+- **Action:**
+  1. Check dashboard for affected bookings
+  2. Query: `fields @timestamp, booking_id, operation_type, db_old, db_new | filter event_type = "db_operation_comparison" and match = false`
+  3. Compare operation sequences and results
+  4. Check if write conflicts or timing issues involved
+
+**🟠 Alarm: Comparison Match Percentage Below 100% (Severity: HIGH)**
+- **Threshold:** Match percentage < 100%
+- **Meaning:** Overall parity dropped below target
+- **Action:**
+  1. Check all mismatch alarms above
+  2. Determine which component type has issues (SMS/DB/Telegram)
+  3. Escalate to development team with query results
+
+**🟡 Alarm: Telegram Mismatches (Severity: MEDIUM)**
+- **Threshold:** TelegramMismatchCount ≥ 0
+- **Meaning:** Telegram notification behavior differs
+- **Action:**
+  1. Query: `fields @timestamp, booking_id, telegram_action_old, telegram_action_new | filter event_type = "telegram_comparison" and match = false`
+  2. Verify if differences are significant (e.g., message content vs delivery timing)
+  3. Decide if acceptable for production or requires fix
+
+### Response Workflow for Validation Campaign
+
+**Step 1: Acknowledge Alarm**
+- Review which comparison metric triggered
+- Open dashboard to see context
+
+**Step 2: Assess Impact**
+- Is this a single isolated mismatch or pattern?
+- How long has it been occurring?
+- Affects how many bookings?
+
+**Step 3: Investigate Root Cause**
+- Use CloudWatch Logs Insights queries (see queries section above)
+- Check recent code deployments to new Lambda
+- Verify no environment differences (secrets, configuration)
+
+**Step 4: Document for QA**
+- Collect evidence: dashboard screenshot, query results, affected booking IDs
+- Append to VALIDATION.md file
+- Note whether issue is blockers for go/no-go or acceptable risk
+
+**Step 5: Escalate if Needed**
+- If blocking issue: Halt validation, notify development team
+- If non-blocking: Continue monitoring, document in go/no-go sign-off
+
+### Success Criteria for Validation Sign-Off
+
+- ✅ Zero SMS mismatches over 7-day validation window
+- ✅ Zero DynamoDB operation mismatches
+- ✅ Zero Telegram notification mismatches
+- ✅ 100% match percentage maintained
+- ✅ All dashboard widgets show zero discrepancies
+- ✅ Evidence collected and archived in VALIDATION.md
+
+### Post-Campaign Tasks
+
+Once validation complete and approved:
+1. **Disable Comparison Mode:** Set `COMPARISON_MODE_ENABLED = false` in Lambda configuration
+2. **Archive Evidence:** Save all dashboard screenshots and query results to VALIDATION.md
+3. **Transition to Production:** Enable new Lambda via EventBridge rule
+4. **Monitor Post-Cutover:** Switch to standard operational alarms (see sections above)
+
+---
+
 ## Debugging Procedure
 
 ### Access CloudWatch Logs

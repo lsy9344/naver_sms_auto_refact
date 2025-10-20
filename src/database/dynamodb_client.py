@@ -89,9 +89,7 @@ class BookingRepository:
         for attempt in range(self.max_retries):
             try:
                 start_time = time.time()
-                response = self.table.get_item(
-                    Key={"booking_num": prefix, "phone": phone}
-                )
+                response = self.table.get_item(Key={"booking_num": prefix, "phone": phone})
                 duration_ms = (time.time() - start_time) * 1000
 
                 item = response.get("Item")

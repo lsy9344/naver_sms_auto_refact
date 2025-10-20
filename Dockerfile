@@ -50,7 +50,9 @@ FROM public.ecr.aws/lambda/python:3.11
 RUN yum update -y && \
     yum install -y \
     ca-certificates \
-    chromium-chromedriver && \
+    chromium-chromedriver \
+    gcc \
+    python3-devel && \
     \
     # Create symlinks for compatibility
     ln -sf /usr/bin/chromedriver /usr/local/bin/chromedriver && \

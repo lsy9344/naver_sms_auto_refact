@@ -363,9 +363,7 @@ def update_flag(
     db_repo = context.db_repo
 
     effective_flag = flag_name or flag
-    desired_value = (
-        flag_value if flag_value is not None else value if value is not None else True
-    )
+    desired_value = flag_value if flag_value is not None else value if value is not None else True
 
     operation = "update_flag"
     log_context = {
@@ -382,9 +380,7 @@ def update_flag(
         # Validate flag name
         valid_flags = {"confirm_sms", "remind_sms", "option_sms"}
         if effective_flag not in valid_flags:
-            raise ValueError(
-                f"Invalid flag name '{effective_flag}'. Must be one of: {valid_flags}"
-            )
+            raise ValueError(f"Invalid flag name '{effective_flag}'. Must be one of: {valid_flags}")
 
         logger.debug(
             f"Updating {effective_flag} flag",
@@ -397,9 +393,7 @@ def update_flag(
 
         # If record doesn't exist, can't update - this is an error
         if current is None:
-            raise ValueError(
-                f"Cannot update flag on non-existent booking {booking.booking_num}"
-            )
+            raise ValueError(f"Cannot update flag on non-existent booking {booking.booking_num}")
 
         # Extract flag value from current record (handle both dict and Booking types)
         if isinstance(current, dict):
@@ -729,9 +723,7 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
             )
             send_sms(action_context, **params)
 
-        def create_db_record_wrapper(
-            rule_context: Dict[str, Any], **params: Any
-        ) -> None:
+        def create_db_record_wrapper(rule_context: Dict[str, Any], **params: Any) -> None:
             booking = rule_context.get("booking")
             if booking is None:
                 raise ValueError("Booking not found in rule context")
@@ -759,9 +751,7 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
             )
             update_flag(action_context, **params)
 
-        def send_telegram_wrapper(
-            rule_context: Dict[str, Any], **params: Any
-        ) -> None:
+        def send_telegram_wrapper(rule_context: Dict[str, Any], **params: Any) -> None:
             booking = rule_context.get("booking")
             if booking is None:
                 raise ValueError("Booking not found in rule context")
@@ -803,9 +793,7 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
             )
             # Inject rule_name and action_name from context if not provided
             params.setdefault("rule_name", rule_context.get("rule_name", "unknown"))
-            params.setdefault(
-                "action_name", rule_context.get("action_name", "unknown")
-            )
+            params.setdefault("action_name", rule_context.get("action_name", "unknown"))
             log_event(action_context, **params)
 
         # Register all executors

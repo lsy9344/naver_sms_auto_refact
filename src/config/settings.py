@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import time
-from functools import lru_cache
 from typing import Dict, Any, Optional, List
 
 import boto3
@@ -18,6 +17,13 @@ import yaml
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
+
+
+class ConfigurationError(Exception):
+    """Exception raised for configuration-related errors."""
+
+    pass
+
 
 # Secrets Manager secret names (from Story 1.2)
 # NOTE: These are secret NAMES, not secret VALUES. Values are fetched from AWS Secrets Manager.
@@ -28,6 +34,15 @@ TELEGRAM_SECRET_ID = "naver-sms-automation/telegram-credentials"  # nosec B105
 # For local development with dummy credentials file
 USE_LOCAL_SECRETS = os.getenv("USE_LOCAL_SECRETS_FILE", "false").lower() == "true"
 LOCAL_SECRETS_FILE = os.getenv("LOCAL_SECRETS_FILE_PATH", ".local/secrets.json")
+
+# Manual approval gate for SENS SMS delivery (Story 5.4 - AC 10)
+# Default: False (SMS delivery disabled) - Requires explicit owner sign-off
+# Set to True via environment variable or Lambda config after manual approval
+SENS_DELIVERY_ENABLED = os.getenv("SENS_DELIVERY_ENABLED", "false").lower() == "true"
+
+# Comparison/validation mode flag
+# When True: Logs SMS payloads and metrics but does NOT send real SENS SMS
+COMPARISON_MODE_ENABLED = os.getenv("COMPARISON_MODE_ENABLED", "false").lower() == "true"
 
 
 class SecretRedactionFilter(logging.Filter):
@@ -72,13 +87,9 @@ class SecretRedactionFilter(logging.Filter):
             # Redact args if present
             if record.args:
                 if isinstance(record.args, dict):
-                    record.args = {
-                        k: self._redact_string(str(v)) for k, v in record.args.items()
-                    }
+                    record.args = {k: self._redact_string(str(v)) for k, v in record.args.items()}
                 elif isinstance(record.args, (list, tuple)):
-                    record.args = tuple(
-                        self._redact_string(str(arg)) for arg in record.args
-                    )
+                    record.args = tuple(self._redact_string(str(arg)) for arg in record.args)
         except Exception as e:
             logger.warning(f"Error during secret redaction: {e}")
         return True
@@ -110,13 +121,22 @@ class Settings:
         self.secrets_client = None
         self.rules: List[Dict[str, Any]] = []
         self.rules_schema: Dict[str, Any] = {}
+        # Feature flags (Story 5.4)
+        self.sens_delivery_enabled = SENS_DELIVERY_ENABLED
+        self.comparison_mode_enabled = COMPARISON_MODE_ENABLED
+
+    def is_sens_delivery_enabled(self) -> bool:
+        """Check if SENS SMS delivery is enabled (Story 5.4 AC 10)."""
+        return self.sens_delivery_enabled
+
+    def is_comparison_mode_enabled(self) -> bool:
+        """Check if comparison/validation mode is enabled."""
+        return self.comparison_mode_enabled
 
     def _get_secrets_client(self):
         """Lazy initialize Secrets Manager client."""
         if self.secrets_client is None:
-            self.secrets_client = boto3.client(
-                "secretsmanager", region_name=self.region_name
-            )
+            self.secrets_client = boto3.client("secretsmanager", region_name=self.region_name)
         return self.secrets_client
 
     @staticmethod
@@ -166,7 +186,7 @@ class Settings:
                 else:
                     # Transient error, retry with exponential backoff
                     if attempt < max_retries - 1:
-                        wait_time = base_wait * (2 ** attempt)
+                        wait_time = base_wait * (2**attempt)
                         logger.warning(
                             f"Transient error fetching secret {secret_id}: {error_code}. "
                             f"Retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})"
@@ -177,12 +197,10 @@ class Settings:
                             f"Failed to retrieve secret '{secret_id}' after {max_retries} attempts: {error_code}"
                         ) from e
             except json.JSONDecodeError as e:
-                raise RuntimeError(
-                    f"Secret '{secret_id}' contains invalid JSON: {str(e)}"
-                ) from e
+                raise RuntimeError(f"Secret '{secret_id}' contains invalid JSON: {str(e)}") from e
             except Exception as e:
                 if attempt < max_retries - 1:
-                    wait_time = base_wait * (2 ** attempt)
+                    wait_time = base_wait * (2**attempt)
                     logger.warning(
                         f"Unexpected error fetching secret {secret_id}: {str(e)}. "
                         f"Retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})"
@@ -209,9 +227,7 @@ class Settings:
             RuntimeError: If credentials cannot be loaded
         """
         if USE_LOCAL_SECRETS:
-            return Settings._load_from_local_file(LOCAL_SECRETS_FILE).get(
-                "naver", {}
-            )
+            return Settings._load_from_local_file(LOCAL_SECRETS_FILE).get("naver", {})
 
         credentials = Settings._get_secret_value(NAVER_SECRET_ID)
         if "username" not in credentials or "password" not in credentials:
@@ -256,9 +272,7 @@ class Settings:
             RuntimeError: If credentials cannot be loaded
         """
         if USE_LOCAL_SECRETS:
-            return Settings._load_from_local_file(LOCAL_SECRETS_FILE).get(
-                "telegram", {}
-            )
+            return Settings._load_from_local_file(LOCAL_SECRETS_FILE).get("telegram", {})
 
         credentials = Settings._get_secret_value(TELEGRAM_SECRET_ID)
         if "bot_token" not in credentials or "chat_id" not in credentials:
@@ -338,21 +352,17 @@ class Settings:
         # Validate against schema
         try:
             jsonschema.validate(instance=rules_config, schema=self.rules_schema)
-            logger.info(f"Rules configuration validated against schema")
+            logger.info("Rules configuration validated against schema")
         except jsonschema.ValidationError as e:
             logger.error(f"Rules configuration failed schema validation: {e.message}")
-            raise ValueError(
-                f"Rules configuration validation failed: {e.message}"
-            ) from e
+            raise ValueError(f"Rules configuration validation failed: {e.message}") from e
         except jsonschema.SchemaError as e:
             logger.error(f"Rules schema is invalid: {e.message}")
             raise ValueError(f"Rules schema is invalid: {e.message}") from e
 
         # Extract and store rules
         self.rules = rules_config.get("rules", [])
-        logger.info(
-            f"Successfully loaded {len(self.rules)} rules from {rules_config_path}"
-        )
+        logger.info(f"Successfully loaded {len(self.rules)} rules from {rules_config_path}")
 
     @staticmethod
     def setup_redaction_filter(logger_instance: logging.Logger) -> None:

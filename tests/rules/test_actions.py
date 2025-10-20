@@ -151,9 +151,7 @@ class TestSendSms:
 
     def test_send_sms_service_error(self, action_context, mock_sms_service):
         """Test that SmsServiceError is wrapped in ActionExecutionError."""
-        mock_sms_service.send_confirm_sms.side_effect = SmsServiceError(
-            "SENS API failed"
-        )
+        mock_sms_service.send_confirm_sms.side_effect = SmsServiceError("SENS API failed")
 
         with pytest.raises(ActionExecutionError) as exc_info:
             send_sms(action_context, template="confirm")
@@ -336,9 +334,7 @@ class TestSendTelegram:
     def test_send_telegram_with_params(self, action_context):
         """Test Telegram notification with template parameters."""
         params = {"booking_id": "123", "status": "confirmed"}
-        send_telegram(
-            action_context, message="Booking {{booking_id}}", template_params=params
-        )
+        send_telegram(action_context, message="Booking {{booking_id}}", template_params=params)
 
         action_context.logger.info.assert_called_once()
 
@@ -457,9 +453,7 @@ class TestActionContextImmutability:
         with pytest.raises(Exception):
             action_context.settings_dict = {}
 
-    def test_action_context_safe_concurrent_reuse(
-        self, action_context, mock_booking
-    ):
+    def test_action_context_safe_concurrent_reuse(self, action_context, mock_booking):
         """Test that ActionContext can be safely reused in concurrent scenarios."""
         # Create a second booking
         booking2 = Booking(

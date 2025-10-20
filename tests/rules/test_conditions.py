@@ -384,9 +384,7 @@ class TestHasOptionKeyword:
 
     def test_keyword_match_in_list(self):
         """Test: Detects keyword in option_keywords list"""
-        booking = Mock(
-            option=False, option_keywords=["일반예약", "네이버", "인스타그램"]
-        )
+        booking = Mock(option=False, option_keywords=["일반예약", "네이버", "인스타그램"])
         settings = Mock(option_keywords=["네이버", "인스타", "원본"])
         context = {"booking": booking, "settings": settings}
         assert has_option_keyword(context) is True

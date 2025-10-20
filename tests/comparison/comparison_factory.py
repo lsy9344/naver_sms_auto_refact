@@ -7,7 +7,7 @@ Story 4.2 Task 2: Implements AC 2, 3 (Comparison Harness)
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ComparisonFactory:
     """
     Factory for building comparison test scenarios from fixtures.
-    
+
     Responsibilities:
     - Load production_bookings.json fixtures
     - Build deterministic contexts for both legacy and refactored handlers
@@ -26,13 +26,13 @@ class ComparisonFactory:
     def __init__(self, fixtures_dir: Path = None):
         """
         Initialize factory with fixture directory.
-        
+
         Args:
             fixtures_dir: Path to tests/fixtures directory
         """
         if fixtures_dir is None:
             fixtures_dir = Path(__file__).resolve().parents[1] / "fixtures"
-        
+
         self.fixtures_dir = fixtures_dir
         self._bookings_cache = None
         self._expected_outputs_cache = None
@@ -40,7 +40,7 @@ class ComparisonFactory:
     def load_bookings_fixture(self) -> Dict[str, Any]:
         """
         Load production_bookings.json fixture.
-        
+
         Returns:
             dict: Bookings fixture with all test scenarios
         """
@@ -50,14 +50,14 @@ class ComparisonFactory:
         bookings_path = self.fixtures_dir / "production_bookings.json"
         with bookings_path.open("r", encoding="utf-8") as f:
             self._bookings_cache = json.load(f)
-        
+
         logger.info(f"Loaded {len(self._bookings_cache['bookings'])} bookings from fixture")
         return self._bookings_cache
 
     def load_expected_outputs_fixture(self) -> Dict[str, Any]:
         """
         Load production_expected_outputs.json fixture.
-        
+
         Returns:
             dict: Expected outputs for all scenarios
         """
@@ -67,22 +67,24 @@ class ComparisonFactory:
         outputs_path = self.fixtures_dir / "production_expected_outputs.json"
         with outputs_path.open("r", encoding="utf-8") as f:
             self._expected_outputs_cache = json.load(f)
-        
-        logger.info(f"Loaded {len(self._expected_outputs_cache['expected_outputs'])} expected outputs")
+
+        logger.info(
+            f"Loaded {len(self._expected_outputs_cache['expected_outputs'])} expected outputs"
+        )
         return self._expected_outputs_cache
 
     def build_scenario_contexts(self) -> List[Dict[str, Any]]:
         """
         Build contexts for each scenario.
-        
+
         Each context includes:
         - Booking data
         - DB record state (if applicable)
         - Current time (for deterministic testing)
         - Settings
-        
+
         Implements AC 4 from story (build rule-engine-ready contexts)
-        
+
         Returns:
             List of scenario contexts ready for comparison
         """
@@ -106,12 +108,12 @@ class ComparisonFactory:
     def _normalize_booking(self, booking: Dict[str, Any]) -> Dict[str, Any]:
         """
         Normalize booking data for both implementations.
-        
+
         Ensures consistent field names and types between fixture and handlers.
-        
+
         Args:
             booking: Raw booking from fixture
-            
+
         Returns:
             Normalized booking dict
         """
@@ -130,28 +132,28 @@ class ComparisonFactory:
     def get_scenario_by_id(self, scenario_id: str) -> Optional[Dict[str, Any]]:
         """
         Get a specific scenario by ID.
-        
+
         Args:
             scenario_id: Booking ID or scenario name
-            
+
         Returns:
             Scenario context or None if not found
         """
         bookings_fixture = self.load_bookings_fixture()
-        
+
         for booking in bookings_fixture["bookings"]:
             if booking["booking_id"] == scenario_id:
                 return self._normalize_booking(booking)
-        
+
         return None
 
     def get_expected_output(self, booking_id: str) -> Optional[Dict[str, Any]]:
         """
         Get expected output for a booking.
-        
+
         Args:
             booking_id: ID of the booking
-            
+
         Returns:
             Expected output dict or None if not found
         """
@@ -161,7 +163,7 @@ class ComparisonFactory:
     def get_validation_rules(self) -> Dict[str, Dict[str, str]]:
         """
         Get all validation rules for parity checking.
-        
+
         Returns:
             Dictionary of validation rules
         """
@@ -171,7 +173,7 @@ class ComparisonFactory:
     def list_all_scenarios(self) -> List[str]:
         """
         List all available scenario IDs.
-        
+
         Returns:
             List of scenario IDs
         """
@@ -181,10 +183,10 @@ class ComparisonFactory:
     def get_scenarios_by_edge_case(self, edge_case_name: str) -> List[Dict[str, Any]]:
         """
         Get all scenarios for a specific edge case.
-        
+
         Args:
             edge_case_name: Edge case name (e.g., "new_booking_confirmation")
-            
+
         Returns:
             List of scenario contexts
         """
@@ -194,10 +196,10 @@ class ComparisonFactory:
     def get_high_volume_scenarios(self, batch_size: int = 50) -> List[Dict[str, Any]]:
         """
         Get high-volume batch scenarios.
-        
+
         Args:
             batch_size: Expected batch size (default 50)
-            
+
         Returns:
             List of high-volume scenario contexts
         """

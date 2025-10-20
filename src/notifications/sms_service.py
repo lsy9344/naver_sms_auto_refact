@@ -146,11 +146,9 @@ class SensSmsClient:
                         "attempt": attempt,
                         "store_id": store_id,
                         "phone_masked": masked_phone,
-                    }
+                    },
                 )
-                response = self.http_client.post(
-                    url, headers=headers, data=body, timeout=10
-                )
+                response = self.http_client.post(url, headers=headers, data=body, timeout=10)
                 if response.status_code >= 400:
                     raise SmsServiceError(
                         f"SENS responded with {response.status_code}: {response.text}"
@@ -164,7 +162,7 @@ class SensSmsClient:
                         "attempt": attempt,
                         "store_id": store_id,
                         "phone_masked": masked_phone,
-                    }
+                    },
                 )
                 return
             except Exception as exc:  # noqa: BLE001 - we need to retry on any failure

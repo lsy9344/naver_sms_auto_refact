@@ -1,6 +1,6 @@
 # Comparison Report: case6_volume_001
 **Scenario:** CASE 6: High-Volume Processing - Batch 1
-**Generated:** 2025-10-20T01:23:52.230642
+**Generated:** 2025-10-20T16:51:42.883166
 
 ## Status
 **Parity Status:** PASS

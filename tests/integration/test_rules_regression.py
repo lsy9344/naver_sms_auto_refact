@@ -29,6 +29,7 @@ import pytest
 
 # Add src directory to path
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from domain.booking import Booking
@@ -64,9 +65,7 @@ class InMemoryBookingRepository:
         """Initialise repository store."""
         self.records: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
-    def seed_record(
-        self, booking_num: str, phone: str, record: Dict[str, Any]
-    ) -> None:
+    def seed_record(self, booking_num: str, phone: str, record: Dict[str, Any]) -> None:
         """Seed repository with an existing booking record."""
         base = {
             "booking_num": booking_num,
@@ -93,9 +92,7 @@ class InMemoryBookingRepository:
         """Fetch booking if it exists."""
         return self.records.get((prefix, phone))
 
-    def update_flag(
-        self, *, prefix: str, phone: str, flag_name: str, value: bool
-    ) -> bool:
+    def update_flag(self, *, prefix: str, phone: str, flag_name: str, value: bool) -> bool:
         """Update flag and persist value."""
         record = self.records.setdefault(
             (prefix, phone),
@@ -209,9 +206,7 @@ class RegressionTestRunner:
         """Ensure artifact directory exists."""
         self.artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    def _write_failure_artifact(
-        self, booking_id: str, payload: Dict[str, Any]
-    ) -> str:
+    def _write_failure_artifact(self, booking_id: str, payload: Dict[str, Any]) -> str:
         """Persist mismatch details for later inspection."""
         self._ensure_artifact_dir()
         artifact_path = self._artifact_path(booking_id)
@@ -266,6 +261,7 @@ class RegressionTestRunner:
 
     def build_context(self, booking: Dict[str, Any]) -> Dict[str, Any]:
         """Build execution context from booking fixture, converting to domain objects."""
+
         def parse_datetime(value: str) -> Optional[datetime]:
             if not value:
                 return None
@@ -372,13 +368,9 @@ class RegressionTestRunner:
                     "phone": booking_obj.phone,
                     **db_record,
                 }
-                self.db_repo.seed_record(
-                    booking_obj.booking_num, booking_obj.phone, seed_record
-                )
+                self.db_repo.seed_record(booking_obj.booking_num, booking_obj.phone, seed_record)
             else:
-                self.db_repo.remove_record(
-                    booking_obj.booking_num, booking_obj.phone
-                )
+                self.db_repo.remove_record(booking_obj.booking_num, booking_obj.phone)
 
         # Execute rules
         try:
@@ -471,17 +463,11 @@ class RegressionTestRunner:
         }
 
         if differences:
-            logger.error(
-                "Action parity mismatch for %s: %s", booking_id, differences
-            )
-            result["artifact_path"] = self._write_failure_artifact(
-                booking_id, artifact_payload
-            )
+            logger.error("Action parity mismatch for %s: %s", booking_id, differences)
+            result["artifact_path"] = self._write_failure_artifact(booking_id, artifact_payload)
         elif not success:
             logger.error("Error processing booking %s: %s", booking_id, error)
-            result["artifact_path"] = self._write_failure_artifact(
-                booking_id, artifact_payload
-            )
+            result["artifact_path"] = self._write_failure_artifact(booking_id, artifact_payload)
         else:
             self._remove_artifact(booking_id)
             result["artifact_path"] = None
@@ -536,9 +522,7 @@ def rule_engine(settings):
     from unittest.mock import Mock
     from src.utils.logger import StructuredLogger
 
-    engine = RuleEngine(
-        str(Path(__file__).parent.parent.parent / "src" / "config" / "rules.yaml")
-    )
+    engine = RuleEngine(str(Path(__file__).parent.parent.parent / "src" / "config" / "rules.yaml"))
 
     # Register condition evaluators
     engine.register_condition("booking_not_in_db", booking_not_in_db)
@@ -614,9 +598,7 @@ class TestRulesRegression:
         # Print individual results
         for result in results["results"]:
             status = "✓ PASS" if result["success"] else "✗ FAIL"
-            logger.info(
-                f"{status}: {result['booking_id']} - {result['booking_name']}"
-            )
+            logger.info(f"{status}: {result['booking_id']} - {result['booking_name']}")
             if not result["success"]:
                 logger.info(
                     f"  Expected {result['expected_action_count']} actions, "
@@ -626,9 +608,9 @@ class TestRulesRegression:
                     logger.error(f"  Error: {result['error']}")
 
         # Assert all tests passed
-        assert results["failed"] == 0, (
-            f"Regression tests failed: {results['failed']} of {results['total']} failed"
-        )
+        assert (
+            results["failed"] == 0
+        ), f"Regression tests failed: {results['failed']} of {results['total']} failed"
 
     def test_booking_001_new_confirmation(self, test_runner, test_fixtures):
         """Test booking 001: New Booking Confirmation."""

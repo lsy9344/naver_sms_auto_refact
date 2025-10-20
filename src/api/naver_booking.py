@@ -41,7 +41,7 @@ class NaverBookingAPIClient:
             option_keywords: List of keywords for option detection (default: ['네이버', '인스타', '원본'])
         """
         self.session = session
-        self.option_keywords = option_keywords or ['네이버', '인스타', '원본']
+        self.option_keywords = option_keywords or ["네이버", "인스타", "원본"]
 
     def get_bookings(
         self,
@@ -73,21 +73,21 @@ class NaverBookingAPIClient:
 
         # Build headers matching legacy implementation (lines 305-317)
         headers = {
-            'authority': 'partner.booking.naver.com',
-            'referer': f'https://partner.booking.naver.com/bizes/{store_id}/booking-list-view',
-            'x-booking-naver-role': 'OWNER',
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-            'accept': 'application/json, text/plain, */*',
-            'accept-language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+            "authority": "partner.booking.naver.com",
+            "referer": f"https://partner.booking.naver.com/bizes/{store_id}/booking-list-view",
+            "x-booking-naver-role": "OWNER",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
         }
 
         # Build query parameters
         params = {
-            'bizItemTypes': 'STANDARD',
-            'bookingStatusCodes': status,
-            'dateFilter': date_filter,
-            'page': page,
-            'size': size,
+            "bizItemTypes": "STANDARD",
+            "bookingStatusCodes": status,
+            "dateFilter": date_filter,
+            "page": page,
+            "size": size,
         }
 
         # Make API request
@@ -109,7 +109,9 @@ class NaverBookingAPIClient:
                     booking = self._transform_booking(booking_data, store_id)
                     bookings.append(booking)
                 except Exception as e:
-                    logger.warning(f"Failed to transform booking {booking_data.get('bookingId')}: {e}")
+                    logger.warning(
+                        f"Failed to transform booking {booking_data.get('bookingId')}: {e}"
+                    )
 
             return bookings
 
@@ -136,7 +138,9 @@ class NaverBookingAPIClient:
             except Exception as e:
                 logger.error(f"Failed to fetch confirmed bookings for store {store_id}: {e}")
 
-        logger.info(f"Retrieved {len(all_bookings)} total confirmed bookings across {len(store_ids)} stores")
+        logger.info(
+            f"Retrieved {len(all_bookings)} total confirmed bookings across {len(store_ids)} stores"
+        )
         return all_bookings
 
     def get_all_completed_bookings(self, store_ids: List[str]) -> List[Booking]:
@@ -158,7 +162,9 @@ class NaverBookingAPIClient:
             except Exception as e:
                 logger.error(f"Failed to fetch completed bookings for store {store_id}: {e}")
 
-        logger.info(f"Retrieved {len(all_bookings)} total completed bookings across {len(store_ids)} stores")
+        logger.info(
+            f"Retrieved {len(all_bookings)} total completed bookings across {len(store_ids)} stores"
+        )
         return all_bookings
 
     def _transform_booking(self, booking_data: Dict[str, Any], store_id: str) -> Booking:
@@ -177,29 +183,50 @@ class NaverBookingAPIClient:
         Returns:
             Booking domain object
         """
-        booking_id = booking_data['bookingId']
-        name = booking_data.get('name', '')
-        phone_raw = booking_data.get('phone', '')
+        booking_id = booking_data["bookingId"]
+        name = booking_data.get("name", "")
+        phone_raw = booking_data.get("phone", "")
 
         # Format phone number: 01012345678 -> 010-1234-5678 (line 375)
         phone = self._format_phone(phone_raw)
 
         # Extract booking info from snapshot
-        snapshot = booking_data.get('snapshotJson', {})
-        start_datetime_str = snapshot.get('startDateTime', '')
+        snapshot = booking_data.get("snapshotJson", {})
+        start_datetime_str = snapshot.get("startDateTime", "")
 
         # Convert UTC ISO to KST datetime +9hrs (lines 369-372)
         reserve_at = self._parse_datetime_kst(start_datetime_str)
 
         # Detect option keywords (lines 361-367)
-        booking_options = snapshot.get('bookingOptionJson', [])
+        booking_options = snapshot.get("bookingOptionJson", [])
         option = self._detect_option_keywords(booking_options)
+
+        # Extract coupon name
+        coupon_name = None
+        coupon_json_list = snapshot.get("couponJson", [])
+        if coupon_json_list:
+            first_coupon = coupon_json_list[0]
+            coupon_name = first_coupon.get("couponName")
+
+        # Extract pro-edit and add_person_edit option info
+        has_pro_edit_option = False
+        pro_edit_count = 0
+        has_edit_add_person_option = False
+        edit_add_person_count = 0
+        for option_item in booking_options:
+            option_name = option_item.get("name", "")
+            if "전문가 보정" in option_name:
+                has_pro_edit_option = True
+                pro_edit_count = option_item.get("bookingCount", 0)
+            elif "사진 보정 추가" in option_name:
+                has_edit_add_person_option = True
+                edit_add_person_count = option_item.get("bookingCount", 0)
 
         # Create composite booking_num key
         booking_num = f"{store_id}_{booking_id}"
 
         # Format booking_time for DynamoDB
-        booking_time = reserve_at.strftime('%Y-%m-%d %H:%M:%S')
+        booking_time = reserve_at.strftime("%Y-%m-%d %H:%M:%S")
 
         return Booking(
             booking_num=booking_num,
@@ -210,7 +237,12 @@ class NaverBookingAPIClient:
             option=option,
             reserve_at=reserve_at,
             booking_time=booking_time,
-            status=booking_data.get('bookingStatusCode', ''),
+            status=booking_data.get("bookingStatusCode", ""),
+            coupon_name=coupon_name,
+            has_pro_edit_option=has_pro_edit_option,
+            pro_edit_count=pro_edit_count,
+            has_edit_add_person_option=has_edit_add_person_option,
+            edit_add_person_count=edit_add_person_count,
         )
 
     def _format_phone(self, phone_raw: str) -> str:
@@ -227,10 +259,10 @@ class NaverBookingAPIClient:
             Formatted phone number with hyphens
         """
         # Remove any existing hyphens/spaces
-        digits = ''.join(c for c in phone_raw if c.isdigit())
+        digits = "".join(c for c in phone_raw if c.isdigit())
 
         # Format as 010-XXXX-XXXX
-        if len(digits) == 11 and digits.startswith('010'):
+        if len(digits) == 11 and digits.startswith("010"):
             return f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
         elif len(digits) == 10:
             return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
@@ -253,7 +285,7 @@ class NaverBookingAPIClient:
             Naive datetime in KST timezone
         """
         # Parse UTC datetime
-        dt_utc = datetime.strptime(iso_string, '%Y-%m-%dT%H:%M:%SZ')
+        dt_utc = datetime.strptime(iso_string, "%Y-%m-%dT%H:%M:%SZ")
 
         # Add 9 hours for KST
         dt_kst = dt_utc + timedelta(hours=9)
@@ -277,7 +309,7 @@ class NaverBookingAPIClient:
             True if any option contains a keyword, False otherwise
         """
         for option in booking_options:
-            option_name = option.get('name', '')
+            option_name = option.get("name", "")
             for keyword in self.option_keywords:
                 if keyword in option_name:
                     logger.debug(f"Option keyword '{keyword}' found in '{option_name}'")

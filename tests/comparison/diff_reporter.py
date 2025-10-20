@@ -6,7 +6,7 @@ Story 4.2 Task 2: Implements AC 3 (Framework emits structured artifacts)
 
 import json
 import logging
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, asdict
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ComparisonMismatch:
     """Represents a single parity mismatch"""
-    
+
     category: str  # "sms", "db_records", "telegram", "actions"
     field: str
     legacy_value: Any
@@ -29,7 +29,7 @@ class ComparisonMismatch:
 class DiffReporter:
     """
     Generate structured comparison artifacts (JSON + Markdown).
-    
+
     Responsibilities:
     - Compare canonical outputs field-by-field
     - Generate JSON diff artifacts
@@ -40,15 +40,13 @@ class DiffReporter:
     def __init__(self, output_dir: Path = None):
         """
         Initialize reporter.
-        
+
         Args:
             output_dir: Directory for writing comparison results
         """
         if output_dir is None:
-            output_dir = (
-                Path(__file__).resolve().parents[1] / "comparison" / "results"
-            )
-        
+            output_dir = Path(__file__).resolve().parents[1] / "comparison" / "results"
+
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -57,17 +55,17 @@ class DiffReporter:
         booking_id: str,
         canonical_legacy: Dict[str, Any],
         canonical_refactored: Dict[str, Any],
-        expected_outputs: Dict[str, Any] = None
+        expected_outputs: Dict[str, Any] = None,
     ) -> Tuple[List[ComparisonMismatch], Dict[str, Any]]:
         """
         Compare canonical outputs from both implementations.
-        
+
         Args:
             booking_id: ID of the booking being compared
             canonical_legacy: Canonical legacy output
             canonical_refactored: Canonical refactored output
             expected_outputs: Expected outputs for reference
-            
+
         Returns:
             Tuple of (mismatches, stats)
         """
@@ -75,9 +73,7 @@ class DiffReporter:
 
         # Compare SMS outputs
         sms_mismatches = self._compare_lists(
-            "sms",
-            canonical_legacy.get("sms", []),
-            canonical_refactored.get("sms", [])
+            "sms", canonical_legacy.get("sms", []), canonical_refactored.get("sms", [])
         )
         mismatches.extend(sms_mismatches)
 
@@ -85,7 +81,7 @@ class DiffReporter:
         db_mismatches = self._compare_lists(
             "db_records",
             canonical_legacy.get("db_records", []),
-            canonical_refactored.get("db_records", [])
+            canonical_refactored.get("db_records", []),
         )
         mismatches.extend(db_mismatches)
 
@@ -93,17 +89,21 @@ class DiffReporter:
         telegram_mismatches = self._compare_lists(
             "telegram",
             canonical_legacy.get("telegram", []),
-            canonical_refactored.get("telegram", [])
+            canonical_refactored.get("telegram", []),
         )
         mismatches.extend(telegram_mismatches)
 
         # Compare action results
         action_mismatches = self._compare_lists(
-            "actions",
-            canonical_legacy.get("actions", []),
-            canonical_refactored.get("actions", [])
+            "actions", canonical_legacy.get("actions", []), canonical_refactored.get("actions", [])
         )
         mismatches.extend(action_mismatches)
+
+        # Compare Slack webhook outputs
+        slack_mismatches = self._compare_lists(
+            "slack", canonical_legacy.get("slack", []), canonical_refactored.get("slack", [])
+        )
+        mismatches.extend(slack_mismatches)
 
         # Calculate statistics
         stats = {
@@ -121,16 +121,16 @@ class DiffReporter:
         self,
         category: str,
         legacy_list: List[Dict[str, Any]],
-        refactored_list: List[Dict[str, Any]]
+        refactored_list: List[Dict[str, Any]],
     ) -> List[ComparisonMismatch]:
         """
         Compare two lists of items (SMS, DB records, etc).
-        
+
         Args:
             category: Category name (sms, db_records, etc)
             legacy_list: List from legacy implementation
             refactored_list: List from refactored implementation
-            
+
         Returns:
             List of mismatches
         """
@@ -145,18 +145,14 @@ class DiffReporter:
                     legacy_value=len(legacy_list),
                     refactored_value=len(refactored_list),
                     severity="critical",
-                    message=f"Item count mismatch: {len(legacy_list)} vs {len(refactored_list)}"
+                    message=f"Item count mismatch: {len(legacy_list)} vs {len(refactored_list)}",
                 )
             )
 
         # Compare each item
-        for i, (legacy_item, refactored_item) in enumerate(
-            zip(legacy_list, refactored_list)
-        ):
+        for i, (legacy_item, refactored_item) in enumerate(zip(legacy_list, refactored_list)):
             if isinstance(legacy_item, dict) and isinstance(refactored_item, dict):
-                item_mismatches = self._compare_dicts(
-                    category, i, legacy_item, refactored_item
-                )
+                item_mismatches = self._compare_dicts(category, i, legacy_item, refactored_item)
                 mismatches.extend(item_mismatches)
 
         return mismatches
@@ -166,17 +162,17 @@ class DiffReporter:
         category: str,
         index: int,
         legacy_dict: Dict[str, Any],
-        refactored_dict: Dict[str, Any]
+        refactored_dict: Dict[str, Any],
     ) -> List[ComparisonMismatch]:
         """
         Compare two dictionaries field by field.
-        
+
         Args:
             category: Category name
             index: Index in list
             legacy_dict: Dict from legacy
             refactored_dict: Dict from refactored
-            
+
         Returns:
             List of field mismatches
         """
@@ -200,7 +196,7 @@ class DiffReporter:
                         legacy_value=legacy_value,
                         refactored_value=refactored_value,
                         severity=severity,
-                        message=f"Field mismatch: {key} = {legacy_value} vs {refactored_value}"
+                        message=f"Field mismatch: {key} = {legacy_value} vs {refactored_value}",
                     )
                 )
 
@@ -214,7 +210,7 @@ class DiffReporter:
         canonical_legacy: Dict[str, Any] = None,
         canonical_refactored: Dict[str, Any] = None,
         container_digest: str = None,
-        dataset_version: str = "1.0"
+        dataset_version: str = "1.0",
     ) -> str:
         """
         Generate JSON report for a booking comparison.
@@ -245,7 +241,7 @@ class DiffReporter:
             "canonical_outputs": {
                 "legacy": canonical_legacy or {},
                 "refactored": canonical_refactored or {},
-            }
+            },
         }
 
         return json.dumps(report, indent=2, default=str)
@@ -255,17 +251,17 @@ class DiffReporter:
         booking_id: str,
         scenario: str,
         mismatches: List[ComparisonMismatch],
-        stats: Dict[str, Any]
+        stats: Dict[str, Any],
     ) -> str:
         """
         Generate markdown summary with mismatch highlighting.
-        
+
         Args:
             booking_id: ID of booking
             scenario: Scenario description
             mismatches: List of mismatches
             stats: Statistics dict
-            
+
         Returns:
             Markdown string
         """
@@ -283,15 +279,19 @@ class DiffReporter:
         ]
 
         if len(mismatches) == 0:
-            md_lines.extend([
-                "## Result",
-                "✅ **Perfect Parity** - Legacy and refactored implementations match!",
-            ])
+            md_lines.extend(
+                [
+                    "## Result",
+                    "✅ **Perfect Parity** - Legacy and refactored implementations match!",
+                ]
+            )
         else:
-            md_lines.extend([
-                "## Mismatches",
-                "",
-            ])
+            md_lines.extend(
+                [
+                    "## Mismatches",
+                    "",
+                ]
+            )
 
             # Group by category
             by_category = {}
@@ -307,19 +307,19 @@ class DiffReporter:
 
                 for item in items:
                     severity_emoji = "🚨" if item.severity == "critical" else "⚠️"
-                    md_lines.append(
-                        f"{severity_emoji} **{item.field}** [{item.severity.upper()}]"
-                    )
+                    md_lines.append(f"{severity_emoji} **{item.field}** [{item.severity.upper()}]")
                     md_lines.append(f"  - Legacy: `{item.legacy_value}`")
                     md_lines.append(f"  - Refactored: `{item.refactored_value}`")
                     md_lines.append(f"  - {item.message}")
                     md_lines.append("")
 
-        md_lines.extend([
-            "",
-            "---",
-            f"*Generated by Comparison Testing Framework v1.0*",
-        ])
+        md_lines.extend(
+            [
+                "",
+                "---",
+                "*Generated by Comparison Testing Framework v1.0*",
+            ]
+        )
 
         return "\n".join(md_lines)
 
@@ -330,11 +330,11 @@ class DiffReporter:
         mismatches: List[ComparisonMismatch],
         stats: Dict[str, Any],
         canonical_legacy: Dict[str, Any] = None,
-        canonical_refactored: Dict[str, Any] = None
+        canonical_refactored: Dict[str, Any] = None,
     ) -> Tuple[Path, Path]:
         """
         Write both JSON and Markdown reports to disk.
-        
+
         Args:
             booking_id: ID of booking
             scenario: Scenario description
@@ -342,7 +342,7 @@ class DiffReporter:
             stats: Statistics dict
             canonical_legacy: Legacy outputs (optional)
             canonical_refactored: Refactored outputs (optional)
-            
+
         Returns:
             Tuple of (json_path, markdown_path)
         """
@@ -350,9 +350,7 @@ class DiffReporter:
         json_report = self.generate_json_report(
             booking_id, mismatches, stats, canonical_legacy, canonical_refactored
         )
-        markdown_report = self.generate_markdown_summary(
-            booking_id, scenario, mismatches, stats
-        )
+        markdown_report = self.generate_markdown_summary(booking_id, scenario, mismatches, stats)
 
         # Write files
         safe_booking_id = booking_id.replace("/", "_")
@@ -371,16 +369,13 @@ class DiffReporter:
 
         return json_path, md_path
 
-    def generate_aggregate_summary(
-        self,
-        all_stats: List[Dict[str, Any]]
-    ) -> str:
+    def generate_aggregate_summary(self, all_stats: List[Dict[str, Any]]) -> str:
         """
         Generate aggregate summary across all bookings.
-        
+
         Args:
             all_stats: List of stats dicts from all comparisons
-            
+
         Returns:
             Markdown summary string
         """
@@ -398,7 +393,7 @@ class DiffReporter:
             f"- **Total Bookings Tested:** {total_bookings}",
             f"- **Passed:** {passed} ✅",
             f"- **Failed:** {failed} ❌",
-            f"- **Pass Rate:** {(passed/total_bookings*100):.1f}%",
+            f"- **Pass Rate:** {(passed / total_bookings * 100):.1f}%",
             "",
             "## Mismatch Summary",
             f"- **Critical Mismatches:** {total_critical} 🚨",
@@ -417,21 +412,23 @@ class DiffReporter:
                 f"Warnings: {stat['warning_mismatches']})"
             )
 
-        md_lines.extend([
-            "",
-            "---",
-            f"*Comparison Testing Framework v1.0*",
-        ])
+        md_lines.extend(
+            [
+                "",
+                "---",
+                "*Comparison Testing Framework v1.0*",
+            ]
+        )
 
         return "\n".join(md_lines)
 
     def write_aggregate_summary(self, all_stats: List[Dict[str, Any]]) -> Path:
         """
         Write aggregate summary to disk.
-        
+
         Args:
             all_stats: List of stats from all comparisons
-            
+
         Returns:
             Path to written file
         """

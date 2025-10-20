@@ -112,9 +112,13 @@ def test_secret_policy_restricts_principals(secrets_client):
                 deny_not_principals.update(_normalise_principals(statement.get("NotPrincipal")))
 
         for principal in EXPECTED_PRINCIPALS:
-            assert principal in allow_principals, f"{principal} missing from Allow statement for {secret_name}"
+            assert (
+                principal in allow_principals
+            ), f"{principal} missing from Allow statement for {secret_name}"
 
         unexpected = deny_not_principals - EXPECTED_PRINCIPALS
-        assert not unexpected, f"Unexpected NotPrincipal entries for {secret_name}: {', '.join(sorted(unexpected))}"
+        assert (
+            not unexpected
+        ), f"Unexpected NotPrincipal entries for {secret_name}: {', '.join(sorted(unexpected))}"
 
         assert deny_not_principals, f"Deny statement missing for {secret_name}"

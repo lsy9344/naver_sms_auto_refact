@@ -125,9 +125,7 @@ def action_context(booking, services_bundle):
 class TestNewBookingWorkflow:
     """Test complete new booking workflow."""
 
-    def test_new_booking_creates_record_and_sends_sms(
-        self, booking, services_bundle
-    ):
+    def test_new_booking_creates_record_and_sends_sms(self, booking, services_bundle):
         """Test creating booking and sending SMS."""
         context = ActionContext(
             booking=booking,
@@ -286,9 +284,7 @@ class TestMultipleActionsSequence:
 class TestActionErrorRecovery:
     """Test error handling and recovery."""
 
-    def test_error_in_one_action_does_not_prevent_others(
-        self, booking, services_bundle
-    ):
+    def test_error_in_one_action_does_not_prevent_others(self, booking, services_bundle):
         """Test that errors don't cascade."""
         context = ActionContext(
             booking=booking,
@@ -302,9 +298,7 @@ class TestActionErrorRecovery:
         create_db_record(context)
 
         # Make SMS fail
-        services_bundle.sms_service.send_confirm_sms.side_effect = Exception(
-            "API error"
-        )
+        services_bundle.sms_service.send_confirm_sms.side_effect = Exception("API error")
 
         # SMS action should fail
         with pytest.raises(Exception):
@@ -459,8 +453,7 @@ class TestRegisterActionsIntegration:
         register_actions(mock_engine, services_bundle)
 
         registered_names = {
-            call_args[0][0]
-            for call_args in mock_engine.register_action.call_args_list
+            call_args[0][0] for call_args in mock_engine.register_action.call_args_list
         }
 
         expected = {

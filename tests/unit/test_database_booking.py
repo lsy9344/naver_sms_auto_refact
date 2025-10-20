@@ -71,7 +71,7 @@ def repository():
 
 class TestBookingRepositoryGetBooking:
     """Tests for get_booking() method."""
-    
+
     def test_get_booking_success(self, repository):
         """Should retrieve existing booking."""
         # Arrange
@@ -86,24 +86,24 @@ class TestBookingRepositoryGetBooking:
             "option_time": "",
         }
         repository.table.put_item(Item=booking_data)
-        
+
         # Act
         result = repository.get_booking("1051707_12345", "010-1234-5678")
-        
+
         # Assert
         assert result is not None
         assert result["booking_num"] == "1051707_12345"
         assert result["phone"] == "010-1234-5678"
         assert result["name"] == "Kim Soo"
-    
+
     def test_get_booking_not_found_returns_none(self, repository):
         """Should return None when booking not found (AC-4a)."""
         # Act
         result = repository.get_booking("1051707_99999", "010-0000-0000")
-        
+
         # Assert
         assert result is None
-    
+
     def test_get_booking_preserves_all_fields(self, repository):
         """Should preserve all booking fields including extra_fields."""
         # Arrange
@@ -119,17 +119,17 @@ class TestBookingRepositoryGetBooking:
             "custom_field": "future_value",
         }
         repository.table.put_item(Item=booking_data)
-        
+
         # Act
         result = repository.get_booking("951291_54321", "010-9876-5432")
-        
+
         # Assert
         assert result["custom_field"] == "future_value"
 
 
 class TestBookingRepositoryCreateBooking:
     """Tests for create_booking() method."""
-    
+
     def test_create_booking_success(self, repository):
         """Should create new booking record."""
         # Arrange
@@ -143,19 +143,19 @@ class TestBookingRepositoryCreateBooking:
             "option_sms": False,
             "option_time": "",
         }
-        
+
         # Act
         result = repository.create_booking(booking_data)
-        
+
         # Assert
         assert result is True
-        
+
         # Verify stored
         stored = repository.table.get_item(
             Key={"booking_num": "1120125_11111", "phone": "010-1111-1111"}
         )
         assert stored["Item"]["name"] == "Lee Jung"
-    
+
     def test_create_booking_missing_required_field(self, repository):
         """Should raise DynamoDBException if required fields missing."""
         # Arrange
@@ -164,11 +164,11 @@ class TestBookingRepositoryCreateBooking:
             "phone": "010-2222-2222",
             # Missing: name, booking_time
         }
-        
+
         # Act & Assert
         with pytest.raises(DynamoDBException):
             repository.create_booking(incomplete_data)
-    
+
     def test_create_booking_with_extra_fields(self, repository):
         """Should support extra fields for future expansion."""
         # Arrange
@@ -185,10 +185,10 @@ class TestBookingRepositoryCreateBooking:
             "visit_count": 5,
             "booking_amount": 150000,
         }
-        
+
         # Act
         result = repository.create_booking(booking_data)
-        
+
         # Assert
         assert result is True
         stored = repository.table.get_item(
@@ -200,7 +200,7 @@ class TestBookingRepositoryCreateBooking:
 
 class TestBookingRepositoryUpdateFlag:
     """Tests for update_flag() method."""
-    
+
     def test_update_flag_success(self, repository):
         """Should update booking flag."""
         # Arrange
@@ -215,19 +215,19 @@ class TestBookingRepositoryUpdateFlag:
             "option_time": "",
         }
         repository.table.put_item(Item=booking_data)
-        
+
         # Act
         result = repository.update_flag("1473826_44444", "010-4444-4444", "confirm_sms", True)
-        
+
         # Assert
         assert result is True
-        
+
         # Verify update
         stored = repository.table.get_item(
             Key={"booking_num": "1473826_44444", "phone": "010-4444-4444"}
         )
         assert stored["Item"]["confirm_sms"] is True
-    
+
     def test_update_multiple_flags(self, repository):
         """Should support updating different flags independently."""
         # Arrange
@@ -242,11 +242,11 @@ class TestBookingRepositoryUpdateFlag:
             "option_time": "",
         }
         repository.table.put_item(Item=booking_data)
-        
+
         # Act
         repository.update_flag("1466783_55555", "010-5555-5555", "confirm_sms", True)
         repository.update_flag("1466783_55555", "010-5555-5555", "remind_sms", True)
-        
+
         # Assert
         stored = repository.table.get_item(
             Key={"booking_num": "1466783_55555", "phone": "010-5555-5555"}
@@ -254,7 +254,7 @@ class TestBookingRepositoryUpdateFlag:
         assert stored["Item"]["confirm_sms"] is True
         assert stored["Item"]["remind_sms"] is True
         assert stored["Item"]["option_sms"] is False
-    
+
     def test_update_custom_flag(self, repository):
         """Should support custom flag names for extensibility."""
         # Arrange
@@ -269,25 +269,25 @@ class TestBookingRepositoryUpdateFlag:
             "option_time": "",
         }
         repository.table.put_item(Item=booking_data)
-        
+
         # Act
         result = repository.update_flag("867589_66666", "010-6666-6666", "custom_notified", True)
-        
+
         # Assert
         assert result is True
 
 
 class TestBookingRepositoryScanUnnotifiedOptions:
     """Tests for scan_unnotified_options() method."""
-    
+
     def test_scan_unnotified_options_empty(self, repository):
         """Should return empty dict when no unnotified options."""
         # Act
         result = repository.scan_unnotified_options()
-        
+
         # Assert
         assert result == {}
-    
+
     def test_scan_unnotified_options_single_store(self, repository):
         """Should find and group unnotified options by store."""
         # Arrange
@@ -315,15 +315,15 @@ class TestBookingRepositoryScanUnnotifiedOptions:
         ]
         for booking in bookings:
             repository.table.put_item(Item=booking)
-        
+
         # Act
         result = repository.scan_unnotified_options()
-        
+
         # Assert
         assert "1051707" in result
         assert result["1051707"]["start_time"] == "2025-10-20T10:00:00.000Z"
         assert result["1051707"]["end_time"] == "2025-10-20T14:00:00.000Z"
-    
+
     def test_scan_unnotified_options_multiple_stores(self, repository):
         """Should handle multiple stores in one scan."""
         # Arrange
@@ -351,16 +351,16 @@ class TestBookingRepositoryScanUnnotifiedOptions:
         ]
         for booking in bookings:
             repository.table.put_item(Item=booking)
-        
+
         # Act
         result = repository.scan_unnotified_options()
-        
+
         # Assert
         assert "1051707" in result
         assert "951291" in result
         assert result["1051707"]["start_time"] == "2025-10-20T10:00:00.000Z"
         assert result["951291"]["start_time"] == "2025-10-20T15:00:00.000Z"
-    
+
     def test_scan_unnotified_options_sorting(self, repository):
         """Should sort bookings by booking_time within each store."""
         # Arrange
@@ -398,14 +398,14 @@ class TestBookingRepositoryScanUnnotifiedOptions:
         ]
         for booking in bookings:
             repository.table.put_item(Item=booking)
-        
+
         # Act
         result = repository.scan_unnotified_options()
-        
+
         # Assert
         assert result["1051707"]["start_time"] == "2025-10-20T08:00:00.000Z"
         assert result["1051707"]["end_time"] == "2025-10-20T18:00:00.000Z"
-    
+
     def test_scan_ignores_notified_options(self, repository):
         """Should ignore bookings with option_sms=True."""
         # Arrange
@@ -433,10 +433,10 @@ class TestBookingRepositoryScanUnnotifiedOptions:
         ]
         for booking in bookings:
             repository.table.put_item(Item=booking)
-        
+
         # Act
         result = repository.scan_unnotified_options()
-        
+
         # Assert
         assert "1051707" in result
         # Should only have times from the one unnotified booking
@@ -446,7 +446,7 @@ class TestBookingRepositoryScanUnnotifiedOptions:
 
 class TestBookingRepositoryErrorHandling:
     """Tests for error handling and retry logic."""
-    
+
     def test_get_booking_network_error(self, repository):
         """Should raise NetworkError on network failure."""
         # Arrange
@@ -454,7 +454,7 @@ class TestBookingRepositoryErrorHandling:
             # Act & Assert
             with pytest.raises(NetworkError):
                 repository.get_booking("1051707_12345", "010-1234-5678")
-    
+
     def test_create_booking_network_error(self, repository):
         """Should raise NetworkError on network failure during create."""
         # Arrange
@@ -468,12 +468,12 @@ class TestBookingRepositoryErrorHandling:
             "option_sms": False,
             "option_time": "",
         }
-        
+
         with patch.object(repository.table, "put_item", side_effect=OSError("Connection refused")):
             # Act & Assert
             with pytest.raises(NetworkError):
                 repository.create_booking(booking_data)
-    
+
     def test_throttling_error_retry(self, repository):
         """Should retry on throttling error."""
         # Arrange
@@ -487,9 +487,10 @@ class TestBookingRepositoryErrorHandling:
             "option_sms": False,
             "option_time": "",
         }
-        
+
         # Mock to fail twice then succeed
         call_count = 0
+
         def side_effect(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -497,11 +498,11 @@ class TestBookingRepositoryErrorHandling:
                 error_response = {"Error": {"Code": "ProvisionedThroughputExceededException"}}
                 raise ClientError(error_response, "PutItem")
             return None
-        
+
         with patch.object(repository.table, "put_item", side_effect=side_effect):
             # Act
             result = repository.create_booking(booking_data)
-        
+
         # Assert
         assert result is True
         assert call_count == 3
@@ -509,24 +510,24 @@ class TestBookingRepositoryErrorHandling:
 
 class TestPhoneMasking:
     """Tests for phone number masking in logs."""
-    
+
     def test_phone_masking_with_hyphens(self):
         """Should mask phone number correctly."""
         from src.utils.logger import mask_phone
-        
+
         result = mask_phone("010-1234-5678")
         assert result == "010-****-5678"
-    
+
     def test_phone_masking_without_hyphens(self):
         """Should normalize and mask phone number."""
         from src.utils.logger import mask_phone
-        
+
         result = mask_phone("01012345678")
         assert result == "010-****-5678"
-    
+
     def test_phone_masking_invalid(self):
         """Should handle invalid phone numbers."""
         from src.utils.logger import mask_phone
-        
+
         assert mask_phone("") == "unknown"
         assert mask_phone("123") == "invalid"

@@ -12,7 +12,7 @@ import json
 import boto3
 import pytest
 
-moto = pytest.importorskip('moto')
+moto = pytest.importorskip("moto")
 from moto import mock_aws  # type: ignore[attr-defined]
 
 from src.auth.naver_login import NaverAuthenticator
@@ -28,18 +28,14 @@ class TestNaverAuthenticatorIntegration:
         self.mock.start()
 
         # Create mock DynamoDB resource
-        self.dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-2')
+        self.dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-2")
 
         # Create session table
         self.dynamodb.create_table(
-            TableName='session',
-            KeySchema=[
-                {'AttributeName': 'id', 'KeyType': 'HASH'}
-            ],
-            AttributeDefinitions=[
-                {'AttributeName': 'id', 'AttributeType': 'S'}
-            ],
-            BillingMode='PAY_PER_REQUEST'
+            TableName="session",
+            KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],
+            BillingMode="PAY_PER_REQUEST",
         )
 
     def teardown_method(self):
@@ -52,8 +48,8 @@ class TestNaverAuthenticatorIntegration:
 
         # Test data
         test_cookies = [
-            {'name': 'NID_AUT', 'value': 'auth_token_123', 'domain': '.naver.com'},
-            {'name': 'NID_SES', 'value': 'session_token_456', 'domain': '.naver.com'},
+            {"name": "NID_AUT", "value": "auth_token_123", "domain": ".naver.com"},
+            {"name": "NID_SES", "value": "session_token_456", "domain": ".naver.com"},
         ]
 
         # Save cookies
@@ -78,11 +74,11 @@ class TestNaverAuthenticatorIntegration:
         session_mgr = SessionManager(self.dynamodb)
 
         # Save first set of cookies
-        first_cookies = [{'name': 'NID_AUT', 'value': 'first_token'}]
+        first_cookies = [{"name": "NID_AUT", "value": "first_token"}]
         session_mgr.save_cookies(json.dumps(first_cookies))
 
         # Save second set of cookies (should overwrite)
-        second_cookies = [{'name': 'NID_AUT', 'value': 'second_token'}]
+        second_cookies = [{"name": "NID_AUT", "value": "second_token"}]
         session_mgr.save_cookies(json.dumps(second_cookies))
 
         # Verify second set is stored
@@ -91,17 +87,19 @@ class TestNaverAuthenticatorIntegration:
 
 
 # Real Naver integration tests (run only when explicitly enabled)
-RUN_LIVE = os.getenv('RUN_NAVER_LIVE_TESTS') == '1'
+RUN_LIVE = os.getenv("RUN_NAVER_LIVE_TESTS") == "1"
 
 
-@pytest.mark.skipif(not RUN_LIVE, reason="Set RUN_NAVER_LIVE_TESTS=1 with test credentials to run live checks")
+@pytest.mark.skipif(
+    not RUN_LIVE, reason="Set RUN_NAVER_LIVE_TESTS=1 with test credentials to run live checks"
+)
 class TestNaverAuthenticatorLive:
     """Live integration tests with real Naver (MANUAL ONLY)"""
 
     @pytest.fixture
     def real_dynamodb(self):
         """Use real DynamoDB (requires AWS credentials)"""
-        return boto3.resource('dynamodb', region_name='ap-northeast-2')
+        return boto3.resource("dynamodb", region_name="ap-northeast-2")
 
     @pytest.fixture
     def naver_credentials(self):
@@ -109,25 +107,25 @@ class TestNaverAuthenticatorLive:
         Naver test credentials.
         IMPORTANT: Use test account, never production credentials!
         """
-        username = os.getenv('NAVER_TEST_USERNAME')
-        password = os.getenv('NAVER_TEST_PASSWORD')
+        username = os.getenv("NAVER_TEST_USERNAME")
+        password = os.getenv("NAVER_TEST_PASSWORD")
         if not username or not password:
-            pytest.skip("NAVER_TEST_USERNAME and NAVER_TEST_PASSWORD environment variables must be set")
-        return {'username': username, 'password': password}
+            pytest.skip(
+                "NAVER_TEST_USERNAME and NAVER_TEST_PASSWORD environment variables must be set"
+            )
+        return {"username": username, "password": password}
 
     def test_real_naver_fresh_login(self, real_dynamodb, naver_credentials):
         """
         Test fresh login with real Naver credentials.
-        
+
         MANUAL TEST: Only run locally with test account credentials.
         DO NOT RUN in CI/CD or with production credentials.
         """
         session_mgr = SessionManager(real_dynamodb)
 
         auth = NaverAuthenticator(
-            naver_credentials['username'],
-            naver_credentials['password'],
-            session_mgr
+            naver_credentials["username"], naver_credentials["password"], session_mgr
         )
 
         try:
@@ -136,7 +134,9 @@ class TestNaverAuthenticatorLive:
 
             # Verify cookies were obtained
             assert len(cookies) > 0, "Should obtain cookies from Naver"
-            assert any(c['name'] == 'NID_AUT' for c in cookies), "Should have NID_AUT authentication cookie"
+            assert any(
+                c["name"] == "NID_AUT" for c in cookies
+            ), "Should have NID_AUT authentication cookie"
 
             # Verify cookies were saved to DynamoDB
             saved_cookies = session_mgr.get_cookies()
@@ -148,7 +148,7 @@ class TestNaverAuthenticatorLive:
     def test_real_naver_cookie_reuse(self, real_dynamodb, naver_credentials):
         """
         Test cookie reuse with real cached cookies.
-        
+
         Prerequisite: Must have valid cookies in DynamoDB session table.
         """
         session_mgr = SessionManager(real_dynamodb)
@@ -159,9 +159,7 @@ class TestNaverAuthenticatorLive:
             pytest.skip("No cached cookies available in DynamoDB")
 
         auth = NaverAuthenticator(
-            naver_credentials['username'],
-            naver_credentials['password'],
-            session_mgr
+            naver_credentials["username"], naver_credentials["password"], session_mgr
         )
 
         try:
@@ -177,7 +175,7 @@ class TestNaverAuthenticatorLive:
     def test_real_naver_api_calls_with_session(self, real_dynamodb, naver_credentials):
         """
         Test that authenticated session can make API calls.
-        
+
         Verifies that cookies from auth can be used for subsequent API calls.
         """
         session_mgr = SessionManager(real_dynamodb)
@@ -189,9 +187,7 @@ class TestNaverAuthenticatorLive:
             pytest.skip("Requires valid cached cookies or fresh login capability")
 
         auth = NaverAuthenticator(
-            naver_credentials['username'],
-            naver_credentials['password'],
-            session_mgr
+            naver_credentials["username"], naver_credentials["password"], session_mgr
         )
 
         try:
@@ -202,15 +198,15 @@ class TestNaverAuthenticatorLive:
 
             # Test API call with authenticated session
             # Example: GET profile page
-            response = session.get('https://partner.booking.naver.com/dashboard')
+            response = session.get("https://partner.booking.naver.com/dashboard")
 
             # Verify successful response (not redirected to login)
             assert response.status_code < 400, "API call should succeed with authenticated session"
-            assert 'login' not in response.url.lower(), "Should not be redirected to login page"
+            assert "login" not in response.url.lower(), "Should not be redirected to login page"
 
         finally:
             auth.cleanup()
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v', '--tb=short'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--tb=short"])

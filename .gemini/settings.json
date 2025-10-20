@@ -1,0 +1,45 @@
+{
+    "ide": {
+      "hasSeenNudge": true
+    },
+    "security": {
+      "auth": {
+        "selectedType": "oauth-personal"
+      }
+    },
+    "ui": {
+      "theme": "Shades Of Purple"
+    },
+    "mcpServers": {
+      "sequential-thinking": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-sequential-thinking"
+        ]
+      },
+      "context7": {
+        "command": "npx",
+        "args": [
+          "@upstash/context7-mcp"
+        ]
+      },
+      "filesystem": {
+        "command": "npx",
+        "args": [
+          "@modelcontextprotocol/server-filesystem",
+          "."
+        ]
+      },
+      "chrome-devtools": {
+        "command": "npx",
+        "args": [
+          "chrome-devtools-mcp@latest."
+        ],
+        "enabled": true
+      }
+    },
+    "general": {
+      "vimMode": false
+    }
+  }

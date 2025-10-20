@@ -131,9 +131,7 @@ class TestStructuredLogger:
         """Test log formatting includes operation field."""
         logger, _ = logger_with_handler
 
-        log_json = logger._format_log(
-            "INFO", "Test message", operation="get_booking"
-        )
+        log_json = logger._format_log("INFO", "Test message", operation="get_booking")
         parsed = json.loads(log_json)
 
         assert parsed["operation"] == "get_booking"
@@ -147,9 +145,7 @@ class TestStructuredLogger:
             "store_id": "1051707",
             "phone_masked": "010-****-5678",
         }
-        log_json = logger._format_log(
-            "INFO", "Test message", context=context
-        )
+        log_json = logger._format_log("INFO", "Test message", context=context)
         parsed = json.loads(log_json)
 
         assert parsed["context"] == context
@@ -158,9 +154,7 @@ class TestStructuredLogger:
         """Test log formatting includes duration in milliseconds."""
         logger, _ = logger_with_handler
 
-        log_json = logger._format_log(
-            "INFO", "Test message", duration_ms=123.456
-        )
+        log_json = logger._format_log("INFO", "Test message", duration_ms=123.456)
         parsed = json.loads(log_json)
 
         assert parsed["duration_ms"] == 123.46  # Rounded to 2 decimals
@@ -304,6 +298,7 @@ class TestLogOperationDecorator:
 
     def test_log_operation_decorator_success(self, logger_with_handler):
         """Test decorator logs operation start and completion."""
+
         @log_operation("test_operation")
         def test_func():
             return "result"
@@ -317,6 +312,7 @@ class TestLogOperationDecorator:
 
     def test_log_operation_decorator_with_exception(self, logger_with_handler):
         """Test decorator logs operation failure."""
+
         @log_operation("failing_operation")
         def failing_func():
             raise ValueError("Test error")
@@ -327,6 +323,7 @@ class TestLogOperationDecorator:
 
     def test_log_operation_decorator_duration_tracked(self, logger_with_handler):
         """Test decorator tracks operation duration."""
+
         @log_operation("slow_operation")
         def slow_func():
             time.sleep(0.05)
@@ -339,6 +336,7 @@ class TestLogOperationDecorator:
 
     def test_log_operation_decorator_with_phone_kwarg(self, logger_with_handler):
         """Test decorator masks phone number in context."""
+
         @log_operation("send_message")
         def send_func(message, phone=None):
             return f"Sent to {phone}"
@@ -350,6 +348,7 @@ class TestLogOperationDecorator:
 
     def test_log_operation_decorator_preserves_function_name(self):
         """Test decorator preserves function metadata."""
+
         @log_operation("test_op")
         def my_function():
             """Test function docstring."""

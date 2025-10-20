@@ -3,4 +3,4 @@
 from .naver_login import NaverAuthenticator
 from .session_manager import SessionManager
 
-__all__ = ['NaverAuthenticator', 'SessionManager']
+__all__ = ["NaverAuthenticator", "SessionManager"]

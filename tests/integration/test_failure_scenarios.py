@@ -569,11 +569,13 @@ rules:
 
         def process_booking(ctx, **p):
             error = RuntimeError("Test error with stack trace")
-            debug_info.append({
-                "error_type": type(error).__name__,
-                "error_message": str(error),
-                "timestamp": datetime.now().isoformat(),
-            })
+            debug_info.append(
+                {
+                    "error_type": type(error).__name__,
+                    "error_message": str(error),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
             raise error
 
         def process_booking_fallback(ctx, **p):

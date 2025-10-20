@@ -30,7 +30,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 # AWS resources (initialized on cold start)
-dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-2')
+dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-2")
 
 
 def lambda_handler(event, context):
@@ -81,14 +81,12 @@ def lambda_handler(event, context):
         session_mgr = SessionManager(dynamodb)
         cached_cookies = session_mgr.get_cookies()
 
-        logger.info(
-            f"Cached cookies: {len(cached_cookies) if cached_cookies else 0} found"
-        )
+        logger.info(f"Cached cookies: {len(cached_cookies) if cached_cookies else 0} found")
 
         authenticator = NaverAuthenticator(
-            username=naver_creds['username'],
-            password=naver_creds['password'],
-            session_manager=session_mgr
+            username=naver_creds["username"],
+            password=naver_creds["password"],
+            session_manager=session_mgr,
         )
 
         try:
@@ -101,8 +99,7 @@ def lambda_handler(event, context):
             # AC 3: Booking retrieval orchestration
             # ============================================================
             booking_api = NaverBookingAPIClient(
-                session=api_session,
-                option_keywords=['네이버', '인스타', '원본']
+                session=api_session, option_keywords=["네이버", "인스타", "원본"]
             )
 
             # Fetch confirmed (RC03) bookings
@@ -128,14 +125,14 @@ def lambda_handler(event, context):
             register_conditions(engine, settings)
 
             # Register action executors with services bundle
-            booking_repo = BookingRepository(table_name='sms', dynamodb_resource=dynamodb)
+            booking_repo = BookingRepository(table_name="sms", dynamodb_resource=dynamodb)
             sms_service = SensSmsClient(settings=settings, credentials=sens_creds)
 
             services_bundle = ActionServicesBundle(
                 db_repo=booking_repo,
                 sms_service=sms_service,
                 logger=logger,
-                settings_dict={'slack_enabled': False}  # Slack not enabled yet
+                settings_dict={"slack_enabled": False},  # Slack not enabled yet
             )
 
             register_actions(engine, services_bundle)
@@ -146,10 +143,7 @@ def lambda_handler(event, context):
             # AC 4, 5, 6: Process bookings through rule engine
             # ============================================================
             all_results, summary = process_all_bookings(
-                bookings=all_bookings,
-                engine=engine,
-                booking_repo=booking_repo,
-                settings=settings
+                bookings=all_bookings, engine=engine, booking_repo=booking_repo, settings=settings
             )
 
             logger.info(
@@ -164,9 +158,7 @@ def lambda_handler(event, context):
             try:
                 telegram_creds = settings.load_telegram_credentials()
                 send_telegram_summary(
-                    telegram_creds=telegram_creds,
-                    summary=summary,
-                    all_results=all_results
+                    telegram_creds=telegram_creds, summary=summary, all_results=all_results
                 )
             except Exception as e:
                 logger.warning(f"Failed to send Telegram summary: {e}")
@@ -175,16 +167,18 @@ def lambda_handler(event, context):
             # AC 7: Return success response
             # ============================================================
             return {
-                'statusCode': 200,
-                'body': json.dumps({
-                    'message': 'Naver SMS automation completed successfully',
-                    'bookings_processed': summary['bookings_processed'],
-                    'actions_executed': summary['actions_executed'],
-                    'actions_succeeded': summary['actions_succeeded'],
-                    'actions_failed': summary['actions_failed'],
-                    'sms_sent': summary['sms_sent'],
-                    'timestamp': datetime.now().isoformat()
-                })
+                "statusCode": 200,
+                "body": json.dumps(
+                    {
+                        "message": "Naver SMS automation completed successfully",
+                        "bookings_processed": summary["bookings_processed"],
+                        "actions_executed": summary["actions_executed"],
+                        "actions_succeeded": summary["actions_succeeded"],
+                        "actions_failed": summary["actions_failed"],
+                        "sms_sent": summary["sms_sent"],
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                ),
             }
 
         finally:
@@ -206,20 +200,19 @@ def lambda_handler(event, context):
             logger.error(f"Failed to send error notification: {notify_err}")
 
         return {
-            'statusCode': 500,
-            'body': json.dumps({
-                'error': 'Lambda execution failed',
-                'message': str(e),
-                'timestamp': datetime.now().isoformat()
-            })
+            "statusCode": 500,
+            "body": json.dumps(
+                {
+                    "error": "Lambda execution failed",
+                    "message": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ),
         }
 
 
 def process_all_bookings(
-    bookings: List[Booking],
-    engine: RuleEngine,
-    booking_repo: BookingRepository,
-    settings: Settings
+    bookings: List[Booking], engine: RuleEngine, booking_repo: BookingRepository, settings: Settings
 ) -> Tuple[List[ActionResult], Dict[str, Any]]:
     """
     Process all bookings through rule engine.
@@ -243,11 +236,11 @@ def process_all_bookings(
 
     # Summary statistics
     summary = {
-        'bookings_processed': 0,
-        'actions_executed': 0,
-        'actions_succeeded': 0,
-        'actions_failed': 0,
-        'sms_sent': 0,
+        "bookings_processed": 0,
+        "actions_executed": 0,
+        "actions_succeeded": 0,
+        "actions_failed": 0,
+        "sms_sent": 0,
     }
 
     for booking in bookings:
@@ -260,16 +253,16 @@ def process_all_bookings(
 
             # Build context dict
             context = {
-                'booking': booking,
-                'db_record': db_record,
-                'current_time': current_time,
-                'settings': settings,
-                'db_repo': booking_repo,
+                "booking": booking,
+                "db_record": db_record,
+                "current_time": current_time,
+                "settings": settings,
+                "db_repo": booking_repo,
             }
 
             logger.debug(
                 f"Processing booking {booking.booking_num}",
-                context={'has_db_record': db_record is not None}
+                context={"has_db_record": db_record is not None},
             )
 
             # ============================================================
@@ -279,31 +272,26 @@ def process_all_bookings(
             all_results.extend(results)
 
             # Update summary statistics
-            summary['bookings_processed'] += 1
-            summary['actions_executed'] += len(results)
+            summary["bookings_processed"] += 1
+            summary["actions_executed"] += len(results)
 
             for result in results:
                 if result.success:
-                    summary['actions_succeeded'] += 1
-                    if result.action_type == 'send_sms':
-                        summary['sms_sent'] += 1
+                    summary["actions_succeeded"] += 1
+                    if result.action_type == "send_sms":
+                        summary["sms_sent"] += 1
                 else:
-                    summary['actions_failed'] += 1
+                    summary["actions_failed"] += 1
 
         except Exception as e:
-            logger.error(
-                f"Failed to process booking {booking.booking_num}: {e}",
-                error=str(e)
-            )
-            summary['actions_failed'] += 1
+            logger.error(f"Failed to process booking {booking.booking_num}: {e}", error=str(e))
+            summary["actions_failed"] += 1
 
     return all_results, summary
 
 
 def send_telegram_summary(
-    telegram_creds: Dict[str, str],
-    summary: Dict[str, Any],
-    all_results: List[ActionResult]
+    telegram_creds: Dict[str, str], summary: Dict[str, Any], all_results: List[ActionResult]
 ) -> None:
     """
     Send summary notification to Telegram.
@@ -315,8 +303,8 @@ def send_telegram_summary(
         summary: Summary statistics dict
         all_results: List of ActionResult objects
     """
-    bot_token = telegram_creds['bot_token']
-    chat_id = telegram_creds['chat_id']
+    bot_token = telegram_creds["bot_token"]
+    chat_id = telegram_creds["chat_id"]
 
     # Build message
     message = (
@@ -331,10 +319,7 @@ def send_telegram_summary(
 
     # Send to Telegram
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        'chat_id': chat_id,
-        'text': message
-    }
+    payload = {"chat_id": chat_id, "text": message}
 
     try:
         response = requests.post(url, json=payload, timeout=10)
@@ -355,8 +340,8 @@ def notify_telegram_error(telegram_creds: Dict[str, str], error_message: str) ->
         telegram_creds: Dict with 'bot_token' and 'chat_id'
         error_message: Error description
     """
-    bot_token = telegram_creds['bot_token']
-    chat_id = telegram_creds['chat_id']
+    bot_token = telegram_creds["bot_token"]
+    chat_id = telegram_creds["chat_id"]
 
     message = (
         f"🚨 Naver SMS Automation Error\n\n"
@@ -365,10 +350,7 @@ def notify_telegram_error(telegram_creds: Dict[str, str], error_message: str) ->
     )
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        'chat_id': chat_id,
-        'text': message
-    }
+    payload = {"chat_id": chat_id, "text": message}
 
     try:
         response = requests.post(url, json=payload, timeout=10)
@@ -378,21 +360,21 @@ def notify_telegram_error(telegram_creds: Dict[str, str], error_message: str) ->
         logger.error(f"Failed to send Telegram error notification: {e}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     Local testing entry point.
 
     Simulates Lambda execution environment with mock context.
     """
+
     class MockContext:
         def __init__(self):
-            self.function_name = 'naver-sms-automation'
-            self.request_id = 'local-test'
-            self.invoked_function_arn = 'arn:aws:lambda:local:local'
+            self.function_name = "naver-sms-automation"
+            self.request_id = "local-test"
+            self.invoked_function_arn = "arn:aws:lambda:local:local"
 
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
     result = lambda_handler({}, MockContext())

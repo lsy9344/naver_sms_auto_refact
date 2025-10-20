@@ -1,6 +1,6 @@
 # Comparison Report: case1_new_booking_001
 **Scenario:** CASE 1: New Booking Confirmation
-**Generated:** 2025-10-20T01:23:43.341725
+**Generated:** 2025-10-20T16:51:33.517446
 
 ## Status
 **Parity Status:** PASS

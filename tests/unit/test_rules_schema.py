@@ -26,6 +26,7 @@ import pytest
 import yaml
 
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from config.settings import Settings
@@ -141,7 +142,7 @@ class TestRulesSchema:
                     "conditions": [
                         {
                             "type": "time_before_booking",
-                            "params": {}  # Missing required 'hours' parameter
+                            "params": {},  # Missing required 'hours' parameter
                         }
                     ],
                     "actions": [{"type": "create_db_record"}],
@@ -165,7 +166,7 @@ class TestRulesSchema:
                     "conditions": [
                         {
                             "type": "time_before_booking",
-                            "params": {"hours": "string"}  # Should be integer
+                            "params": {"hours": "string"},  # Should be integer
                         }
                     ],
                     "actions": [{"type": "create_db_record"}],
@@ -250,10 +251,7 @@ class TestRulesSchema:
                     "enabled": True,
                     "conditions": [{"type": "booking_not_in_db"}],
                     "actions": [
-                        {
-                            "type": "send_sms",
-                            "params": {}  # Missing required 'template' parameter
-                        }
+                        {"type": "send_sms", "params": {}}  # Missing required 'template' parameter
                     ],
                 }
             ]
@@ -273,10 +271,7 @@ class TestRulesSchema:
                     "name": "Test Rule",
                     "enabled": True,
                     "conditions": [
-                        {
-                            "type": "flag_not_set",
-                            "params": {}  # Missing required 'flag' parameter
-                        }
+                        {"type": "flag_not_set", "params": {}}  # Missing required 'flag' parameter
                     ],
                     "actions": [{"type": "create_db_record"}],
                 }
@@ -300,7 +295,7 @@ class TestRulesSchema:
                     "actions": [
                         {
                             "type": "update_flag",
-                            "params": {"flag": "test_flag"}  # Missing required 'value' parameter
+                            "params": {"flag": "test_flag"},  # Missing required 'value' parameter
                         }
                     ],
                 }
@@ -352,7 +347,7 @@ class TestRulesSchema:
                     "conditions": [
                         {
                             "type": "has_option_keyword",
-                            "params": {"keywords": []}  # Empty array not allowed
+                            "params": {"keywords": []},  # Empty array not allowed
                         }
                     ],
                     "actions": [{"type": "create_db_record"}],
