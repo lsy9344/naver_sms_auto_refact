@@ -103,6 +103,49 @@ rules:
           template: "guide"
           store_specific: true
 
+  # Rule 5: Expert Correction Slack Digest (Story 6.1, AC1)
+  # Priority: LOW - Informational digest for admin team
+  # Triggers when: Customer has expert correction option
+  # Expected behavior: Send Slack notification with expert correction roster
+  - name: "Expert Correction Slack Digest"
+    enabled: true
+    description: "Send Slack digest for bookings requesting expert correction (Story 6.1, AC1)"
+    tags: ["story-6.1", "slack", "digest"]
+    priority: "low"
+    notes: "Demonstrates send_slack action for expert correction digests. Requires Slack enabled."
+    conditions:
+      - type: "has_option_keyword"
+        params:
+          keywords: ["전문가 보정"]
+    actions:
+      - type: "send_slack"
+        params:
+          template_name: "expert_correction_digest"
+
+  # Rule 6: Holiday Event Customer List (Story 6.1, AC3)
+  # Priority: LOW - Informational digest for marketing team
+  # Triggers when: Booking date is within event window AND customer has multiple options
+  # Expected behavior: Send Slack notification with holiday event customer roster
+  - name: "Holiday Event Customer List"
+    enabled: true
+    description: "Send Slack digest for holiday event customer list (Story 6.1, AC3)"
+    tags: ["story-6.1", "slack", "digest", "date-range"]
+    priority: "low"
+    notes: "Demonstrates send_slack action for holiday event marketing. Requires Slack enabled."
+    conditions:
+      - type: "date_range"
+        params:
+          start_date: "2025-10-19"
+          end_date: "2025-10-19"
+      - type: "has_multiple_options"
+        params:
+          keywords: ["네이버", "원본"]
+          min_count: 2
+    actions:
+      - type: "send_slack"
+        params:
+          template_name: "holiday_event_digest"
+
   # Template: Slack Notification (DISABLED - Future Enhancement)
   # This rule serves as a template for future implementation
   # When enabled, sends SMS summary to Slack channel daily

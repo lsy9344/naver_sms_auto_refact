@@ -1,6 +1,6 @@
 # Comparison Report: case2c_no_option_match
 **Scenario:** CASE 2C: No Option Match - Should not trigger option SMS
-**Generated:** 2025-10-21T13:50:26.237347
+**Generated:** 2025-10-21T17:39:23.674436
 
 ## Status
 **Parity Status:** PASS

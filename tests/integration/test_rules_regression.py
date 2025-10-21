@@ -669,6 +669,20 @@ class TestRulesRegression:
         result = test_runner.test_booking(booking)
         assert result["success"], f"Booking 008 failed: {result}"
 
+    def test_booking_009_expert_correction_slack_digest(self, test_runner, test_fixtures):
+        """Test booking 009: Expert Correction Slack Digest (Story 6.1, AC1) - Rule matches but Slack disabled."""
+        booking = next(b for b in test_fixtures.get_bookings() if b["id"] == "booking_009")
+        result = test_runner.test_booking(booking)
+        assert result["success"], f"Booking 009 failed: {result}"
+        # Note: send_slack action does not execute because slack_enabled=False in test fixture
+
+    def test_booking_010_holiday_event_customer_list(self, test_runner, test_fixtures):
+        """Test booking 010: Holiday Event Customer List (Story 6.1, AC3) - Rule disabled."""
+        booking = next(b for b in test_fixtures.get_bookings() if b["id"] == "booking_010")
+        result = test_runner.test_booking(booking)
+        assert result["success"], f"Booking 010 failed: {result}"
+        # Note: Holiday Event rule is disabled in config, so it does not match
+
     def test_has_multiple_options_sufficient_matches(self):
         """Story 6.4: has_multiple_options - Sufficient keyword matches."""
         booking = Booking(
@@ -760,3 +774,120 @@ class TestRulesRegression:
         # 2 options match "네이버" keyword + 1 "인스타" = 3 matches
         result = has_multiple_options(context, keywords=["네이버", "인스타"], min_count=3)
         assert result is True
+
+
+class TestSlackEnabledRegression:
+    """Regression tests for Slack-enabled rules (Story 6.1, AC4)."""
+
+    @pytest.fixture
+    def slack_enabled_engine(self, settings):
+        """Initialize rule engine with Slack enabled for regression testing."""
+        from unittest.mock import Mock
+        from src.utils.logger import StructuredLogger
+
+        engine = RuleEngine(
+            str(Path(__file__).parent.parent.parent / "src" / "config" / "rules.yaml")
+        )
+
+        # Register condition evaluators
+        engine.register_condition("booking_not_in_db", booking_not_in_db)
+        engine.register_condition("time_before_booking", time_before_booking)
+        engine.register_condition("flag_not_set", flag_not_set)
+        engine.register_condition("current_hour", current_hour)
+        engine.register_condition("booking_status", booking_status)
+        engine.register_condition("has_option_keyword", has_option_keyword)
+        engine.register_condition("has_multiple_options", has_multiple_options)
+        engine.register_condition("date_range", date_range)
+
+        # Create services for action executors
+        db_repo = InMemoryBookingRepository()
+
+        mock_sms_service = Mock()
+        mock_sms_service.send_confirm_sms.return_value = None
+        mock_sms_service.send_guide_sms.return_value = None
+        mock_sms_service.send_event_sms.return_value = None
+
+        mock_slack_service = Mock()
+        mock_slack_service._dispatch.return_value = None
+
+        mock_slack_template_loader = Mock()
+        mock_slack_template_loader.render.return_value = "Rendered Slack template"
+
+        mock_logger = Mock(spec=StructuredLogger)
+        mock_logger.logger = Mock()
+        mock_logger.logger.name = "test_logger"
+        mock_logger.debug = Mock()
+        mock_logger.info = Mock()
+        mock_logger.warning = Mock()
+        mock_logger.error = Mock()
+
+        # KEY CHANGE: slack_enabled set to True for Slack-enabled tests (AC4)
+        services = ActionServicesBundle(
+            db_repo=db_repo,
+            sms_service=mock_sms_service,
+            slack_service=mock_slack_service,
+            slack_template_loader=mock_slack_template_loader,
+            logger=mock_logger,
+            settings_dict={"slack_enabled": True},  # AC4: Enable Slack for regression
+        )
+
+        # Register action executors using register_actions
+        register_actions(engine, services)
+        engine._db_repo_for_tests = db_repo
+
+        return engine
+
+    @pytest.fixture
+    def slack_enabled_runner(self, slack_enabled_engine, test_fixtures):
+        """Create regression test runner with Slack enabled."""
+        return RegressionTestRunner(slack_enabled_engine, test_fixtures)
+
+    def test_booking_009_slack_enabled_expert_correction(self, slack_enabled_runner, test_fixtures):
+        """Test booking 009 with Slack enabled: Expert Correction Slack Digest (Story 6.1, AC1, AC4).
+
+        Regression evidence for AC4: Demonstrates that send_slack action executes
+        when Slack is enabled and rule matches via has_option_keyword condition.
+        """
+        booking = next(
+            (b for b in test_fixtures.get_bookings() if b["id"] == "booking_009_slack_enabled"),
+            None,
+        )
+        assert booking is not None, "Fixture booking_009_slack_enabled not found"
+
+        result = slack_enabled_runner.test_booking(booking)
+        assert result["success"], (
+            f"Booking 009 (Slack enabled) failed: Expected send_slack action, "
+            f"got {result['actual_action_count']} actions. Differences: {result['differences']}"
+        )
+        # Verify send_slack was called
+        assert (
+            result["actual_action_count"] > 0
+        ), "Expected at least one action (send_slack) for Expert Correction rule"
+        assert any(
+            action["action_type"] == "send_slack" for action in result["actual_actions"]
+        ), "Expected send_slack action in Expert Correction rule execution"
+
+    def test_booking_010_slack_enabled_holiday_event(self, slack_enabled_runner, test_fixtures):
+        """Test booking 010 with Slack enabled: Holiday Event Customer List (Story 6.1, AC3, AC4).
+
+        Regression evidence for AC4: Demonstrates that send_slack action executes
+        when Slack is enabled and rule matches via date_range and has_multiple_options conditions.
+        """
+        booking = next(
+            (b for b in test_fixtures.get_bookings() if b["id"] == "booking_010_slack_enabled"),
+            None,
+        )
+        assert booking is not None, "Fixture booking_010_slack_enabled not found"
+
+        result = slack_enabled_runner.test_booking(booking)
+        assert result["success"], (
+            f"Booking 010 (Slack enabled) failed: Expected send_slack action, "
+            f"got {result['actual_action_count']} actions. Differences: {result['differences']}"
+        )
+        # Verify send_slack was called
+        assert (
+            result["actual_action_count"] > 0
+        ), "Expected at least one action (send_slack) for Holiday Event rule"
+        assert any(
+            action["action_type"] == "send_slack" for action in result["actual_actions"]
+        ), "Expected send_slack action in Holiday Event rule execution"

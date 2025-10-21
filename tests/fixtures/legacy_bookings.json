@@ -13,7 +13,9 @@
       },
       "db_record": null,
       "current_time": "2025-10-18T14:00:00",
-      "expected_rule_matches": ["New Booking Confirmation"]
+      "expected_rule_matches": [
+        "New Booking Confirmation"
+      ]
     },
     {
       "id": "booking_002",
@@ -33,7 +35,9 @@
         "option_sms": false
       },
       "current_time": "2025-10-19T14:35:00",
-      "expected_rule_matches": ["Two-Hour Reminder"]
+      "expected_rule_matches": [
+        "Two-Hour Reminder"
+      ]
     },
     {
       "id": "booking_003",
@@ -54,7 +58,9 @@
         "option_sms": false
       },
       "current_time": "2025-10-19T20:00:00",
-      "expected_rule_matches": ["Evening Option SMS"]
+      "expected_rule_matches": [
+        "Evening Option SMS"
+      ]
     },
     {
       "id": "booking_004",
@@ -159,6 +165,110 @@
       },
       "current_time": "2025-10-20T10:00:00",
       "expected_rule_matches": []
+    },
+    {
+      "id": "booking_009",
+      "name": "Expert Correction Slack Digest",
+      "description": "Story 6.1, AC1: Test booking that matches 'Expert Correction Slack Digest' rule via has_option_keyword condition",
+      "booking": {
+        "customer_phone": "01055555555",
+        "customer_name": "이혜진",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T14:00:00",
+        "status": "confirmed",
+        "option": "전문가 보정"
+      },
+      "db_record": {
+        "booking_id": "booking_009",
+        "created_at": "2025-10-19T10:00:00",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "current_time": "2025-10-19T14:00:00",
+      "expected_rule_matches": [
+        "Expert Correction Slack Digest"
+      ]
+    },
+    {
+      "id": "booking_010",
+      "name": "Holiday Event Customer List",
+      "description": "Story 6.1, AC3: Test booking that matches 'Holiday Event Customer List' rule via date_range and has_multiple_options conditions",
+      "booking": {
+        "customer_phone": "01066666666",
+        "customer_name": "박준호",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T18:30:00",
+        "status": "confirmed",
+        "option_keywords": [
+          "네이버",
+          "원본"
+        ]
+      },
+      "db_record": {
+        "booking_id": "booking_010",
+        "created_at": "2025-10-19T10:00:00",
+        "confirm_sms": true,
+        "remind_sms": true,
+        "option_sms": false
+      },
+      "current_time": "2025-10-19T14:00:00",
+      "expected_rule_matches": [
+        "Holiday Event Customer List"
+      ]
+    },
+    {
+      "id": "booking_009_slack_enabled",
+      "name": "Expert Correction Slack Digest - Slack Enabled",
+      "description": "Story 6.1, AC1, AC4: Same as booking_009 but with Slack enabled to demonstrate send_slack action",
+      "booking": {
+        "customer_phone": "01055555555",
+        "customer_name": "이혜진",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T14:00:00",
+        "status": "confirmed",
+        "option": "전문가 보정"
+      },
+      "db_record": {
+        "booking_id": "booking_009_slack_enabled",
+        "created_at": "2025-10-19T10:00:00",
+        "confirm_sms": true,
+        "remind_sms": false,
+        "option_sms": false
+      },
+      "current_time": "2025-10-19T14:00:00",
+      "slack_enabled": true,
+      "expected_rule_matches": [
+        "Expert Correction Slack Digest"
+      ]
+    },
+    {
+      "id": "booking_010_slack_enabled",
+      "name": "Holiday Event Customer List - Slack Enabled",
+      "description": "Story 6.1, AC3, AC4: Same as booking_010 but with Slack enabled to demonstrate send_slack action for holiday event digest",
+      "booking": {
+        "customer_phone": "01066666666",
+        "customer_name": "박준호",
+        "store_id": 1051707,
+        "booking_time": "2025-10-19T18:30:00",
+        "status": "confirmed",
+        "option_keywords": [
+          "네이버",
+          "원본"
+        ]
+      },
+      "db_record": {
+        "booking_id": "booking_010_slack_enabled",
+        "created_at": "2025-10-19T10:00:00",
+        "confirm_sms": true,
+        "remind_sms": true,
+        "option_sms": false
+      },
+      "current_time": "2025-10-19T14:00:00",
+      "slack_enabled": true,
+      "expected_rule_matches": [
+        "Holiday Event Customer List"
+      ]
     }
   ]
 }

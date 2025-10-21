@@ -18,13 +18,14 @@ import requests
 from src.auth.naver_login import NaverAuthenticator
 from src.auth.session_manager import SessionManager
 from src.api.naver_booking import NaverBookingAPIClient
-from src.config.settings import Settings, setup_logging_redaction
+from src.config.settings import Settings, setup_logging_redaction, SLACK_ENABLED
 from src.database.dynamodb_client import BookingRepository
 from src.domain.booking import Booking
 from src.notifications.sms_service import SensSmsClient
+from src.notifications.slack_service import SlackWebhookClient
 from src.rules.engine import RuleEngine, ActionResult
 from src.rules.conditions import register_conditions
-from src.rules.actions import register_actions, ActionServicesBundle
+from src.rules.actions import register_actions, ActionServicesBundle, SlackTemplateLoader
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -128,13 +129,40 @@ def lambda_handler(event, context):
             booking_repo = BookingRepository(table_name="sms", dynamodb_resource=dynamodb)
             sms_service = SensSmsClient(settings=settings, credentials=sens_creds)
 
+            # Initialize Slack services if enabled (Story 6.2, 6.1)
+            # CRITICAL FIX: Slack is now independent from SMS settings
+            # - Slack uses SLACK_ENABLED (global config)
+            # - SMS uses settings.sens_delivery_enabled (approval gate)
+            # These are now completely decoupled (AC1/AC3)
+            slack_enabled = SLACK_ENABLED
+            slack_service = None
+            slack_template_loader = None
+
+            if slack_enabled:
+                try:
+                    slack_webhook_url = Settings.load_slack_webhook_url()
+                    if slack_webhook_url:
+                        slack_service = SlackWebhookClient(
+                            webhook_url=slack_webhook_url, logger=logger
+                        )
+                        slack_template_loader = SlackTemplateLoader(logger=logger)
+                        logger.info("Slack services initialized and enabled")
+                    else:
+                        logger.warning(
+                            "Slack enabled but webhook URL not configured; disabling Slack"
+                        )
+                        slack_enabled = False
+                except Exception as e:
+                    logger.error(f"Failed to initialize Slack services: {e}; disabling Slack")
+                    slack_enabled = False
+
             services_bundle = ActionServicesBundle(
                 db_repo=booking_repo,
                 sms_service=sms_service,
                 logger=logger,
-                settings_dict={"slack_enabled": False},  # Slack not enabled yet
-                slack_service=None,
-                slack_template_loader=None,
+                settings_dict={"slack_enabled": slack_enabled},
+                slack_service=slack_service,
+                slack_template_loader=slack_template_loader,
             )
 
             register_actions(engine, services_bundle)
@@ -277,7 +305,9 @@ def _parse_rule_date(value: Optional[str]) -> Optional[date]:
         return None
 
 
-def _build_holiday_event_roster(bookings: List[Booking], engine: RuleEngine) -> List[Dict[str, Any]]:
+def _build_holiday_event_roster(
+    bookings: List[Booking], engine: RuleEngine
+) -> List[Dict[str, Any]]:
     """
     Build Slack roster for holiday/event marketing rule using rule windows.
     """

@@ -228,7 +228,9 @@ class NaverBookingAPIClient:
                 has_edit_add_person_option = True
                 edit_add_person_count = option_item.get("bookingCount", 0)
 
-        if has_pro_edit_option and all("전문가 보정" not in keyword for keyword in option_keywords_list):
+        if has_pro_edit_option and all(
+            "전문가 보정" not in keyword for keyword in option_keywords_list
+        ):
             option_keywords_list.append("전문가 보정")
 
         # Create composite booking_num key

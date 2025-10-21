@@ -1,11 +1,11 @@
 {
   "metadata": {
     "booking_id": "case1_new_booking_001",
-    "generated_at": "2025-10-21T13:50:09.037718",
+    "generated_at": "2025-10-21T17:39:07.456004",
     "version": "1.0",
     "container_digest": "local-development",
     "dataset_version": "1.0",
-    "parity_run_timestamp": "2025-10-21T13:50:09.038662"
+    "parity_run_timestamp": "2025-10-21T17:39:07.458222"
   },
   "statistics": {
     "booking_id": "case1_new_booking_001",
@@ -13,7 +13,7 @@
     "critical_mismatches": 0,
     "warning_mismatches": 0,
     "parity_status": "PASS",
-    "timestamp": "2025-10-21T13:50:09.037706"
+    "timestamp": "2025-10-21T17:39:07.455984"
   },
   "mismatches": [],
   "canonical_outputs": {

@@ -1,6 +1,6 @@
 # Comparison Report: case4b_cookie_refresh_002
 **Scenario:** CASE 4B: Cookie Expiry - Multiple bookings after refresh
-**Generated:** 2025-10-21T13:50:15.917193
+**Generated:** 2025-10-21T17:39:14.444656
 
 ## Status
 **Parity Status:** PASS

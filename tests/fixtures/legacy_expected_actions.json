@@ -97,6 +97,42 @@
     "booking_008": {
       "description": "Date Range - Outside Range After (Story 6.3) - No actions should execute",
       "actions": []
+    },
+    "booking_009": {
+      "description": "Expert Correction Slack Digest (Story 6.1, AC1) - Rule matches but Slack is disabled in regression test, so no actions execute",
+      "actions": []
+    },
+    "booking_010": {
+      "description": "Holiday Event Customer List (Story 6.1, AC3) - Rule is disabled in config, so no actions execute",
+      "actions": []
+    },
+    "booking_009_slack_enabled": {
+      "description": "Expert Correction Slack Digest with Slack Enabled (Story 6.1, AC1, AC4) - Rule matches and Slack is enabled, so send_slack action executes",
+      "actions": [
+        {
+          "rule_name": "Expert Correction Slack Digest",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Slack notification sent",
+          "params": {
+            "template_name": "expert_correction_digest"
+          }
+        }
+      ]
+    },
+    "booking_010_slack_enabled": {
+      "description": "Holiday Event Customer List with Slack Enabled (Story 6.1, AC3, AC4) - Rule matches and Slack is enabled, so send_slack action executes",
+      "actions": [
+        {
+          "rule_name": "Holiday Event Customer List",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Slack notification sent",
+          "params": {
+            "template_name": "holiday_event_digest"
+          }
+        }
+      ]
     }
   }
 }

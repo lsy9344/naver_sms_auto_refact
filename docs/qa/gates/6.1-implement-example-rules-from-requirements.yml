@@ -2,28 +2,28 @@ schema: 1
 story: "6.1"
 story_title: "Implement Example Rules from Requirements"
 gate: "FAIL"
-status_reason: "Slack service remains unwired and regression harness lacks coverage, so AC1–AC4 still fail."
+status_reason: "Holiday roster ignores the marketing keyword filter and the Slack regression fixtures remain stale, so AC3/AC4 still fail."
 reviewer: "Quinn (Test Architect)"
-updated: "2025-10-25T10:00:00Z"
+updated: "2025-10-27T10:00:00Z"
 
 waiver: { active: false }
 
 top_issues:
   - severity: critical
-    title: "Slack notifications disabled at runtime"
-    detail: "Lambda injects ActionServicesBundle with slack_enabled=False and no SlackWebhookClient, so send_slack exits early and nothing posts."
-    refs: ["src/main.py:131", "src/rules/actions.py:750"]
+    title: "Holiday roster ignores configured keywords"
+    detail: "The Slack context builder drops the `has_multiple_options` keyword list, so any booking with two options is emitted even when it does not match the marketing filter."
+    refs: ["src/main.py:271", "src/main.py:335"]
   - severity: high
-    title: "Regression harness missing Slack scenarios"
-    detail: "Fixtures remain limited to SMS-only bookings; no regression assertion runs for the new digest or holiday rules."
-    refs: ["tests/fixtures/legacy_expected_actions.json:1", "tests/integration/test_rules_regression.py:520"]
+    title: "Slack regression fixtures out of sync"
+    detail: "Regression expectations still point at the old Slack payload (`holiday_event_digest` without channel/template_params), so the refreshed tests fail against the live YAML configuration."
+    refs: ["tests/fixtures/legacy_expected_actions.json:118", "config/rules.yaml:125"]
 
 risk_summary:
   totals: { critical: 1, high: 1, medium: 0, low: 0 }
   recommendations:
     must_fix:
-      - "Wire Slack settings/service into ActionServicesBundle so send_slack can execute."
-      - "Extend regression fixtures and assertions to cover Expert Correction and Holiday Slack rules."
+      - "Propagate the configured keywords into the holiday roster so only eligible bookings reach Slack."
+      - "Update Slack regression fixtures/expected params to match the new rule configuration and rerun the suite."
     monitor: []
 
 evidence:
@@ -53,10 +53,10 @@ expires: "2025-11-08T10:00:00Z"
 
 recommendations:
   immediate:
-    - action: "Instantiate SlackWebhookClient and SlackTemplateLoader in lambda bootstrap, passing slack_enabled from Settings."
-      refs: ["src/main.py:131"]
-    - action: "Add regression bookings/expected actions for expert digest and holiday list so send_slack paths are asserted."
-      refs: ["tests/fixtures/legacy_expected_actions.json", "tests/integration/test_rules_regression.py"]
+    - action: "Carry the marketing keywords from `has_multiple_options` into `_build_holiday_event_roster` before resubmitting."
+      refs: ["src/main.py:271", "src/main.py:335"]
+    - action: "Refresh Slack regression fixtures/expected params to match the YAML channel + template parameters, then rerun the suites."
+      refs: ["tests/fixtures/legacy_expected_actions.json:118", "config/rules.yaml:125"]
   future:
     - action: "Introduce integration coverage that runs send_slack with real template context to guard formatting changes."
       refs: ["tests/integration/test_slack_integration.py"]
@@ -68,3 +68,9 @@ history:
   - at: "2025-10-25T10:00:00Z"
     gate: FAIL
     note: "Slack wiring still disabled and regression evidence absent; story remains blocked."
+  - at: "2025-10-26T09:30:00Z"
+    gate: FAIL
+    note: "Slack depends on SMS enablement and regression still asserts zero Slack actions, so AC1/AC3/AC4 fail."
+  - at: "2025-10-27T10:00:00Z"
+    gate: FAIL
+    note: "Holiday roster ignores the keyword filter and the Slack regression fixtures stay stale, so AC3/AC4 remain blocked."

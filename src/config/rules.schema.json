@@ -534,10 +534,6 @@
             "properties": {
               "params": {
                 "type": "object",
-                "required": [
-                  "channel",
-                  "message"
-                ],
                 "properties": {
                   "channel": {
                     "type": "string",
@@ -546,8 +542,17 @@
                   },
                   "message": {
                     "type": "string",
-                    "description": "Message to send",
+                    "description": "Static message to send",
                     "minLength": 1
+                  },
+                  "template_name": {
+                    "type": "string",
+                    "description": "Slack template name from config/slack_templates.yaml",
+                    "minLength": 1
+                  },
+                  "template_params": {
+                    "type": "object",
+                    "description": "Template variables for Jinja2 substitution"
                   }
                 },
                 "additionalProperties": false
