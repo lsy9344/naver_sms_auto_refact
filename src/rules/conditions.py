@@ -330,20 +330,14 @@ def has_option_keyword(context: Dict[str, Any], **params) -> bool:
                 keyword_list = [keywords_param]
             else:
                 keyword_list = [str(keyword) for keyword in list(keywords_param)]
-            logger.debug(
-                f"has_option_keyword: Using keywords from params {keyword_list}"
-            )
+            logger.debug(f"has_option_keyword: Using keywords from params {keyword_list}")
         elif settings and getattr(settings, "option_keywords", None):
             keyword_list = list(getattr(settings, "option_keywords"))
-            logger.debug(
-                f"has_option_keyword: Using keywords from settings {keyword_list}"
-            )
+            logger.debug(f"has_option_keyword: Using keywords from settings {keyword_list}")
         else:
             # Default keyword list matching legacy behavior
             keyword_list = ["네이버", "인스타", "원본"]
-            logger.debug(
-                f"has_option_keyword: Using default keyword list {keyword_list}"
-            )
+            logger.debug(f"has_option_keyword: Using default keyword list {keyword_list}")
 
         # Nested loop: check each option against keyword list (early exit on match)
         for option in booking_options:

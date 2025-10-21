@@ -70,7 +70,7 @@ rules:
         params:
           flag: "option_sms"
       - type: "has_option_keyword"
-        params: {"keywords": ["네이버", "인스타"]}
+        params: {"keywords": ["네이버", "인스타", "전문가 보정"]}
     actions:
       - type: "send_sms"
         params:
@@ -99,6 +99,7 @@ rules:
       - type: "send_slack"
         params:
           template_name: "expert_correction_digest"
+          channel: "C09N3JCA800"
           template_params:
             bookings: "{{ bookings_with_expert_correction }}"
 

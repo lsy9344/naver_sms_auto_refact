@@ -690,9 +690,7 @@ class TestRulesRegression:
             "current_time": datetime(2025, 10, 20, 8, 0, tzinfo=timezone.utc),
         }
         # 2 keywords match against 2 required minimum
-        result = has_multiple_options(
-            context, keywords=["네이버", "원본"], min_count=2
-        )
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=2)
         assert result is True
 
     def test_has_multiple_options_insufficient_matches(self):
@@ -715,9 +713,7 @@ class TestRulesRegression:
             "current_time": datetime(2025, 10, 20, 8, 0, tzinfo=timezone.utc),
         }
         # Only 1 keyword matches but 2 required
-        result = has_multiple_options(
-            context, keywords=["네이버", "원본"], min_count=2
-        )
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=2)
         assert result is False
 
     def test_has_multiple_options_no_matches(self):
@@ -739,9 +735,7 @@ class TestRulesRegression:
             "db_record": None,
             "current_time": datetime(2025, 10, 20, 8, 0, tzinfo=timezone.utc),
         }
-        result = has_multiple_options(
-            context, keywords=["네이버", "원본"], min_count=1
-        )
+        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=1)
         assert result is False
 
     def test_has_multiple_options_multiple_options_single_keyword(self):
@@ -764,7 +758,5 @@ class TestRulesRegression:
             "current_time": datetime(2025, 10, 20, 8, 0, tzinfo=timezone.utc),
         }
         # 2 options match "네이버" keyword + 1 "인스타" = 3 matches
-        result = has_multiple_options(
-            context, keywords=["네이버", "인스타"], min_count=3
-        )
+        result = has_multiple_options(context, keywords=["네이버", "인스타"], min_count=3)
         assert result is True

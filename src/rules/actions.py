@@ -76,9 +76,7 @@ def _resolve_template_params(raw_params: Any, context: Dict[str, Any]) -> Any:
     Allows YAML configs to specify values such as "{{ bookings_with_expert_correction }}".
     """
     if isinstance(raw_params, dict):
-        return {
-            key: _resolve_template_params(value, context) for key, value in raw_params.items()
-        }
+        return {key: _resolve_template_params(value, context) for key, value in raw_params.items()}
 
     if isinstance(raw_params, list):
         return [_resolve_template_params(item, context) for item in raw_params]
@@ -804,9 +802,7 @@ def send_slack(
             payload["channel"] = channel
 
         # Dispatch via webhook with retry handling
-        context.slack_service._dispatch(
-            payload, action="send_slack_from_rule_engine"
-        )
+        context.slack_service._dispatch(payload, action="send_slack_from_rule_engine")
 
         logger.info(
             "Slack notification sent",

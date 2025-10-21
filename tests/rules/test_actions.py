@@ -98,7 +98,14 @@ def mock_slack_template_loader():
 
 
 @pytest.fixture
-def action_context(mock_booking, mock_db_repo, mock_sms_service, mock_logger, mock_slack_service, mock_slack_template_loader):
+def action_context(
+    mock_booking,
+    mock_db_repo,
+    mock_sms_service,
+    mock_logger,
+    mock_slack_service,
+    mock_slack_template_loader,
+):
     """Create an ActionContext for testing."""
     return ActionContext(
         booking=mock_booking,
@@ -112,7 +119,9 @@ def action_context(mock_booking, mock_db_repo, mock_sms_service, mock_logger, mo
 
 
 @pytest.fixture
-def services_bundle(mock_db_repo, mock_sms_service, mock_logger, mock_slack_service, mock_slack_template_loader):
+def services_bundle(
+    mock_db_repo, mock_sms_service, mock_logger, mock_slack_service, mock_slack_template_loader
+):
     """Create an ActionServicesBundle for testing."""
     return ActionServicesBundle(
         db_repo=mock_db_repo,
@@ -473,7 +482,16 @@ class TestActionContextImmutability:
         with pytest.raises(Exception):
             action_context.settings_dict = {}
 
-    def test_action_context_safe_concurrent_reuse(self, action_context, mock_booking, mock_db_repo, mock_sms_service, mock_slack_service, mock_slack_template_loader, mock_logger):
+    def test_action_context_safe_concurrent_reuse(
+        self,
+        action_context,
+        mock_booking,
+        mock_db_repo,
+        mock_sms_service,
+        mock_slack_service,
+        mock_slack_template_loader,
+        mock_logger,
+    ):
         """Test that ActionContext can be safely reused in concurrent scenarios."""
         # Create a second booking
         booking2 = Booking(

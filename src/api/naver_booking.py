@@ -208,13 +208,18 @@ class NaverBookingAPIClient:
             first_coupon = coupon_json_list[0]
             coupon_name = first_coupon.get("couponName")
 
-        # Extract pro-edit and add_person_edit option info
+        # Extract option keywords and option-specific info
+        option_keywords_list = []
         has_pro_edit_option = False
         pro_edit_count = 0
         has_edit_add_person_option = False
         edit_add_person_count = 0
         for option_item in booking_options:
             option_name = option_item.get("name", "")
+            # Collect all option names as keywords
+            if option_name:
+                option_keywords_list.append(option_name)
+            # Track specific options
             if "전문가 보정" in option_name:
                 has_pro_edit_option = True
                 pro_edit_count = option_item.get("bookingCount", 0)
@@ -243,6 +248,7 @@ class NaverBookingAPIClient:
             pro_edit_count=pro_edit_count,
             has_edit_add_person_option=has_edit_add_person_option,
             edit_add_person_count=edit_add_person_count,
+            option_keywords=option_keywords_list,
         )
 
     def _format_phone(self, phone_raw: str) -> str:

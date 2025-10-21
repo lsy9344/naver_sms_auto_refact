@@ -7,7 +7,7 @@ Designed to support dynamic field expansion for future requirements.
 
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 
 @dataclass
@@ -64,6 +64,7 @@ class Booking:
     pro_edit_count: int = 0
     has_edit_add_person_option: bool = False
     edit_add_person_count: int = 0
+    option_keywords: List[str] = field(default_factory=list)
     extra_fields: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -100,6 +101,7 @@ class Booking:
             "pro_edit_count",
             "has_edit_add_person_option",
             "edit_add_person_count",
+            "option_keywords",
         }
 
         # Extract core fields
@@ -179,6 +181,7 @@ class Booking:
             "pro_edit_count",
             "has_edit_add_person_option",
             "edit_add_person_count",
+            "option_keywords",
         }
 
         if field_name in core_fields:
