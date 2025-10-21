@@ -2,44 +2,34 @@ schema: 1
 story: "6.1"
 story_title: "Implement Example Rules from Requirements"
 gate: "FAIL"
-status_reason: "Slack digest rules cannot execute: missing channel wiring, keyword detection, and context payloads break AC1–AC4; regression tests also out of date."
+status_reason: "Slack service remains unwired and regression harness lacks coverage, so AC1–AC4 still fail."
 reviewer: "Quinn (Test Architect)"
-updated: "2025-10-23T10:00:00Z"
+updated: "2025-10-25T10:00:00Z"
 
 waiver: { active: false }
 
 top_issues:
   - severity: critical
-    title: "Slack digest rule never fires"
-    detail: "has_option_keyword relies on booking.option_keywords, but API client never populates it nor maps the '전문가 보정' keyword – rule cannot match."
-    refs: ["src/rules/conditions.py:313", "src/api/naver_booking.py:200"]
-  - severity: critical
-    title: "Channel requirement dropped"
-    detail: "Story AC requires explicit Slack channel, yet rules.yaml omits it and send_slack_wrapper strips any provided channel."
-    refs: ["config/rules.yaml:99", "src/rules/actions.py:1046"]
+    title: "Slack notifications disabled at runtime"
+    detail: "Lambda injects ActionServicesBundle with slack_enabled=False and no SlackWebhookClient, so send_slack exits early and nothing posts."
+    refs: ["src/main.py:131", "src/rules/actions.py:750"]
   - severity: high
-    title: "Holiday list template lacks data context"
-    detail: "Rule references {{ bookings_in_date_range }}, but lambda context never supplies that list, so Slack payload renders empty."
-    refs: ["config/rules.yaml:122", "src/main.py:285"]
-  - severity: high
-    title: "Regression tests broken"
-    detail: "Slack integration test still asserts the old template fields (users, count ⇒ 장), so current template fails CI and new behaviors lack coverage."
-    refs: ["tests/integration/test_slack_integration.py:61"]
+    title: "Regression harness missing Slack scenarios"
+    detail: "Fixtures remain limited to SMS-only bookings; no regression assertion runs for the new digest or holiday rules."
+    refs: ["tests/fixtures/legacy_expected_actions.json:1", "tests/integration/test_rules_regression.py:520"]
 
 risk_summary:
-  totals: { critical: 2, high: 2, medium: 0, low: 0 }
+  totals: { critical: 1, high: 1, medium: 0, low: 0 }
   recommendations:
     must_fix:
-      - "Restore explicit channel support and ensure send_slack honors it."
-      - "Populate booking.option_keywords / include expert keyword so rule triggers."
-      - "Provide holiday roster context before rendering Slack template."
-      - "Update integration tests to new template contract and add rule regression coverage."
+      - "Wire Slack settings/service into ActionServicesBundle so send_slack can execute."
+      - "Extend regression fixtures and assertions to cover Expert Correction and Holiday Slack rules."
     monitor: []
 
 evidence:
-  tests_reviewed: 12
+  tests_reviewed: 10
   tests_passed: 0
-  risks_identified: 4
+  risks_identified: 2
   trace:
     ac_covered: []
     ac_gaps: [1, 2, 3, 4]
@@ -47,31 +37,34 @@ evidence:
 nfr_validation:
   security:
     status: CONCERNS
-    notes: "Slack payload currently empty; channel stripping may cause operators to reroute manually, raising process risk."
+    notes: "Operations still lacks verified Slack delivery, so manual workarounds remain likely."
   performance:
     status: N/A
-    notes: "Functionality blocked before any performance can be assessed."
+    notes: "Functionality blocked before measuring against criteria."
   reliability:
     status: FAIL
-    notes: "Rules cannot fire; tests fail; regression harness lacks coverage for new behaviors."
+    notes: "Rules never execute and there is no regression evidence to prevent drift."
   maintainability:
     status: CONCERNS
-    notes: "Config/documentation promises channel + context fields that code drops, increasing future confusion."
+    notes: "Missing tests for new rules leaves YAML configuration fragile and unverified."
 
-quality_score: 40
-expires: "2025-11-06T10:00:00Z"
+quality_score: 35
+expires: "2025-11-08T10:00:00Z"
 
 recommendations:
   immediate:
-    - action: "Implement end-to-end tests proving both Slack rules render expected payloads with masked phone and counts."
-      refs: ["tests/integration/test_slack_integration.py"]
-    - action: "Adjust Naver booking transform (or rule context) to surface expert correction keywords consumed by has_option_keyword."
-      refs: ["src/api/naver_booking.py"]
+    - action: "Instantiate SlackWebhookClient and SlackTemplateLoader in lambda bootstrap, passing slack_enabled from Settings."
+      refs: ["src/main.py:131"]
+    - action: "Add regression bookings/expected actions for expert digest and holiday list so send_slack paths are asserted."
+      refs: ["tests/fixtures/legacy_expected_actions.json", "tests/integration/test_rules_regression.py"]
   future:
-    - action: "Add context builder utilities to prevent missing keys like bookings_in_date_range and keep config/schema aligned."
-      refs: ["src/main.py", "config/rules.yaml"]
+    - action: "Introduce integration coverage that runs send_slack with real template context to guard formatting changes."
+      refs: ["tests/integration/test_slack_integration.py"]
 
 history:
   - at: "2025-10-23T10:00:00Z"
     gate: FAIL
     note: "Initial QA review – blockers documented; story not ready for implementation."
+  - at: "2025-10-25T10:00:00Z"
+    gate: FAIL
+    note: "Slack wiring still disabled and regression evidence absent; story remains blocked."

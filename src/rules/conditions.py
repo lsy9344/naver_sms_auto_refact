@@ -339,6 +339,11 @@ def has_option_keyword(context: Dict[str, Any], **params) -> bool:
             keyword_list = ["네이버", "인스타", "원본"]
             logger.debug(f"has_option_keyword: Using default keyword list {keyword_list}")
 
+        # Some pipelines expose boolean flags alongside keywords (e.g., has_pro_edit_option)
+        if "전문가 보정" in keyword_list and getattr(booking, "has_pro_edit_option", False):
+            logger.debug("has_option_keyword: Matched via has_pro_edit_option flag")
+            return True
+
         # Nested loop: check each option against keyword list (early exit on match)
         for option in booking_options:
             # Handle both string, dict, and object option formats

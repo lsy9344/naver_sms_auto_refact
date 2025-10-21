@@ -1062,9 +1062,9 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
 
             if resolved_params.get("channel"):
                 services.logger.debug(
-                    "send_slack_wrapper: Channel override ignored; webhook default channel will be used"
+                    "send_slack_wrapper: Using explicit Slack channel override",
+                    context={"channel": resolved_params.get("channel")},
                 )
-                resolved_params.pop("channel", None)
 
             send_slack(action_context, **resolved_params)
 

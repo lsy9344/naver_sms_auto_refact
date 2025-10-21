@@ -62,21 +62,29 @@ class TestSlackTemplateLoader:
         """Test that templates render correctly with Jinja2 substitution (AC 3)"""
         loader = SlackTemplateLoader(template_path="config/slack_templates.yaml")
 
-        # Render expert_correction_digest template
         rendered = loader.render(
             "expert_correction_digest",
-            today_date="2025-10-22",
-            users=[
-                {"name": "User A", "count": 5},
-                {"name": "User B", "count": 3},
+            bookings=[
+                {
+                    "name": "User A",
+                    "phone_masked": "010-****-1234",
+                    "pro_edit_count": 5,
+                },
+                {
+                    "name": "User B",
+                    "phone_masked": "010-****-5678",
+                    "pro_edit_count": 3,
+                },
             ],
         )
 
-        assert "2025-10-22" in rendered
         assert "User A" in rendered
         assert "User B" in rendered
-        assert "5장" in rendered
-        assert "3장" in rendered
+        assert "(010-****-1234)" in rendered
+        assert "(010-****-5678)" in rendered
+        assert "(5건)" in rendered
+        assert "(3건)" in rendered
+        assert "총 2건의 보정 요청이 있습니다." in rendered
 
     def test_template_render_fails_on_missing_template(self):
         """Test that render raises ValueError for missing template"""
@@ -93,6 +101,28 @@ class TestSlackTemplateLoader:
         assert isinstance(names, list)
         assert len(names) > 0
         assert "expert_correction_digest" in names
+        assert "holiday_event_customer_list" in names
+
+    def test_holiday_event_template_includes_options(self):
+        """Holiday event template should include option summaries"""
+        loader = SlackTemplateLoader(template_path="config/slack_templates.yaml")
+
+        rendered = loader.render(
+            "holiday_event_customer_list",
+            bookings=[
+                {
+                    "name": "User C",
+                    "phone_masked": "010-****-9999",
+                    "reserve_at": "2025-12-24",
+                    "option_keywords": ["프리미엄 촬영", "추가 인원"],
+                }
+            ],
+        )
+
+        assert "User C" in rendered
+        assert "010-****-9999" in rendered
+        assert "2025-12-24" in rendered
+        assert "프리미엄 촬영, 추가 인원" in rendered
 
 
 class TestSendSlackAction:
@@ -157,7 +187,15 @@ class TestSendSlackAction:
         self, action_context, mock_slack_service, mock_template_loader
     ):
         """Test send_slack renders template correctly (AC 3)"""
-        template_params = {"users": ["User A"], "today_date": "2025-10-22"}
+        template_params = {
+            "bookings": [
+                {
+                    "name": "User A",
+                    "phone_masked": "010-****-0000",
+                    "pro_edit_count": 2,
+                }
+            ]
+        }
 
         send_slack(
             action_context,
@@ -172,6 +210,14 @@ class TestSendSlackAction:
 
         # Verify webhook was called with rendered message
         mock_slack_service._dispatch.assert_called_once()
+
+    def test_send_slack_with_channel_override(self, action_context, mock_slack_service):
+        """send_slack should respect explicit channel overrides"""
+        send_slack(action_context, message="Test message", channel="C999")
+
+        mock_slack_service._dispatch.assert_called_once()
+        payload = mock_slack_service._dispatch.call_args[0][0]
+        assert payload["channel"] == "C999"
 
     def test_send_slack_disabled_skips_delivery(self, booking, mock_slack_service, mock_logger):
         """Test send_slack skips delivery when disabled (AC 2)"""

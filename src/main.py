@@ -7,8 +7,8 @@ Implements Story 4.1 requirements for end-to-end Lambda execution.
 
 import json
 import logging
-from datetime import datetime
-from typing import List, Dict, Any, Tuple
+from datetime import datetime, date
+from typing import List, Dict, Any, Tuple, Optional
 import yaml
 from pathlib import Path
 
@@ -240,6 +240,84 @@ def _build_expert_correction_roster(bookings: List[Booking]) -> List[Dict[str, A
     return roster
 
 
+def _get_holiday_event_rule_window(engine: RuleEngine) -> Optional[Dict[str, Any]]:
+    """
+    Extract date range and option thresholds for the Holiday Event rule.
+    """
+    for rule in getattr(engine, "rules", []):
+        if rule.name != "Holiday Event Customer List":
+            continue
+
+        window: Dict[str, Any] = {}
+
+        for condition in rule.conditions:
+            if condition.type == "date_range":
+                window.update(condition.params or {})
+            elif condition.type == "has_multiple_options":
+                params = condition.params or {}
+                if "min_count" in params:
+                    window["min_count"] = params.get("min_count")
+
+        return window
+
+    return None
+
+
+def _parse_rule_date(value: Optional[str]) -> Optional[date]:
+    """
+    Parse YYYY-MM-DD strings from rule configuration into date objects.
+    """
+    if not value:
+        return None
+
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        logger.warning(f"Ignored invalid holiday event date in rules configuration: {value}")
+        return None
+
+
+def _build_holiday_event_roster(bookings: List[Booking], engine: RuleEngine) -> List[Dict[str, Any]]:
+    """
+    Build Slack roster for holiday/event marketing rule using rule windows.
+    """
+    window = _get_holiday_event_rule_window(engine)
+    if not window:
+        return []
+
+    start_date = _parse_rule_date(window.get("start_date"))
+    end_date = _parse_rule_date(window.get("end_date"))
+    min_count = int(window.get("min_count", 0) or 0)
+
+    roster: List[Dict[str, Any]] = []
+
+    for booking in bookings:
+        reserve_at = getattr(booking, "reserve_at", None)
+        if reserve_at is None:
+            continue
+
+        booking_date = reserve_at.date()
+        if start_date and booking_date < start_date:
+            continue
+        if end_date and booking_date > end_date:
+            continue
+
+        option_keywords = getattr(booking, "option_keywords", []) or []
+        if min_count and len(option_keywords) < min_count:
+            continue
+
+        roster.append(
+            {
+                "name": booking.name,
+                "phone_masked": booking.phone_masked,
+                "reserve_at": booking_date.strftime("%Y-%m-%d"),
+                "option_keywords": option_keywords,
+            }
+        )
+
+    return roster
+
+
 def process_all_bookings(
     bookings: List[Booking], engine: RuleEngine, booking_repo: BookingRepository, settings: Settings
 ) -> Tuple[List[ActionResult], Dict[str, Any]]:
@@ -273,6 +351,7 @@ def process_all_bookings(
     }
 
     expert_correction_roster = _build_expert_correction_roster(bookings)
+    holiday_event_roster = _build_holiday_event_roster(bookings, engine)
 
     for booking in bookings:
         try:
@@ -290,6 +369,7 @@ def process_all_bookings(
                 "settings": settings,
                 "db_repo": booking_repo,
                 "bookings_with_expert_correction": expert_correction_roster,
+                "bookings_in_date_range": holiday_event_roster,
             }
 
             logger.debug(

@@ -209,7 +209,7 @@ class NaverBookingAPIClient:
             coupon_name = first_coupon.get("couponName")
 
         # Extract option keywords and option-specific info
-        option_keywords_list = []
+        option_keywords_list: List[str] = []
         has_pro_edit_option = False
         pro_edit_count = 0
         has_edit_add_person_option = False
@@ -218,7 +218,8 @@ class NaverBookingAPIClient:
             option_name = option_item.get("name", "")
             # Collect all option names as keywords
             if option_name:
-                option_keywords_list.append(option_name)
+                if option_name not in option_keywords_list:
+                    option_keywords_list.append(option_name)
             # Track specific options
             if "전문가 보정" in option_name:
                 has_pro_edit_option = True
@@ -226,6 +227,9 @@ class NaverBookingAPIClient:
             elif "사진 보정 추가" in option_name:
                 has_edit_add_person_option = True
                 edit_add_person_count = option_item.get("bookingCount", 0)
+
+        if has_pro_edit_option and all("전문가 보정" not in keyword for keyword in option_keywords_list):
+            option_keywords_list.append("전문가 보정")
 
         # Create composite booking_num key
         booking_num = f"{store_id}_{booking_id}"

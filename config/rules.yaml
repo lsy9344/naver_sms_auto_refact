@@ -117,11 +117,12 @@ rules:
           end_date: "2025-12-31"
       - type: "has_multiple_options"
         params:
-          keywords: []
+          keywords: ["원본", "네이버"]
           min_count: 2
     actions:
       - type: "send_slack"
         params:
           template_name: "holiday_event_customer_list"
+          channel: "#marketing"
           template_params:
             bookings: "{{ bookings_in_date_range }}"

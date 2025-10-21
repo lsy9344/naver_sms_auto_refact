@@ -1,13 +1,13 @@
 expert_correction_digest: |
   전문가 보정 요청 현황:
   {% for booking in bookings %}
-  • {{ booking.name }} ({{ booking.phone_masked }}) - 보정 건수: {{ booking.pro_edit_count }}
+  • {{ booking.name }} ({{ booking.phone_masked }}) ({{ booking.pro_edit_count }}건)
   {% endfor %}
   총 {{ bookings|length }}건의 보정 요청이 있습니다.
 
 holiday_event_customer_list: |
   휴일/이벤트 고객 리스트:
   {% for booking in bookings %}
-  • {{ booking.name }} ({{ booking.phone_masked }}) - 예약일: {{ booking.reserve_at|default('미정') }}
+  • {{ booking.name }} ({{ booking.phone_masked }}) - 예약일: {{ booking.reserve_at|default('미정') }} - 선택 옵션: {{ booking.option_keywords|join(", ") }}
   {% endfor %}
   총 {{ bookings|length }}명의 고객이 선택지를 포함하여 예약했습니다.
