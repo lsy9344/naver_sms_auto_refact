@@ -139,8 +139,8 @@ rules:
           end_date: "2025-10-19"
       - type: "has_multiple_options"
         params:
-          keywords: ["네이버", "원본"]
-          min_count: 2
+          keywords: ["인스타", "네이버"]
+          min_count: 1
     actions:
       - type: "send_slack"
         params:

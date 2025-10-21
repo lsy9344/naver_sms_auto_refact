@@ -343,8 +343,8 @@ Suggested template structure:
         end_date: "2025-12-31"
     - type: "has_multiple_options"
       params:
-        keywords: ["원본", "네이버"]
-        min_count: 2
+        keywords: ["인스타", "네이버"]
+        min_count: 1
   actions:
     - type: "send_slack"
       params:

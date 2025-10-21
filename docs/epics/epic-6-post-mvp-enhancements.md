@@ -174,7 +174,7 @@ conditions:
 ```yaml
 params:
   keywords: ["keyword1", "keyword2"]  # List of keywords to search for
-  min_count: 2                          # Minimum matches required
+  min_count: 1                          # Minimum matches required
 ```
 
 **Use case:** Target customers who selected premium options, multi-service bookings
@@ -185,8 +185,8 @@ params:
 conditions:
   - type: "has_multiple_options"
     params:
-      keywords: ["프리미엄", "보정"]  # Korean: "premium", "correction"
-      min_count: 2
+      keywords: ["전문가 보정"]  # Korean: "premium", "correction"
+      min_count: 1
 ```
 
 ---
@@ -396,8 +396,8 @@ channel: "#your-channel-name"  # Any Slack channel your bot has access to
         end_date: "2025-12-31"    # End of holiday period
     - type: "has_multiple_options"
       params:
-        keywords: ["원본", "네이버"]  # Keywords to match (Korean)
-        min_count: 2               # Must match 2+ keywords
+        keywords: ["인스타", "네이버"]  # Keywords to match (Korean)
+        min_count: 1               # Must match 1+ keywords
   actions:
     - type: "send_slack"
       params:

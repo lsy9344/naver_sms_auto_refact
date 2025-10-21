@@ -129,7 +129,11 @@
           "success": true,
           "message": "Slack notification sent",
           "params": {
-            "template_name": "holiday_event_digest"
+            "template_name": "holiday_event_customer_list",
+            "channel": "#naver_sms_auto_notify",
+            "template_params": {
+              "bookings": "{{ bookings_in_date_range }}"
+            }
           }
         }
       ]

@@ -201,7 +201,7 @@ conditions:
   - type: "has_multiple_options"
     params:
       keywords: ["네이버", "인스타", "원본"]
-      min_count: 2
+      min_count: 1
 ```
 
 **Parameters:**
@@ -225,8 +225,8 @@ conditions:
 conditions:
   - type: "has_multiple_options"
     params:
-      keywords: ["네이버 Pay", "원본 방식", "프리미엄"]
-      min_count: 2
+      keywords: ["인스타", "네이버"]
+      min_count: 1
 actions:
   - type: "send_sms"
     params:
