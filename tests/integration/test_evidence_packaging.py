@@ -453,7 +453,8 @@ class EvidencePackager:
         # Add artifact tables
         for artifact_type in sorted(by_type.keys()):
             artifacts = by_type[artifact_type]
-            lines.append(f"### {artifact_type.replace('_', ' ').title()}")
+            readable_name = artifact_type.replace("_", " ").title()
+            lines.append(f"### {readable_name} ({artifact_type})")
             lines.append("")
             lines.append("| Artifact | Description | Timestamp |")
             lines.append("|----------|-------------|-----------|")

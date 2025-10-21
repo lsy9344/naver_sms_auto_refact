@@ -82,23 +82,43 @@ def mock_logger():
 
 
 @pytest.fixture
-def action_context(mock_booking, mock_db_repo, mock_sms_service, mock_logger):
+def mock_slack_service():
+    """Create a mock SlackWebhookClient."""
+    service = Mock()
+    service._dispatch.return_value = None
+    return service
+
+
+@pytest.fixture
+def mock_slack_template_loader():
+    """Create a mock SlackTemplateLoader."""
+    loader = Mock()
+    loader.render.return_value = "Rendered template message"
+    return loader
+
+
+@pytest.fixture
+def action_context(mock_booking, mock_db_repo, mock_sms_service, mock_logger, mock_slack_service, mock_slack_template_loader):
     """Create an ActionContext for testing."""
     return ActionContext(
         booking=mock_booking,
         settings_dict={"slack_enabled": False},
         db_repo=mock_db_repo,
         sms_service=mock_sms_service,
+        slack_service=mock_slack_service,
+        slack_template_loader=mock_slack_template_loader,
         logger=mock_logger,
     )
 
 
 @pytest.fixture
-def services_bundle(mock_db_repo, mock_sms_service, mock_logger):
+def services_bundle(mock_db_repo, mock_sms_service, mock_logger, mock_slack_service, mock_slack_template_loader):
     """Create an ActionServicesBundle for testing."""
     return ActionServicesBundle(
         db_repo=mock_db_repo,
         sms_service=mock_sms_service,
+        slack_service=mock_slack_service,
+        slack_template_loader=mock_slack_template_loader,
         logger=mock_logger,
         settings_dict={"slack_enabled": False},
     )
@@ -453,7 +473,7 @@ class TestActionContextImmutability:
         with pytest.raises(Exception):
             action_context.settings_dict = {}
 
-    def test_action_context_safe_concurrent_reuse(self, action_context, mock_booking):
+    def test_action_context_safe_concurrent_reuse(self, action_context, mock_booking, mock_db_repo, mock_sms_service, mock_slack_service, mock_slack_template_loader, mock_logger):
         """Test that ActionContext can be safely reused in concurrent scenarios."""
         # Create a second booking
         booking2 = Booking(
@@ -473,9 +493,11 @@ class TestActionContextImmutability:
         new_context = ActionContext(
             booking=booking2,
             settings_dict=action_context.settings_dict,
-            db_repo=action_context.db_repo,
-            sms_service=action_context.sms_service,
-            logger=action_context.logger,
+            db_repo=mock_db_repo,
+            sms_service=mock_sms_service,
+            slack_service=mock_slack_service,
+            slack_template_loader=mock_slack_template_loader,
+            logger=mock_logger,
         )
 
         assert action_context.booking == original_booking

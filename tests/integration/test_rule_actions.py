@@ -95,13 +95,37 @@ def mock_logger():
 
 
 @pytest.fixture
-def services_bundle(mock_db_repo, mock_sms_service, mock_logger):
+def mock_slack_service():
+    """Create a mock Slack service."""
+    service = Mock()
+    service._dispatch = Mock()
+    return service
+
+
+@pytest.fixture
+def mock_slack_template_loader():
+    """Create a mock Slack template loader."""
+    loader = Mock()
+    loader.render.return_value = "Rendered template message"
+    return loader
+
+
+@pytest.fixture
+def services_bundle(
+    mock_db_repo,
+    mock_sms_service,
+    mock_logger,
+    mock_slack_service,
+    mock_slack_template_loader,
+):
     """Create a services bundle for integration testing."""
     return ActionServicesBundle(
         db_repo=mock_db_repo,
         sms_service=mock_sms_service,
-        logger=mock_logger,
         settings_dict={"slack_enabled": False},
+        logger=mock_logger,
+        slack_service=mock_slack_service,
+        slack_template_loader=mock_slack_template_loader,
     )
 
 
@@ -113,6 +137,8 @@ def action_context(booking, services_bundle):
         settings_dict=services_bundle.settings_dict,
         db_repo=services_bundle.db_repo,
         sms_service=services_bundle.sms_service,
+        slack_service=services_bundle.slack_service,
+        slack_template_loader=services_bundle.slack_template_loader,
         logger=services_bundle.logger,
     )
 
@@ -133,6 +159,8 @@ class TestNewBookingWorkflow:
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
             logger=services_bundle.logger,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
         )
 
         # Step 1: Create booking record
@@ -175,6 +203,8 @@ class TestReminderWorkflow:
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
             logger=services_bundle.logger,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
         )
 
         # Create booking first
@@ -209,6 +239,8 @@ class TestEventSMSWorkflow:
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
             logger=services_bundle.logger,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
         )
 
         # Create booking
@@ -242,6 +274,8 @@ class TestMultipleActionsSequence:
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
             logger=services_bundle.logger,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
         )
 
         # 1. Create booking
@@ -292,6 +326,8 @@ class TestActionErrorRecovery:
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
             logger=services_bundle.logger,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
         )
 
         # Create booking
@@ -325,6 +361,8 @@ class TestIdempotencyWithMultipleUpdates:
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
             logger=services_bundle.logger,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
         )
 
         # Create booking
@@ -352,6 +390,8 @@ class TestNotificationActions:
             settings_dict=services_bundle.settings_dict,
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
             logger=services_bundle.logger,
         )
 
@@ -386,6 +426,8 @@ class TestLoggingActions:
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
             logger=services_bundle.logger,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
         )
 
         # Log event
@@ -408,6 +450,8 @@ class TestLoggingActions:
             db_repo=services_bundle.db_repo,
             sms_service=services_bundle.sms_service,
             logger=services_bundle.logger,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
         )
 
         statuses = ["success", "failure", "skipped", "retry"]

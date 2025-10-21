@@ -17,6 +17,7 @@ Acceptance Criteria Coverage:
 - AC9: ActionExecutionError wraps executor exceptions with context
 """
 
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -43,6 +44,53 @@ try:
     import jinja2
 except ImportError:
     jinja2 = None  # type: ignore
+
+
+_TEMPLATE_PARAM_PATTERN = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*\}\}")
+
+
+def _lookup_context_value(path: str, context: Dict[str, Any]) -> Any:
+    """
+    Resolve dot-delimited path from rule context.
+
+    Supports dictionary lookups and attribute access (for Booking objects).
+    """
+    value: Any = context
+
+    for part in path.split("."):
+        if isinstance(value, dict):
+            value = value.get(part)
+        else:
+            value = getattr(value, part, None)
+
+        if value is None:
+            break
+
+    return value
+
+
+def _resolve_template_params(raw_params: Any, context: Dict[str, Any]) -> Any:
+    """
+    Resolve template parameters that reference rule context placeholders.
+
+    Allows YAML configs to specify values such as "{{ bookings_with_expert_correction }}".
+    """
+    if isinstance(raw_params, dict):
+        return {
+            key: _resolve_template_params(value, context) for key, value in raw_params.items()
+        }
+
+    if isinstance(raw_params, list):
+        return [_resolve_template_params(item, context) for item in raw_params]
+
+    if isinstance(raw_params, str):
+        match = _TEMPLATE_PARAM_PATTERN.fullmatch(raw_params.strip())
+        if match:
+            resolved = _lookup_context_value(match.group(1), context)
+            return resolved
+        return raw_params
+
+    return raw_params
 
 
 # ============================================================================
@@ -224,9 +272,9 @@ class ActionContext:
     settings_dict: Dict[str, Any]
     db_repo: BookingRepository
     sms_service: SensSmsClient
-    slack_service: Optional[Any]
-    slack_template_loader: Optional[Any]
     logger: StructuredLogger
+    slack_service: Optional[Any] = None
+    slack_template_loader: Optional[Any] = None
 
 
 @dataclass(frozen=True)
@@ -249,10 +297,10 @@ class ActionServicesBundle:
 
     db_repo: BookingRepository
     sms_service: SensSmsClient
-    slack_service: Optional[Any]
-    slack_template_loader: Optional[Any]
     logger: StructuredLogger
     settings_dict: Dict[str, Any]
+    slack_service: Optional[Any] = None
+    slack_template_loader: Optional[Any] = None
 
 
 # ============================================================================
@@ -751,15 +799,13 @@ def send_slack(
         )
 
         # Build Slack payload (webhook format)
-        payload = {
-            "text": final_message,
-        }
+        payload = {"text": final_message}
         if channel:
             payload["channel"] = channel
 
         # Dispatch via webhook with retry handling
         context.slack_service._dispatch(
-            {"text": final_message}, action="send_slack_from_rule_engine"
+            payload, action="send_slack_from_rule_engine"
         )
 
         logger.info(
@@ -1011,7 +1057,20 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 slack_template_loader=services.slack_template_loader,
                 logger=services.logger,
             )
-            send_slack(action_context, **params)
+            resolved_params = dict(params)
+
+            if "template_params" in resolved_params:
+                resolved_params["template_params"] = _resolve_template_params(
+                    resolved_params["template_params"], rule_context
+                )
+
+            if resolved_params.get("channel"):
+                services.logger.debug(
+                    "send_slack_wrapper: Channel override ignored; webhook default channel will be used"
+                )
+                resolved_params.pop("channel", None)
+
+            send_slack(action_context, **resolved_params)
 
         def log_event_wrapper(rule_context: Dict[str, Any], **params: Any) -> None:
             booking = rule_context.get("booking")

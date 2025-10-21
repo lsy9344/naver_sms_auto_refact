@@ -133,6 +133,8 @@ def lambda_handler(event, context):
                 sms_service=sms_service,
                 logger=logger,
                 settings_dict={"slack_enabled": False},  # Slack not enabled yet
+                slack_service=None,
+                slack_template_loader=None,
             )
 
             register_actions(engine, services_bundle)
@@ -211,6 +213,33 @@ def lambda_handler(event, context):
         }
 
 
+def _build_expert_correction_roster(bookings: List[Booking]) -> List[Dict[str, Any]]:
+    """
+    Build Slack digest roster for bookings that include expert correction requests.
+
+    Args:
+        bookings: Combined list of Booking objects processed in this run.
+
+    Returns:
+        List of dictionaries ready for Slack template rendering.
+    """
+    roster: List[Dict[str, Any]] = []
+
+    for booking in bookings:
+        if not getattr(booking, "has_pro_edit_option", False):
+            continue
+
+        roster.append(
+            {
+                "name": booking.name,
+                "phone_masked": booking.phone_masked,
+                "pro_edit_count": getattr(booking, "pro_edit_count", 0) or 0,
+            }
+        )
+
+    return roster
+
+
 def process_all_bookings(
     bookings: List[Booking], engine: RuleEngine, booking_repo: BookingRepository, settings: Settings
 ) -> Tuple[List[ActionResult], Dict[str, Any]]:
@@ -243,6 +272,8 @@ def process_all_bookings(
         "sms_sent": 0,
     }
 
+    expert_correction_roster = _build_expert_correction_roster(bookings)
+
     for booking in bookings:
         try:
             # ============================================================
@@ -258,6 +289,7 @@ def process_all_bookings(
                 "current_time": current_time,
                 "settings": settings,
                 "db_repo": booking_repo,
+                "bookings_with_expert_correction": expert_correction_roster,
             }
 
             logger.debug(

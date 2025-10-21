@@ -18,7 +18,7 @@ All evaluators are pure functions with no side effects.
 Reference: docs/brownfield-architecture.md:1070-1145
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from datetime import timedelta
 import logging
 
@@ -304,6 +304,7 @@ def has_option_keyword(context: Dict[str, Any], **params) -> bool:
     try:
         booking = context.get("booking")
         settings = context.get("settings")
+        keywords_param = params.get("keywords")
 
         if not booking:
             logger.debug("has_option_keyword: Missing booking")
@@ -322,12 +323,27 @@ def has_option_keyword(context: Dict[str, Any], **params) -> bool:
             logger.debug("has_option_keyword: No option_keywords on booking")
             return False
 
-        # Get configured keyword list from settings
-        if settings:
-            keyword_list = getattr(settings, "option_keywords", [])
+        # Determine keyword list priority: explicit params > settings > defaults
+        keyword_list: List[str]
+        if keywords_param is not None:
+            if isinstance(keywords_param, str):
+                keyword_list = [keywords_param]
+            else:
+                keyword_list = [str(keyword) for keyword in list(keywords_param)]
+            logger.debug(
+                f"has_option_keyword: Using keywords from params {keyword_list}"
+            )
+        elif settings and getattr(settings, "option_keywords", None):
+            keyword_list = list(getattr(settings, "option_keywords"))
+            logger.debug(
+                f"has_option_keyword: Using keywords from settings {keyword_list}"
+            )
         else:
             # Default keyword list matching legacy behavior
             keyword_list = ["네이버", "인스타", "원본"]
+            logger.debug(
+                f"has_option_keyword: Using default keyword list {keyword_list}"
+            )
 
         # Nested loop: check each option against keyword list (early exit on match)
         for option in booking_options:
@@ -431,7 +447,9 @@ def date_range(context: Dict[str, Any], start_date: str, end_date: str, **params
         return False
 
 
-def has_multiple_options(context: Dict[str, Any], keywords: list, min_count: int = 1, **params) -> bool:
+def has_multiple_options(
+    context: Dict[str, Any], keywords: list, min_count: int = 1, **params
+) -> bool:
     """
     Evaluate if booking has at least min_count matching option keywords.
 

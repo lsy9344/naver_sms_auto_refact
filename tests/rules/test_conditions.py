@@ -442,6 +442,20 @@ class TestHasOptionKeyword:
         context = {"booking": booking, "settings": settings}
         assert has_option_keyword(context) is True
 
+    def test_keywords_override_params(self):
+        """Test: Explicit keywords override settings/default list"""
+        booking = Mock(option=False, option_keywords=["전문가 보정", "기타"])
+        settings = Mock(option_keywords=["네이버", "인스타"])
+        context = {"booking": booking, "settings": settings}
+        assert has_option_keyword(context, keywords=["전문가 보정"]) is True
+
+    def test_keywords_override_params_no_match(self):
+        """Test: Explicit keywords list respected when no match"""
+        booking = Mock(option=False, option_keywords=["네이버", "인스타"])
+        settings = Mock(option_keywords=["네이버", "인스타"])
+        context = {"booking": booking, "settings": settings}
+        assert has_option_keyword(context, keywords=["전문가 보정"]) is False
+
     def test_missing_booking(self):
         """Test: Handles missing booking"""
         context = {}
@@ -661,9 +675,7 @@ class TestHasMultipleOptions:
         """Test: Handles mixed format options (string, dict, object)"""
         option_obj = Mock()
         option_obj.name = "원본 방식"
-        booking = Mock(
-            option_keywords=["네이버 Pay", {"name": "인스타"}, option_obj]
-        )
+        booking = Mock(option_keywords=["네이버 Pay", {"name": "인스타"}, option_obj])
         context = {"booking": booking}
         result = has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=3)
         assert result is True
@@ -672,8 +684,14 @@ class TestHasMultipleOptions:
         """Test: Supports higher min_count values"""
         booking = Mock(option_keywords=["네이버", "인스타", "원본"])
         context = {"booking": booking}
-        assert has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=3) is True
-        assert has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=4) is False
+        assert (
+            has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=3)
+            is True
+        )
+        assert (
+            has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=4)
+            is False
+        )
 
     def test_duplicate_option_names_counted_once(self):
         """Test: Each option is counted only once even if multiple keywords match"""

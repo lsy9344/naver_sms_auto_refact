@@ -19,6 +19,10 @@ Acceptance Criteria Coverage:
 - AC7: Results recorded in VALIDATION.md
 """
 
+from unittest.mock import Mock
+
+from src.domain.booking import Booking
+
 import json
 import logging
 from datetime import datetime, timezone

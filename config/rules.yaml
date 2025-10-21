@@ -70,7 +70,7 @@ rules:
         params:
           flag: "option_sms"
       - type: "has_option_keyword"
-        params: {}
+        params: {"keywords": ["네이버", "인스타"]}
     actions:
       - type: "send_sms"
         params:
@@ -80,17 +80,47 @@ rules:
           flag: "option_sms"
           value: true
 
-  # Example: Disabled rule (shows how to disable without deleting)
-  # Can be re-enabled by changing enabled: false to enabled: true
-  - name: "Future Feature - Slack Notification"
-    description: "Send Slack notification for high-value bookings"
-    enabled: false
+  # ============================================================================
+  # Story 6.1: Example Rules from Korean Requirements
+  # ============================================================================
+
+  # Rule 4: Expert Correction Slack Digest
+  # Requirement: When bookings contain "전문가 보정" keyword, dispatch daily digest to operations team
+  # Implemented via: has_option_keyword condition + send_slack action
+  # Reference: docs/epics/epic-6-post-mvp-enhancements.md#example-rules-from-requiermentmd-korean-requirements
+  - name: "Expert Correction Slack Digest"
+    description: "Send daily digest of expert correction requests to operations team"
+    enabled: true
     conditions:
-      - type: "booking_amount_over"
+      - type: "has_option_keyword"
         params:
-          amount: 100000
+          keywords: ["전문가 보정"]
     actions:
       - type: "send_slack"
         params:
-          channel: "#bookings"
-          priority: "high"
+          template_name: "expert_correction_digest"
+          template_params:
+            bookings: "{{ bookings_with_expert_correction }}"
+
+  # Rule 5: Holiday Event Customer List
+  # Requirement: During holiday/event periods, collect customers with multiple options for targeted marketing
+  # Implemented via: date_range + has_multiple_options conditions + send_slack action
+  # Reference: docs/epics/epic-6-post-mvp-enhancements.md#example-rules-from-requiermentmd-korean-requirements
+  - name: "Holiday Event Customer List"
+    description: "Collect customers with multiple options during holiday/event periods for marketing campaigns"
+    enabled: false
+    conditions:
+      - type: "date_range"
+        params:
+          start_date: "2025-12-20"
+          end_date: "2025-12-31"
+      - type: "has_multiple_options"
+        params:
+          keywords: []
+          min_count: 2
+    actions:
+      - type: "send_slack"
+        params:
+          template_name: "holiday_event_customer_list"
+          template_params:
+            bookings: "{{ bookings_in_date_range }}"

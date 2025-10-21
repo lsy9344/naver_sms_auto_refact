@@ -186,3 +186,25 @@ class Booking:
         else:
             # Store in extra_fields
             self.extra_fields[field_name] = value
+
+    @property
+    def phone_masked(self) -> str:
+        """
+        Get masked phone number for display in logs and Slack templates.
+
+        Format: 010-****-XXXX (keeps last 4 digits, masks middle)
+
+        Returns:
+            Masked phone number string
+        """
+        if not self.phone:
+            return "unknown"
+
+        # Normalize: remove hyphens
+        clean_phone = self.phone.replace("-", "")
+
+        if len(clean_phone) < 8:
+            return "invalid"
+
+        # Format: 010-****-XXXX (last 4 digits visible)
+        return f"{clean_phone[:3]}-****-{clean_phone[-4:]}"
