@@ -1,6 +1,6 @@
 # Comparison Report: case1b_new_with_option
 **Scenario:** CASE 1B: New Booking with Option
-**Generated:** 2025-10-21T23:20:03.818070
+**Generated:** 2025-10-22T00:01:57.862442
 
 ## Status
 **Parity Status:** PASS

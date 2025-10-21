@@ -270,7 +270,10 @@ def _build_expert_correction_roster(bookings: List[Booking]) -> List[Dict[str, A
 
 def _get_holiday_event_rule_window(engine: RuleEngine) -> Optional[Dict[str, Any]]:
     """
-    Extract date range and option thresholds for the Holiday Event rule.
+    Extract date range, option thresholds, and keywords for the Holiday Event rule.
+
+    AC3 Fix: Now extracts keywords from has_multiple_options condition to ensure
+    keyword filtering is preserved when building the roster.
     """
     for rule in getattr(engine, "rules", []):
         if rule.name != "Holiday Event Customer List":
@@ -285,6 +288,9 @@ def _get_holiday_event_rule_window(engine: RuleEngine) -> Optional[Dict[str, Any
                 params = condition.params or {}
                 if "min_count" in params:
                     window["min_count"] = params.get("min_count")
+                # AC3 Fix: Extract keywords to ensure they are preserved
+                if "keywords" in params:
+                    window["keywords"] = params.get("keywords")
 
         return window
 
@@ -310,6 +316,9 @@ def _build_holiday_event_roster(
 ) -> List[Dict[str, Any]]:
     """
     Build Slack roster for holiday/event marketing rule using rule windows.
+
+    AC3 Fix: Now validates that option keywords match the configured keyword filter
+    before adding bookings to the roster. This ensures the marketing criteria is enforced.
     """
     window = _get_holiday_event_rule_window(engine)
     if not window:
@@ -318,6 +327,8 @@ def _build_holiday_event_roster(
     start_date = _parse_rule_date(window.get("start_date"))
     end_date = _parse_rule_date(window.get("end_date"))
     min_count = int(window.get("min_count", 0) or 0)
+    # AC3 Fix: Extract configured keywords for filtering
+    required_keywords = window.get("keywords", [])
 
     roster: List[Dict[str, Any]] = []
 
@@ -335,6 +346,12 @@ def _build_holiday_event_roster(
         option_keywords = getattr(booking, "option_keywords", []) or []
         if min_count and len(option_keywords) < min_count:
             continue
+
+        # AC3 Fix: Validate that at least one option keyword matches required keywords
+        if required_keywords:
+            has_matching_keyword = any(keyword in required_keywords for keyword in option_keywords)
+            if not has_matching_keyword:
+                continue
 
         roster.append(
             {
