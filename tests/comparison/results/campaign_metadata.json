@@ -1,0 +1,7 @@
+{
+  "campaign_id": "validation-2025-10-22T06:14:34",
+  "campaign_start_time": "2025-10-22T06:14:34.102904",
+  "test_environment": "local-development",
+  "docker_image_digest": "local-development",
+  "test_data_version": "1.0"
+}

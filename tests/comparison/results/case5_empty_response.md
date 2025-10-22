@@ -1,6 +1,6 @@
 # Comparison Report: case5_empty_response
 **Scenario:** CASE 5: Empty Booking Response
-**Generated:** 2025-10-22T00:23:12.883893
+**Generated:** 2025-10-22T15:18:20.765891
 
 ## Status
 **Parity Status:** PASS

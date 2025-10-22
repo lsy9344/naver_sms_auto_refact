@@ -1,6 +1,6 @@
 # Comparison Report: case3b_option_8pm_002
 **Scenario:** CASE 3B: Option Keyword Trigger - Alternative keyword
-**Generated:** 2025-10-22T00:23:08.180821
+**Generated:** 2025-10-22T15:18:16.155787
 
 ## Status
 **Parity Status:** PASS

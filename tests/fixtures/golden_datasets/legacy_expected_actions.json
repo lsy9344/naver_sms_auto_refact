@@ -1,0 +1,181 @@
+{
+  "expected_actions": {
+    "booking_001": {
+      "description": "New Booking Confirmation - Should execute all 3 actions",
+      "actions": [
+        {
+          "rule_name": "New Booking Confirmation",
+          "action_type": "create_db_record",
+          "success": true,
+          "message": "Booking record created in DynamoDB"
+        },
+        {
+          "rule_name": "New Booking Confirmation",
+          "action_type": "send_sms",
+          "success": true,
+          "message": "Confirmation SMS sent via SENS API",
+          "params": {
+            "template": "confirmation"
+          }
+        },
+        {
+          "rule_name": "New Booking Confirmation",
+          "action_type": "send_telegram",
+          "success": true,
+          "message": "Telegram notification sent",
+          "params": {
+            "message": "[SMS] Confirmation sent to customer"
+          }
+        }
+      ]
+    },
+    "booking_002": {
+      "description": "Two-Hour Reminder - Should send guide SMS and update flag",
+      "actions": [
+        {
+          "rule_name": "Two-Hour Reminder",
+          "action_type": "send_sms",
+          "success": true,
+          "message": "Reminder SMS sent via SENS API",
+          "params": {
+            "template": "guide",
+            "store_specific": true
+          }
+        },
+        {
+          "rule_name": "Two-Hour Reminder",
+          "action_type": "update_flag",
+          "success": true,
+          "message": "Flag remind_sms updated to true in DynamoDB",
+          "params": {
+            "flag": "remind_sms",
+            "value": true
+          }
+        }
+      ]
+    },
+    "booking_003": {
+      "description": "Evening Option SMS - Should send event SMS and update flag, plus Holiday Event rule matches (has 네이버 option on 2025-10-19)",
+      "actions": [
+        {
+          "rule_name": "Evening Option SMS",
+          "action_type": "send_sms",
+          "success": true,
+          "message": "Event SMS sent via SENS API",
+          "params": {
+            "template": "event"
+          }
+        },
+        {
+          "rule_name": "Evening Option SMS",
+          "action_type": "update_flag",
+          "success": true,
+          "message": "Flag option_sms updated to true in DynamoDB",
+          "params": {
+            "flag": "option_sms",
+            "value": true
+          }
+        },
+        {
+          "rule_name": "Holiday Event Customer List",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Action 'send_slack' executed successfully",
+          "params": {
+            "template_name": "holiday_event_customer_list",
+            "channel": "#naver_sms_auto_notify",
+            "template_params": {
+              "bookings": "{{ bookings_in_date_range }}"
+            }
+          }
+        }
+      ]
+    },
+    "booking_004": {
+      "description": "All Flags Set - No actions should execute",
+      "actions": []
+    },
+    "booking_005": {
+      "description": "No Option Keyword - No actions should execute",
+      "actions": []
+    },
+    "booking_006": {
+      "description": "Date Range - Within Range (Story 6.3) - Tests date_range condition without rules (rule is disabled)",
+      "actions": []
+    },
+    "booking_007": {
+      "description": "Date Range - Outside Range Before (Story 6.3) - No actions should execute",
+      "actions": []
+    },
+    "booking_008": {
+      "description": "Date Range - Outside Range After (Story 6.3) - No actions should execute",
+      "actions": []
+    },
+    "booking_009": {
+      "description": "Expert Correction Slack Digest (Story 6.1, AC1) - Rule matches and send_slack executes, but Slack is disabled so notification is skipped",
+      "actions": [
+        {
+          "rule_name": "Expert Correction Slack Digest",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Action 'send_slack' executed successfully",
+          "params": {
+            "template_name": "expert_correction_digest",
+            "channel": "#naver_sms_auto_notify"
+          }
+        }
+      ]
+    },
+    "booking_010": {
+      "description": "Holiday Event Customer List (Story 6.1, AC3) - Rule matches and send_slack executes, but Slack is disabled so notification is skipped",
+      "actions": [
+        {
+          "rule_name": "Holiday Event Customer List",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Action 'send_slack' executed successfully",
+          "params": {
+            "template_name": "holiday_event_customer_list",
+            "channel": "#naver_sms_auto_notify",
+            "template_params": {
+              "bookings": "{{ bookings_in_date_range }}"
+            }
+          }
+        }
+      ]
+    },
+    "booking_009_slack_enabled": {
+      "description": "Expert Correction Slack Digest with Slack Enabled (Story 6.1, AC1, AC4) - Rule matches and Slack is enabled, so send_slack action executes",
+      "actions": [
+        {
+          "rule_name": "Expert Correction Slack Digest",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Slack notification sent",
+          "params": {
+            "template_name": "expert_correction_digest",
+            "channel": "#naver_sms_auto_notify"
+          }
+        }
+      ]
+    },
+    "booking_010_slack_enabled": {
+      "description": "Holiday Event Customer List with Slack Enabled (Story 6.1, AC3, AC4) - Rule matches and Slack is enabled, so send_slack action executes",
+      "actions": [
+        {
+          "rule_name": "Holiday Event Customer List",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Slack notification sent",
+          "params": {
+            "template_name": "holiday_event_customer_list",
+            "channel": "#naver_sms_auto_notify",
+            "template_params": {
+              "bookings": "{{ bookings_in_date_range }}"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

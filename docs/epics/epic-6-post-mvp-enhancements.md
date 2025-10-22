@@ -1,7 +1,7 @@
 # Epic 6: Post-MVP Enhancements
 
 **Epic ID:** EPIC-6
-**Status:** In Progress (Stories 6.2-6.4 Done, 6.1 In Progress)
+**Status:** In Progress (Stories 6.2-6.4 Done, 6.1 In Progress, 6.6 In Progress)
 **Duration:** Week 5+ (ongoing)
 **Dependencies:** Epic 5 (Successful Cutover)
 **Risk Level:** Low (enhancements, not critical)
@@ -46,7 +46,7 @@ After successful production cutover, implement enhancement features that demonst
 | 6.3 | Add Date-Range Condition Evaluator | P1 | 0.5d | Done | 2 |
 | 6.4 | Add Multi-Option Condition Evaluator | P2 | 0.5d | Done | 3 |
 | 6.1 | Implement Example Rules from Requirements | P1 | 1d | In Progress | 4 |
-| 6.6 | Create Rule Management Documentation | P1 | 0.5d | Pending | 5 |
+| 6.6 | Create Rule Management Documentation | P1 | 0.5d | In Progress | 5 |
 | 6.5 | Performance Optimization | P2 | 1d | Pending | 6 |
 
 **Total Estimated Effort:** 5 days
@@ -76,6 +76,12 @@ After successful production cutover, implement enhancement features that demonst
 ---
 
 ## Business User Rule Management Guide
+
+**Version:** 1.0  
+**Last Updated:** 2025-10-24  
+**Created for:** Business Operations Teams, Compliance, Marketing
+
+---
 
 ### 1. Introduction
 
@@ -145,7 +151,7 @@ When writing messages in actions, use `{{ }}` brackets for substitution:
 
 ### 3. Available Conditions
 
-#### New Conditions (Story 6.1+)
+#### New Conditions (Story 6.3-6.4)
 
 **`date_range`** - Check if booking is within a date window
 
@@ -248,7 +254,7 @@ params:
 
 ### 4. Available Actions
 
-#### New Actions (Story 6.2+)
+#### New Actions (Story 6.2)
 
 **`send_slack`** - Send Slack notification to channel
 
@@ -422,87 +428,494 @@ enabled: false  # Rule stops executing immediately
 
 ---
 
-### 6. Testing Your Changes
+### 6. Slack Template Management (Story 6.2 Integration)
 
-**Before making changes:**
+#### Configuration File: `config/slack_templates.yaml`
 
-1. Backup current `config/rules.yaml`
-2. Make a test copy with different rule names
+**Purpose:** Store message templates that operations can update without code changes
 
-**To validate YAML syntax:**
-
-```bash
-# Ask developers to run:
-python -m yaml config/rules.yaml
-```
-
-**To test a rule:**
-
-1. Set `enabled: true` on your test rule
-2. Wait for next Lambda execution (cron runs every 20 minutes)
-3. Check CloudWatch logs in AWS Console
-4. Look for log entries with your rule name
-
-**How to read logs:**
-
-```json
-{
-  "timestamp": "2025-10-22T14:30:00Z",
-  "level": "INFO",
-  "message": "Expert Correction Slack Digest executed",
-  "operation": "send_slack",
-  "context": {
-    "booking_id": "store123_booking456",
-    "rule_name": "Expert Correction Slack Digest",
-    "status": "success"
-  }
-}
-```
-
----
-
-### 7. Troubleshooting
-
-**Problem: "YAML syntax error"**
-
-- Check: Indentation (2 spaces per level)
-- Use online YAML validator: `yamllint.com`
-- Compare with working rules in config/rules.yaml
-
-**Problem: "Rule isn't triggering"**
-
-- Check: Is `enabled: true`?
-- Check: Do ALL conditions match? (AND logic)
-- Check: Is Lambda running? (Check CloudWatch logs)
-- Check: Are booking records being created? (DynamoDB)
-
-**Problem: "Slack message not appearing"**
-
-- Check: Is Slack enabled in settings?
-- Check: Is channel name correct (starts with #)?
-- Check: Do you have permission to post to that channel?
-- Check: Template variables are correct
-
-**To rollback bad rules:**
-
-1. Restore backup: `cp config/rules.yaml.backup config/rules.yaml`
-2. Or manually disable: `enabled: false`
-3. Wait for next Lambda execution
-4. Ask developers to verify in CloudWatch logs
-
-**Emergency: Disable all custom rules**
+**Template Anatomy:**
 
 ```yaml
-# In config/rules.yaml, add at the very top:
-rules:
-  # Keep only Rule 1-3 (original system rules)
-  # Comment out or delete all Story 6.1 rules
-  # Wait for next Lambda execution
+template_key: |
+  Line 1: {{ variable_name }}
+  {% for item in items %}
+  - {{ item.name }}: {{ item.value }}
+  {% endfor %}
+```
+
+#### Available Variables in Templates
+
+**Booking Object Variables:**
+- `{{ booking.name }}` → Customer name
+- `{{ booking.phone_masked }}` → Masked phone (010-****-5678) - **PII safe**
+- `{{ booking.reserve_at }}` → Reservation date/time
+- `{{ booking.pro_edit_count }}` → Number of expert corrections
+- `{{ booking.status }}` → Booking status
+
+**Critical: PII Protection**
+
+✅ **CORRECT:** `{{ booking.phone_masked }}`
+```
+Result: 010-****-5678 (last 4 digits visible)
+```
+
+❌ **WRONG:** `{{ booking.phone }}`
+```
+Result: 01012345678 (EXPOSED - security violation)
+```
+
+**Always use `phone_masked` to protect customer privacy.**
+
+#### Editing Slack Templates
+
+**Step 1: Backup current templates**
+```bash
+cp config/slack_templates.yaml config/slack_templates.yaml.backup
+```
+
+**Step 2: Edit template in `config/slack_templates.yaml`**
+
+Example: Modifying the expert correction message format
+
+```yaml
+expert_correction_digest: |
+  보정 요청 일일 리포트:
+  생성일시: {{ today_date }}
+  {% for booking in bookings %}
+  • {{ booking.name }} ({{ booking.phone_masked }}) - {{ booking.pro_edit_count }}건
+  {% endfor %}
+```
+
+**Step 3: Test template rendering**
+
+Run Slack integration tests to verify template renders correctly:
+
+```bash
+pytest tests/integration/test_slack_integration.py::TestSlackTemplateLoader -v
+```
+
+Expected output:
+```
+test_template_render_with_variables PASSED
+test_template_with_jinja2_loops PASSED
+test_template_pii_masking_applied PASSED
+```
+
+**Step 4: Validate end-to-end**
+
+Enable the rule using your template and wait for next Lambda execution. Check CloudWatch logs for success.
+
+#### Template Testing with Manual Webhook Testing
+
+See `docs/testing/slack-integration.md` for detailed webhook testing instructions.
+
+---
+
+### 7. Change Control: Rule Change Checklist
+
+**See companion document:** `docs/rules/rule-change-checklist.md`
+
+The checklist provides step-by-step instructions for:
+- Pre-change: Backup, review, approval
+- Change: Testing, gradual rollout
+- Post-change: Monitoring, validation, rollback procedures
+
+---
+
+### 8. Testing Your Changes
+
+#### Before Making Any Changes
+
+1. **Backup all configuration files**
+   ```bash
+   cp config/rules.yaml config/rules.yaml.backup.$(date +%Y%m%d_%H%M%S)
+   cp config/slack_templates.yaml config/slack_templates.yaml.backup.$(date +%Y%m%d_%H%M%S)
+   ```
+
+2. **Create test rule with disabled flag**
+   ```yaml
+   - name: "TEST: My New Rule"
+     enabled: false  # Always start disabled
+     description: "Testing new condition"
+     # ... rest of rule
+   ```
+
+#### Validation Commands
+
+**Step 1: Validate YAML Syntax**
+
+```bash
+python scripts/print_rules.py
+```
+
+**Expected output:**
+```
+Rules Configuration:
+
+✓ File: config/rules.yaml
+✓ Total rules: 15
+✓ Enabled: 13
+✓ Disabled: 2
+
+Rule List:
+1. [ENABLED] Expert Correction Slack Digest
+2. [ENABLED] Holiday Event Customer List
+3. [DISABLED] TEST: My New Rule
+...
+```
+
+**Step 2: Run Schema Validation Tests**
+
+```bash
+pytest tests/unit/test_rules_schema.py -v
+```
+
+**Expected output:**
+```
+test_rules_yaml_conforms_to_schema PASSED
+test_all_condition_types_valid PASSED
+test_all_action_types_valid PASSED
+test_slack_templates_referenced_exist PASSED
+======================== 4 passed in 0.45s =========================
+```
+
+**Step 3: Run Slack Integration Tests (If Using Slack)**
+
+```bash
+export SLACK_ENABLED=true
+pytest tests/integration/test_slack_integration.py -v
+```
+
+**Expected output:**
+```
+TestSlackTemplateLoader::
+  test_template_loading PASSED
+  test_template_render_with_variables PASSED
+TestSendSlackAction::
+  test_send_slack_with_static_message PASSED
+  test_send_slack_with_template_rendering PASSED
+======================== 4 passed in 1.23s =========================
+```
+
+**Step 4: Run Regression Tests**
+
+Test that your changes don't break existing functionality:
+
+```bash
+pytest tests/integration/test_rules_regression.py -v --tb=short
+```
+
+**Expected output (subset):**
+```
+TestRulesRegression::
+  test_booking_001_new_confirmation PASSED
+  test_booking_002_reminder_sms PASSED
+  test_booking_006_date_range_within PASSED
+  test_booking_007_date_range_before PASSED
+  ...
+======================== 14 passed in 8.45s =========================
+```
+
+#### Recording Command Results (AC 8)
+
+Before publishing your changes, document the verification:
+
+```markdown
+## Verification Results - Date: 2025-10-24
+
+### Command 1: Validate YAML Syntax
+```bash
+python scripts/print_rules.py
+```
+✅ PASSED
+- Total rules: 15
+- All rule names unique
+- All references valid
+
+### Command 2: Schema Validation
+```bash
+pytest tests/unit/test_rules_schema.py -v
+```
+✅ PASSED (4/4 tests)
+
+### Command 3: Slack Integration Tests
+```bash
+pytest tests/integration/test_slack_integration.py -v
+```
+✅ PASSED (4/4 tests)
+
+### Command 4: Regression Tests
+```bash
+pytest tests/integration/test_rules_regression.py -v
+```
+✅ PASSED (14/14 tests)
+
+### Reviewer
+- Verified by: John Doe
+- Date: 2025-10-24 14:30 UTC
 ```
 
 ---
 
-### 8. Operations Checklist
+### 9. Monitoring and Rollback (Operational Readiness)
+
+#### Monitoring Signals (AC 6)
+
+**Healthy Signals:**
+- Log entries for your rule name appear every 20 minutes
+- Slack messages appear in the configured channel
+- No error messages in logs
+- Customer complaints remain stable
+
+**Warning Signals (Monitor Closely):**
+- Rule log entries but no Slack messages → Template rendering issue
+- Slack channel blocked by workspace admin → Permission issue
+- Same customer receiving duplicate messages → Flag logic issue
+
+**Critical Signals (Rollback Immediately):**
+- Error messages in logs with your rule name
+- Customers complaining about wrong message
+- SMS/Slack not being sent at all
+- Database errors in CloudWatch
+
+#### Monitoring Duration
+
+Monitor new rules for:
+- **First 1 hour:** Every 10 minutes (watch for immediate issues)
+- **First 24 hours:** Every 2-4 hours (watch for edge cases)
+- **First 1 week:** Daily (watch for performance/trend issues)
+
+#### Rollback Procedures
+
+**For minor issues (template, channel, keywords):**
+
+1. Disable the rule immediately
+   ```yaml
+   - name: "Holiday Event Customer List"
+     enabled: false  # Changed from true
+   ```
+
+2. Make your fix
+
+3. Wait for next Lambda execution (20 min)
+
+4. Monitor logs for resolution
+
+5. Re-enable when ready
+
+**For critical issues (revert entire rule):**
+
+```bash
+# Restore previous version
+cp config/rules.yaml.backup config/rules.yaml
+
+# Verify restoration
+python scripts/print_rules.py
+
+# Commit the revert
+git add config/rules.yaml
+git commit -m "Revert rule: Holiday Event Customer List due to [issue]"
+```
+
+**Ownership and Escalation (AC 6):**
+
+| Issue Type | Owner | Escalate To | Timeline |
+|-----------|-------|-------------|----------|
+| Template not rendering | Ops | Dev | Immediately |
+| Slack channel permission | Ops | Slack Admin | Within 1 hour |
+| Wrong customers targeted | Ops | Dev (logic review) | Within 1 hour |
+| Database errors | Dev | Dev Lead | Immediately |
+| Performance degradation | Dev | Dev Lead | Within 1 hour |
+
+---
+
+### 10. Rollout Communication Plan (AC 7)
+
+#### Pre-Rollout (1 week before)
+
+**Announcement Channel:** Slack #general or #operations
+
+**Message Template:**
+```
+📢 NEW FEATURE: Rule Management Self-Service (Story 6.6)
+
+Starting [DATE], operations team can manage SMS/Slack rules without developer intervention.
+
+What's new:
+• Enable/disable rules in YAML config
+• No code deployment needed
+• 5-minute rule updates vs 2-day deployments
+
+Training session: [DATE] at [TIME]
+Documentation: See internal wiki
+
+Questions? Reach out in #operations-rules
+```
+
+#### Day-of Rollout
+
+**Announcement:**
+```
+✅ Rule Management now LIVE
+
+First users: QA team (staging testing)
+General availability: [DATE + 1 day]
+
+For help:
+• Read: docs/epics/epic-6-post-mvp-enhancements.md
+• Checklist: docs/rules/rule-change-checklist.md
+• Slack: @operations-rules-support
+```
+
+#### Post-Rollout (First week)
+
+**Daily Updates:**
+```
+📊 Rule Management Status Report
+
+Rules deployed: 2
+Average execution time: 145ms
+No errors reported
+Next: Training session for marketing team
+```
+
+#### Feedback Loop Process
+
+1. **Collect:** Issues, questions, feature requests in Slack #operations-rules
+2. **Triage:** Weekly meeting to categorize feedback
+3. **Act:** 
+   - Quick fixes: Dev team handles immediately
+   - Enhancements: Added to Story 6.5 backlog
+   - Blockers: Escalate to product manager
+4. **Report:** Share resolution in next update
+
+---
+
+### 11. FAQ (Frequently Asked Questions)
+
+#### Rules and Conditions
+
+**Q: How many rules can I have?**
+A: No hard limit. System evaluates all enabled rules in order. ~20-30 rules are typical.
+
+**Q: What happens if two rules match the same booking?**
+A: Both rules execute! Use `enabled: false` to prevent unwanted rules from running.
+
+**Q: Can I test a rule without enabling it?**
+A: Yes, change `enabled: false` to `enabled: true` temporarily, then change back.
+
+**Q: What's the difference between `has_option_keyword` and `has_multiple_options`?**
+A:
+- `has_option_keyword`: Matches if ANY keyword is found (at least 1)
+- `has_multiple_options`: Matches if MINIMUM number of keywords found (configurable)
+
+**Q: Can I combine multiple conditions?**
+A: Yes! ALL conditions must match (AND logic). No OR logic available currently.
+
+#### Slack Integration
+
+**Q: How do I change which channel gets Slack messages?**
+A: Update the `channel` parameter in the rule's `send_slack` action:
+```yaml
+actions:
+  - type: "send_slack"
+    params:
+      channel: "#your-new-channel"  # Change this
+```
+
+**Q: Can I include customer phone numbers in Slack?**
+A: Never use `{{ booking.phone }}` - use `{{ booking.phone_masked }}` instead to protect privacy.
+
+**Q: What if Slack is down?**
+A: Slack failures are logged but don't stop other actions. SMS still sends.
+
+**Q: How do I test Slack without the real webhook?**
+A: Set `SLACK_ENABLED=false` to skip Slack and test other actions.
+
+#### Troubleshooting
+
+**Q: My rule isn't executing. What do I check?**
+A: In order:
+1. Is `enabled: true`?
+2. Do ALL conditions match? (use test data)
+3. Are booking records being created?
+4. Check CloudWatch logs
+
+**Q: Slack message looks wrong. How do I debug?**
+A: Run template tests:
+```bash
+pytest tests/integration/test_slack_integration.py -k "template" -v
+```
+
+**Q: I messed up the YAML. How do I undo?**
+A: 
+1. Stop - don't commit the broken config
+2. Restore backup: `cp config/rules.yaml.backup config/rules.yaml`
+3. Run validation: `python scripts/print_rules.py`
+4. Try again
+
+**Q: How long does a Lambda execution take?**
+A: Typically 200-500ms. CloudWatch shows exact time in logs.
+
+#### Getting Help
+
+**Q: I need to add a brand new condition type. What do I do?**
+A: Contact developer. You can't add new condition types via YAML only.
+
+**Q: Can I have if/else logic in rules?**
+A: Not yet. Current system uses AND logic only. Feature requested for Story 6.7.
+
+**Q: Where do I report issues with rules?**
+A: 
+1. Slack channel: #operations-rules
+2. GitHub issues: Label `rule-management`
+3. Email: dev-team@company.com
+
+---
+
+### 12. Known Limitations and Future Work (AC 9)
+
+#### Current Limitations (v1.0)
+
+1. **No OR Logic in Conditions**
+   - Current: ALL conditions must match (AND)
+   - Workaround: Create separate rules
+   - Future: Story 6.7 will add OR support
+
+2. **Manual Slack Template Validation**
+   - Current: Must test via `pytest` commands
+   - Workaround: Run integration tests before deployment
+   - Future: Auto-validation in pre-commit hook
+
+3. **No Built-in Rule Testing UI**
+   - Current: Test via YAML + CloudWatch logs
+   - Workaround: Use test rules with `enabled: false`
+   - Future: Web UI for rule testing (Story 6.8)
+
+4. **Limited Template Variables**
+   - Current: Only booking and system variables
+   - Workaround: Ask dev for custom variable
+   - Future: Plugin system for custom variables
+
+5. **Rule Execution Order Not Configurable**
+   - Current: Rules execute in YAML order
+   - Workaround: Order rules in config by priority
+   - Future: Priority field with numeric ordering
+
+#### Post-MVP Enhancement Opportunities
+
+| Story | Title | Effort | Impact | Status |
+|-------|-------|--------|--------|--------|
+| 6.7 | Add OR Logic to Conditions | 1d | High | Planned Q4 |
+| 6.8 | Build Rule Testing Web UI | 3d | Medium | Backlog |
+| 6.9 | Add Custom Template Variables | 2d | Medium | Backlog |
+| 6.10 | Implement Rule Scheduling | 1d | Low | Backlog |
+| 6.11 | Add Rule Performance Metrics | 1d | Low | Backlog |
+
+---
+
+### 13. Operations Checklist (AC 1)
 
 **Before enabling new rule in production:**
 
@@ -537,9 +950,19 @@ rules:
 
 ---
 
-## Change Log
+## Business User Rule Management Guide - Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
+| 2025-10-24 | 1.0 | Rule management guide v1.0 - Story 6.6 implementation complete | James (Dev) |
+| 2025-10-22 | 0.1 | Initial sections added from Business User Rule Management section | Sarah (PO) |
+
+---
+
+## Epic Change Log
+
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
+| 2025-10-24 | 3.0 | Story 6.6 complete - Comprehensive rule management documentation published (v1.0) | James (Dev) |
 | 2025-10-22 | 2.0 | Story 6.1 complete - Added example rules and business user guide | James (Dev) |
 | 2025-10-18 | 1.0 | Epic created from PRD and requirements | Sarah (PO) |

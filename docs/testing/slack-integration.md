@@ -558,6 +558,24 @@ aws lambda update-function-configuration \
 
 ---
 
+## Operator-Facing Rule Management (Story 6.6 Integration)
+
+For business users who want to manage Slack notifications via rules configuration, see:
+
+- **Rule Management Guide:** `docs/epics/epic-6-post-mvp-enhancements.md#business-user-rule-management-guide`
+  - How to enable/disable Slack rules
+  - How to modify Slack channels and templates
+  - Slack template management and PII protection
+  - Testing your Slack rule changes
+
+- **Rule Change Checklist:** `docs/rules/rule-change-checklist.md`
+  - Pre-change, change, and post-change procedures
+  - How to test Slack template changes
+  - Monitoring and rollback procedures
+  - Emergency rollback if issues occur
+
+---
+
 ## References
 
 - **Source:** `src/rules/actions.py` - send_slack, SlackTemplateLoader
@@ -566,3 +584,4 @@ aws lambda update-function-configuration \
 - **Tests:** `tests/integration/test_slack_integration.py` - AC 1-5 verification
 - **Service:** `src/notifications/slack_service.py` - Webhook client
 - **Story:** Story 6.2 - Add Slack Integration
+- **Story 6.6:** Rule Management Documentation - Complete operator guide with examples
