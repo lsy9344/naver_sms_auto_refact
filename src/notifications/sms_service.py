@@ -206,7 +206,7 @@ class SensSmsClient:
         if not normalized_phone:
             raise ValueError("phone number is required")
 
-        payload: dict[str, Any] = {
+        payload: Dict[str, Any] = {
             "type": template["type"],
             "contentType": template["contentType"],
             "from": from_number,

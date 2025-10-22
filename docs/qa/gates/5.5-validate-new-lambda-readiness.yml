@@ -4,89 +4,102 @@ story: '5.5'
 story_title: 'Validate New Lambda Readiness'
 gate: FAIL
 status_reason: |
-  2025-10-23 re-review: validation, readiness, and evidence suites now complete their
-  assertions but each run still fails the repository coverage gate (14% / 0%), because
-  all automation continues to execute exclusively under `tests/`. Documentation still
-  advertises a GO decision without executable artefacts, so the cutover remains blocked.
+  2025-10-24 re-review: the validation, readiness, evidence, and security suites now
+  execute their assertions, but each invocation halts on the repository coverage gate
+  (54% / 53% / 63% / 0% vs ≥80%) because the production orchestration paths remain
+  untouched. Core helpers in `src/validation/environment.py`, `src/validation/readiness.py`,
+  and `src/validation/performance.py` still show 0% execution, and VALIDATION.md continues
+  to advertise a GO decision with no new artefacts. Story 5.5 stays blocked from MSC1 sign-off.
 
 reviewer: 'Quinn (Test Architect)'
-updated: '2025-10-23T05:00:00Z'
-expires: '2025-11-06T05:00:00Z'
+updated: '2025-10-24T05:00:00Z'
+expires: '2025-11-07T05:00:00Z'
 
-quality_score: 30
+quality_score: 35
 
 top_issues:
   - id: 'TECH-001'
     severity: critical
     title: 'Validation workflow still not implemented in production'
     description: |
-      `pytest tests/integration/test_validation_campaign.py` now passes assertions but exits with
-      `Coverage failure: total of 14 is less than fail-under=80` because it still imports
-      `ValidationEnvironmentSetup` from `tests/validation_environment.py`. No production module
-      orchestrates the campaign, so the repo gate blocks validation.
+      `pytest tests/integration/test_validation_campaign.py` now runs all 18 scenarios but stops at
+      54% coverage (fail-under=80). Key paths such as `ValidationEnvironmentConfig.validate` and
+      `ValidationEnvironmentSetup.validate_prerequisites` still record 0% execution, so the suite
+      never exercises the real campaign bootstrap.
     suggested_owner: 'dev'
     refs:
-      - tests/integration/test_validation_campaign.py:26
-      - tests/validation_environment.py:19
+      - pytest.ini:12
+      - coverage.json:1
+      - src/validation/environment.py:77
+      - src/validation/environment.py:177
     remediation: |
-      Promote the validation runner into `src/validation`, exercise production modules, and satisfy the
-      ≥80% repository coverage gate so the suite can pass.
+      Promote the validation runner into `src/validation`, drive it via integration tests, and keep
+      coverage ≥80% by executing the real bootstrap + diff workflow instead of the synthetic harness.
 
   - id: 'OPS-001'
     severity: critical
     title: 'Readiness gate automation remains test-only with 0% coverage'
     description: |
-      The readiness validator lives entirely inside `tests/integration/test_readiness_gate.py`, and
-      running the suite produces 0% coverage and an immediate fail-under=80% abort. No code under `src/`
-      generates a readiness report or updates VALIDATION.md.
+      `pytest tests/integration/test_readiness_gate.py` still exits at 53% coverage while warning that
+      the comparison, monitoring, and Slack modules were never imported. All helpers under
+      `ReadinessValidator` report 0% execution, so no production readiness artefact exists.
     suggested_owner: 'dev'
     refs:
-      - tests/integration/test_readiness_gate.py:18
+      - pytest.ini:12
+      - coverage.json:1
+      - src/validation/readiness.py:85
+      - src/validation/readiness.py:222
     remediation: |
       Implement a production readiness validator module, feed it campaign outputs, and update the
-      tests to import it so coverage is collected from real code paths.
+      tests to import it so coverage is collected from real code paths and the gate can pass.
 
   - id: 'BUS-001'
     severity: critical
     title: 'Evidence packaging and documentation are inaccurate'
     description: |
-      `pytest tests/integration/test_evidence_packaging.py` exits with 0% coverage, yet `VALIDATION.md`
-      still advertises “24/24 PASSED” and a GO recommendation. No artefacts are appended to VALIDATION.md,
-      and the doc misrepresents the state of the story.
+      `pytest tests/integration/test_evidence_packaging.py` now generates synthetic JSON/markdown but
+      still halts at 63% coverage, and `VALIDATION.md` continues to claim “Story 5.5 validation PASSED”
+      with a GO recommendation. No new artefacts have been appended since the refactor.
     suggested_owner: 'dev'
     refs:
-      - tests/integration/test_evidence_packaging.py:688
-      - VALIDATION.md:2298
+      - pytest.ini:12
+      - coverage.json:1
+      - VALIDATION.md:2785
     remediation: |
-      Build a production evidence packager that writes to VALIDATION.md, rerun the campaign, and rewrite
-      the dossier with real outputs before requesting another gate.
+      Build a production evidence packager that writes to VALIDATION.md with real campaign artefacts,
+      rerun the campaign, and rewrite the dossier before requesting another gate.
 
   - id: 'SEC-001'
     severity: high
-    title: 'Comparison mode kill switch still case-insensitive'
+    title: 'Comparison mode governance unverified in readiness automation'
     description: |
-      `COMPARISON_MODE_ENABLED` continues to lowercase the environment flag (`.lower() == "true"`), contrary
-      to the documented fix. No integration coverage prevents live SMS when the env var is set to "TRUE".
+      Unit tests now confirm the kill switch rejects uppercase values, but every readiness helper that
+      should enforce comparison mode still reports 0% execution. The automated QA gate never checks the
+      flag before issuing a GO recommendation.
     suggested_owner: 'dev'
     refs:
-      - src/config/settings.py:52
-      - VALIDATION.md:2298
+      - coverage.json:1
+      - src/validation/readiness.py:222
+      - tests/unit/test_security_comparison_mode.py:17
     remediation: |
-      Enforce a case-sensitive flag comparison in `src/config/settings.py`, add handler-level tests that
-      exercise comparison mode, and document the behaviour accurately.
+      Ensure the readiness validator exercises `COMPARISON_MODE_ENABLED`, capture the result inside the
+      readiness report, and include integration coverage that fails if the flag is disabled during a campaign.
 
   - id: 'PERF-001'
     severity: high
     title: 'Performance suite impractical with 1.2s sleeps per booking'
     description: |
-      `CampaignPerformanceSimulator` sleeps for 1.2 seconds per booking when `simulate_delay=True`, so the
-      integration suite times out long before finishing (200 bookings ≈ 240 seconds of sleep).
+      `CampaignPerformanceSimulator` is still never executed by the validation campaign—coverage remains
+      0% for the simulator and 39% overall for `src/validation/performance.py`, leaving Lambda performance
+      thresholds unverified.
     suggested_owner: 'dev'
     refs:
-      - tests/integration/test_campaign_performance.py:129
+      - coverage.json:1
+      - src/validation/performance.py:70
+      - src/validation/performance.py:97
     remediation: |
-      Replace the real sleeps with deterministic timing fakes/mocks so the performance harness runs in
-      seconds and can meaningfully validate PRD thresholds.
+      Replace sleeps with deterministic timing, wire the simulator into the production validation flow,
+      and gather real execution metrics so the performance suite satisfies coverage and PRD thresholds.
 
 waiver:
   active: false
@@ -95,13 +108,14 @@ waiver:
   approval_date: null
 
 evidence:
-  tests_reviewed: 3
+  tests_reviewed: 4
   tests_passed: 0
-  tests_failed: 3
+  tests_failed: 4
   commands:
     - 'pytest tests/integration/test_validation_campaign.py'
     - 'pytest tests/integration/test_readiness_gate.py'
     - 'pytest tests/integration/test_evidence_packaging.py'
+    - 'pytest tests/unit/test_security_comparison_mode.py'
   trace:
     ac_covered: []
     ac_partial_coverage:
@@ -120,13 +134,13 @@ evidence:
 nfr_validation:
   security:
     status: FAIL
-    notes: 'COMPARISON_MODE kill switch still lowercases the env flag; no integration coverage prevents live SMS during validation.'
+    notes: 'Readiness automation never exercises COMPARISON_MODE enforcement; coverage remains 0% for the kill-switch checks.'
   performance:
     status: FAIL
-    notes: 'Performance suite relies on 1.2s sleeps per booking, so runs time out before capturing metrics.'
+    notes: 'Performance simulator is never executed by the suites; no measurable data for MSC1 performance budgets.'
   reliability:
     status: FAIL
-    notes: 'Validation, readiness, and evidence suites all fail or exit with 0% coverage; no production pathways executed.'
+    notes: 'Validation, readiness, evidence, and security suites all fail the repo coverage gate; production pathways remain untested.'
   maintainability:
     status: CONCERNS
     notes: 'Automation remains stranded under tests/ and documentation advertises success despite red suites.'
@@ -259,9 +273,14 @@ status_history:
     status: FAIL
     reviewer: Quinn (Test Architect)
     notes: 'Coverage gate still stops validation (14%/0%); automation remains under tests/ and dossier still reports GO.'
+  - date: '2025-10-24T05:00:00Z'
+    status: FAIL
+    reviewer: Quinn (Test Architect)
+    notes: 'Coverage improves to 54%/53%/63% but remains far below ≥80%; readiness/performance helpers untouched and documentation still claims GO.'
 
 dev_notes: |
   Commands executed:
     - `pytest tests/integration/test_validation_campaign.py`
     - `pytest tests/integration/test_readiness_gate.py`
     - `pytest tests/integration/test_evidence_packaging.py`
+    - `pytest tests/unit/test_security_comparison_mode.py`

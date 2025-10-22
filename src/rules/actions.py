@@ -795,7 +795,7 @@ def send_slack(
         logger.debug(
             "Sending Slack notification",
             operation=operation,
-            context={**log_context, "message_length": len(final_message)},
+            context={**log_context, "message_length": len(final_message or "")},
         )
 
         # Build Slack payload (webhook format)

@@ -469,7 +469,7 @@ def compare_sms_payloads(old_payload: str, new_payload: str) -> Tuple[bool, int,
     # Character-by-character comparison
     diff_count = 0
     diff_positions: list[str] = []
-    max_samples = 10  # Increased from 5 to capture more context for debugging
+    max_samples: int = 10  # Increased from 5 to capture more context for debugging
 
     for i, (old_char, new_char) in enumerate(zip(old_payload, new_payload)):
         if old_char != new_char:
