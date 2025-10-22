@@ -1,6 +1,6 @@
 # Comparison Report: case2_two_hour_001
 **Scenario:** CASE 2: Two-Hour Window Reminder
-**Generated:** 2025-10-22T00:01:44.800087
+**Generated:** 2025-10-22T00:23:05.829501
 
 ## Status
 **Parity Status:** PASS
