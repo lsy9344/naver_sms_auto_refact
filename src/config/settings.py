@@ -49,7 +49,7 @@ SENS_DELIVERY_ENABLED = os.getenv("SENS_DELIVERY_ENABLED", "false").lower() == "
 
 # Comparison/validation mode flag
 # When True: Logs SMS payloads and metrics but does NOT send real SENS SMS
-COMPARISON_MODE_ENABLED = os.getenv("COMPARISON_MODE_ENABLED", "false").lower() == "true"
+COMPARISON_MODE_ENABLED = os.getenv("COMPARISON_MODE_ENABLED", "false") == "true"
 
 
 class SecretRedactionFilter(logging.Filter):
@@ -67,7 +67,7 @@ class SecretRedactionFilter(logging.Filter):
         """
         super().__init__()
         self.secrets = secrets or {}
-        self.redacted_values = set()
+        self.redacted_values: set[str] = set()
         if self.secrets:
             self._extract_secret_values(self.secrets)
 

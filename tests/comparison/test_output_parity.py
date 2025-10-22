@@ -16,7 +16,7 @@ from datetime import datetime
 
 from tests.comparison.comparison_factory import ComparisonFactory
 from tests.comparison.output_normalizer import OutputNormalizer
-from tests.comparison.diff_reporter import DiffReporter
+from src.comparison.diff_reporter import DiffReporter
 from tests.comparison.parity_validator import ParityValidator
 
 logger = logging.getLogger(__name__)

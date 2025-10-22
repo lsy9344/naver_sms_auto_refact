@@ -538,8 +538,10 @@ def update_flag(
     logger = context.logger
     db_repo = context.db_repo
 
-    effective_flag = flag_name or flag
-    desired_value = flag_value if flag_value is not None else value if value is not None else True
+    effective_flag: Optional[str] = flag_name or flag
+    desired_value: bool = (
+        flag_value if flag_value is not None else value if value is not None else True
+    )
 
     operation = "update_flag"
     log_context = {

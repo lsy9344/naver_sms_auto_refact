@@ -206,7 +206,7 @@ class SensSmsClient:
         if not normalized_phone:
             raise ValueError("phone number is required")
 
-        return {
+        payload: dict[str, Any] = {
             "type": template["type"],
             "contentType": template["contentType"],
             "from": from_number,
@@ -214,6 +214,7 @@ class SensSmsClient:
             "content": template["content"],
             "messages": [{"to": normalized_phone}],
         }
+        return payload
 
     def _build_headers(self, timestamp: str) -> Dict[str, str]:
         """Return headers with preserved signature logic."""

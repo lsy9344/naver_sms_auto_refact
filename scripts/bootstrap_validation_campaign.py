@@ -18,10 +18,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tests.validation_environment import (
-    ValidationEnvironmentSetup,
-    create_default_validation_environment,
-)
+from src.validation.environment import ValidationEnvironmentSetup, create_default_validation_environment
 from src.notifications.slack_service import SlackWebhookClient
 
 

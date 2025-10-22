@@ -4,105 +4,89 @@ story: '5.5'
 story_title: 'Validate New Lambda Readiness'
 gate: FAIL
 status_reason: |
-  2025-10-21 re-review shows Story 5.5 remains blocked. The newly added "automation" exists
-  only as self-contained test fixtures that never exercise production code, and the suites
-  themselves fail (coverage gate + assertions). No validation campaign has been executed,
-  acceptance criteria 1-9 remain unmet, and the readiness decision is still manual.
+  2025-10-23 re-review: validation, readiness, and evidence suites now complete their
+  assertions but each run still fails the repository coverage gate (14% / 0%), because
+  all automation continues to execute exclusively under `tests/`. Documentation still
+  advertises a GO decision without executable artefacts, so the cutover remains blocked.
 
 reviewer: 'Quinn (Test Architect)'
-updated: '2025-10-21T02:45:00Z'
-expires: '2025-11-04T02:45:00Z'
+updated: '2025-10-23T05:00:00Z'
+expires: '2025-11-06T05:00:00Z'
 
-quality_score: 38
+quality_score: 30
 
 top_issues:
   - id: 'TECH-001'
     severity: critical
-    title: 'End-to-End Validation Workflow Not Implemented'
+    title: 'Validation workflow still not implemented in production'
     description: |
-      `tests/integration/test_validation_campaign.py` defines a fake `ValidationEnvironment`
-      and campaign workflow entirely inside the test file. No production orchestration exists
-      and the test never touches `scripts/bootstrap_validation_campaign.py` or the Lambda
-      entrypoints. AC1/AC3/AC5 remain unimplemented. Regression run fails immediately when
-      executed with project coverage settings.
+      `pytest tests/integration/test_validation_campaign.py` now passes assertions but exits with
+      `Coverage failure: total of 14 is less than fail-under=80` because it still imports
+      `ValidationEnvironmentSetup` from `tests/validation_environment.py`. No production module
+      orchestrates the campaign, so the repo gate blocks validation.
     suggested_owner: 'dev'
     refs:
-      - tests/integration/test_validation_campaign.py:20
-      - scripts/bootstrap_validation_campaign.py:17
-      - docs/stories/5.5.validate-new-lambda-readiness.md:80
+      - tests/integration/test_validation_campaign.py:26
+      - tests/validation_environment.py:19
     remediation: |
-      Move the workflow code into `src/validation`, wire it to real bootstrap/comparison logic,
-      and execute against recorded fixtures. Replace in-test classes with imports from the
-      production package and ensure pytest passes under the repo's coverage thresholds.
+      Promote the validation runner into `src/validation`, exercise production modules, and satisfy the
+      ≥80% repository coverage gate so the suite can pass.
 
   - id: 'OPS-001'
     severity: critical
-    title: 'Readiness Gate Automation Missing'
+    title: 'Readiness gate automation remains test-only with 0% coverage'
     description: |
-      The supposed readiness validator lives only inside
-      `tests/integration/test_readiness_gate.py`. It fabricates its own dataclasses and never
-      integrates with comparison metrics, CloudWatch exports, or Slack telemetry. Running the
-      test fails the repo-wide coverage requirement, confirming the automation is non-functional.
-      AC9 is still 0% complete.
+      The readiness validator lives entirely inside `tests/integration/test_readiness_gate.py`, and
+      running the suite produces 0% coverage and an immediate fail-under=80% abort. No code under `src/`
+      generates a readiness report or updates VALIDATION.md.
     suggested_owner: 'dev'
     refs:
       - tests/integration/test_readiness_gate.py:18
-      - docs/stories/5.5.validate-new-lambda-readiness.md:146
-      - VALIDATION.md:2241
     remediation: |
-      Implement a real readiness validator under `src/validation/` that consumes campaign outputs,
-      emits a JSON report, and updates VALIDATION.md. Update the tests to import that module and
-      make them pass with coverage enabled.
+      Implement a production readiness validator module, feed it campaign outputs, and update the
+      tests to import it so coverage is collected from real code paths.
 
   - id: 'BUS-001'
     severity: critical
-    title: 'Evidence Packaging Automation Failing'
+    title: 'Evidence packaging and documentation are inaccurate'
     description: |
-      `tests/integration/test_evidence_packaging.py` introduces another in-test implementation of
-      an EvidencePackager. The integration case fails (`AssertionError: 'test_report' in content`)
-      and the coverage gate aborts the run. No automation updates VALIDATION.md; AC2/AC6/AC8 remain
-      unmet with placeholder copy only (`VALIDATION.md:2241-2259`).
+      `pytest tests/integration/test_evidence_packaging.py` exits with 0% coverage, yet `VALIDATION.md`
+      still advertises “24/24 PASSED” and a GO recommendation. No artefacts are appended to VALIDATION.md,
+      and the doc misrepresents the state of the story.
     suggested_owner: 'dev'
     refs:
-      - tests/integration/test_evidence_packaging.py:18
-      - VALIDATION.md:2241
-      - docs/stories/5.5.validate-new-lambda-readiness.md:100
+      - tests/integration/test_evidence_packaging.py:688
+      - VALIDATION.md:2298
     remediation: |
-      Deliver a concrete evidence packaging pipeline (scripts + library) that ingests campaign
-      artifacts, updates VALIDATION.md, and provide green integration tests that reference it.
+      Build a production evidence packager that writes to VALIDATION.md, rerun the campaign, and rewrite
+      the dossier with real outputs before requesting another gate.
 
   - id: 'SEC-001'
     severity: high
-    title: 'COMPARISON_MODE Enforcement Untested'
+    title: 'Comparison mode kill switch still case-insensitive'
     description: |
-      The new "kill switch" coverage lives only in `tests/unit/test_comparison_mode.py`, which
-      defines its own stub service instead of exercising `src/config/settings.py` or the Lambda
-      handler. Production code still uses `.lower() == "true"` and no automated check prevents SMS
-      sends in comparison mode.
+      `COMPARISON_MODE_ENABLED` continues to lowercase the environment flag (`.lower() == "true"`), contrary
+      to the documented fix. No integration coverage prevents live SMS when the env var is set to "TRUE".
     suggested_owner: 'dev'
     refs:
-      - tests/unit/test_comparison_mode.py:20
-      - src/config/settings.py:45
-      - docs/stories/5.5.validate-new-lambda-readiness.md:206
+      - src/config/settings.py:52
+      - VALIDATION.md:2298
     remediation: |
-      Add integration coverage that boots the real handler with COMPARISON_MODE_ENABLED=true,
-      verifies no SMS leaves `src/notifications/sms_service.py`, and align env parsing with the
-      documented requirements.
+      Enforce a case-sensitive flag comparison in `src/config/settings.py`, add handler-level tests that
+      exercise comparison mode, and document the behaviour accurately.
 
   - id: 'PERF-001'
     severity: high
-    title: 'Performance Simulation Failing'
+    title: 'Performance suite impractical with 1.2s sleeps per booking'
     description: |
-      `tests/integration/test_campaign_performance.py` fails multiple assertions (threshold checks,
-      linear scaling) and aborts after 10 seconds. No actionable performance profile exists for the
-      validation campaign.
+      `CampaignPerformanceSimulator` sleeps for 1.2 seconds per booking when `simulate_delay=True`, so the
+      integration suite times out long before finishing (200 bookings ≈ 240 seconds of sleep).
     suggested_owner: 'dev'
     refs:
-      - tests/integration/test_campaign_performance.py:170
-      - docs/stories/5.5.validate-new-lambda-readiness.md:119
+      - tests/integration/test_campaign_performance.py:129
     remediation: |
-      Replace synthetic calculations with measurements from the real comparison runner, adjust
-      thresholds to PRD values, and ensure the suite completes under coverage gating.
+      Replace the real sleeps with deterministic timing fakes/mocks so the performance harness runs in
+      seconds and can meaningfully validate PRD thresholds.
 
 waiver:
   active: false
@@ -111,19 +95,18 @@ waiver:
   approval_date: null
 
 evidence:
-  tests_reviewed: 57
-  tests_passed: 33
-  tests_failed: 24
-  risks_identified: 13
+  tests_reviewed: 3
+  tests_passed: 0
+  tests_failed: 3
   commands:
+    - 'pytest tests/integration/test_validation_campaign.py'
     - 'pytest tests/integration/test_readiness_gate.py'
     - 'pytest tests/integration/test_evidence_packaging.py'
-    - 'pytest tests/integration/test_campaign_performance.py::TestCampaignPerformanceMetrics::test_metrics_validates_execution_threshold -q'
   trace:
     ac_covered: []
     ac_partial_coverage:
-      - 4  # CloudWatch dashboards referenced but no campaign export attached
-      - 7  # Runbook references Story 5.4 only; Story 5.5 playbook missing
+      - 4
+      - 7
     ac_gaps:
       - 1
       - 2
@@ -137,137 +120,126 @@ evidence:
 nfr_validation:
   security:
     status: FAIL
-    notes: |
-      No automated enforcement of COMPARISON_MODE. Tests exercise only stubs and do not touch the
-      handler. Risk of accidental live SMS during validation persists.
+    notes: 'COMPARISON_MODE kill switch still lowercases the env flag; no integration coverage prevents live SMS during validation.'
   performance:
     status: FAIL
-    notes: |
-      Performance suite fails and produces no actionable metrics. No evidence for 4-minute / 10s
-      thresholds. Campaign scalability unknown.
+    notes: 'Performance suite relies on 1.2s sleeps per booking, so runs time out before capturing metrics.'
   reliability:
     status: FAIL
-    notes: |
-      Coverage gating failures prevent running the validation suite. No end-to-end campaign run, no
-      alarm response rehearsal, and no readiness report.
+    notes: 'Validation, readiness, and evidence suites all fail or exit with 0% coverage; no production pathways executed.'
   maintainability:
     status: CONCERNS
-    notes: |
-      Automation lives inside tests, bootstrap script imports from `tests/` namespace. Lacks clear
-      separation between production utilities and QA tooling.
+    notes: 'Automation remains stranded under tests/ and documentation advertises success despite red suites.'
 
 risk_summary:
   totals:
     critical: 3
-    high: 5
-    medium: 3
-    low: 1
+    high: 2
+    medium: 0
+    low: 0
   highest:
     id: 'TECH-001'
     score: 10
     title: 'Validation workflow missing and regression suite red'
   recommended_actions:
     must_fix:
-      - 'Promote validation workflow + readiness validator into production modules and rerun pytest with coverage'
-      - 'Repair evidence packaging automation and update VALIDATION.md with real artifacts'
-      - 'Implement COMPARISON_MODE enforcement test against src/main handler'
-      - 'Stabilise performance simulation against real comparison runs'
-      - 'Document and execute a full validation campaign before requesting another QA gate'
+      - 'Promote validation workflow into src/validation and fix failing integration tests with real coverage.'
+      - 'Implement production readiness validator & evidence packager and feed VALIDATION.md with actual results.'
+      - 'Enforce case-sensitive COMPARISON_MODE flag and add handler-level coverage.'
+      - 'Replace real sleeps in the performance suite with deterministic timing.'
     monitor:
-      - 'Slack webhook reliability once real campaign automation exists'
-      - 'CloudWatch metrics ingestion under sustained load'
-      - 'Fixture drift between golden datasets and production'
+      - 'Update documentation only after real campaign artefacts exist.'
+      - 'Ensure CloudWatch metrics publisher API is exercised through integration tests.'
     nice_to_have:
-      - 'Failure-recovery drills once base automation is green'
-      - 'Automated rollback rehearsal scripts'
+      - 'Automate risk and trace assessment refresh once campaign automation lands.'
 
 recommendations:
   immediate:
-    - action: 'Create real validation runner module and wire integration tests to it'
+    - action: 'Move validation automation into production modules and satisfy the ≥80% coverage gate.'
       refs:
-        - 'src/validation/__init__.py (new)'
         - 'tests/integration/test_validation_campaign.py'
+        - 'tests/validation_environment.py'
       priority: 'BLOCKING'
       effort: '3-4 days'
-    - action: 'Implement readiness report generator consumed by VALIDATION.md'
+    - action: 'Ship production readiness validator & evidence packager and update VALIDATION.md with real outputs.'
       refs:
         - 'tests/integration/test_readiness_gate.py'
+        - 'tests/integration/test_evidence_packaging.py'
         - 'VALIDATION.md'
       priority: 'BLOCKING'
-      effort: '2 days'
-    - action: 'Fix evidence packager assertions and align markdown output'
+      effort: '3 days'
+    - action: 'Fix COMPARISON_MODE flag parsing and add integration coverage for handler behaviour.'
       refs:
-        - 'tests/integration/test_evidence_packaging.py:688-715'
+        - 'src/config/settings.py'
+        - 'tests/unit/test_comparison_mode.py'
       priority: 'BLOCKING'
       effort: '1 day'
-    - action: 'Adjust performance thresholds and remove hard-coded pass/fail shortcuts'
+    - action: 'Stub out performance timing so the suite completes under CI limits.'
       refs:
-        - 'tests/integration/test_campaign_performance.py:170-240'
+        - 'tests/integration/test_campaign_performance.py'
       priority: 'HIGH'
-      effort: '2 days'
+      effort: '1 day'
   future:
-    - action: 'Move validation environment helpers out of tests/ namespace'
+    - action: 'Refresh risk and trace assessments once production automation lands.'
       refs:
-        - 'scripts/bootstrap_validation_campaign.py'
+        - 'docs/qa/assessments/5.5-risk-20251020.md'
       priority: 'MEDIUM'
       effort: '1 day'
-    - action: 'Automate Slack/Telegram incident drill and document SLA results'
+    - action: 'Align the validation dossier with actual artefacts, including Slack evidence.'
       refs:
-        - 'docs/ops/runbook.md'
+        - 'VALIDATION.md'
       priority: 'MEDIUM'
-      effort: '2 days'
+      effort: '1 day'
 
 code_quality_assessment: |
-  Component code quality remains solid (SlackWebhookClient, diff tooling, Terraform modules) but
-  none of the new Story 5.5 automation is in production modules. Test suites fabricate their own
-  implementations, leading to green tests that provide no assurance—and now they are red due to
-  assertion bugs and coverage gating. The bootstrap script importing from `tests/` indicates the
-  design has not been productised.
+  Component code remains isolated and solid, but every piece of Story 5.5 automation still lives in `tests/`.
+  The integration suites fabricate their own environments, never touch production modules, and therefore
+  fail the repo coverage gate (14% / 0%). Documentation claims 100% parity despite coverage failures and
+  missing artefacts.
 
 files_modified_during_review: []
 
 next_steps: |
-  1. Promote automation into src/validation and ensure pytest succeeds with coverage ≥80%.
-  2. Run a real validation campaign, capture metrics, alarms, and Slack history.
-  3. Update VALIDATION.md with evidence, dashboard exports, and readiness decision artefacts.
-  4. Re-submit QA gate once AC1-9 have verifiable proof and all new tests pass.
+  1. Move validation, readiness, and evidence automation into production modules and satisfy coverage gates.
+  2. Execute a real validation campaign, capture artefacts, and rewrite VALIDATION.md before requesting QA again.
+  3. Enforce comparison-mode kill switch behaviour and stabilise the performance harness so CI can exercise it.
 
 gate_decision_rationale: |
-  The story regressed from CONCERNS to FAIL. Critical automation remains missing, new tests fail,
-  and acceptance criteria lack evidence. Until a real campaign is executed and automation is
-  delivered in production modules with passing tests, the story cannot proceed toward cutover.
+  The story remains in FAIL. All validation suites fail the repository coverage gate because automation remains
+  trapped under `tests/`, the comparison kill switch is still case-insensitive, and VALIDATION.md advertises success
+  despite missing artefacts. Until production-grade automation and evidence exist, the cutover cannot move forward.
 
 compliance_checklist:
   - name: 'All acceptance criteria implemented'
     status: 'FAIL'
-    notes: 'AC1-9 lack executed evidence; tasks remain unchecked in story file.'
+    notes: 'AC1-9 still lack executable proof; the task checklist remains unchecked.'
   - name: 'Test coverage adequate'
     status: 'FAIL'
-    notes: 'Repository coverage gate fails (0%). Multiple new suites abort with assertion errors.'
+    notes: 'Repository gate requires ≥80%; suites currently report 13.82% / 0% coverage.'
   - name: 'Architecture compliance'
-    status: 'CONCERNS'
-    notes: 'Automation code resides under tests/. Needs production placement.'
+    status: 'FAIL'
+    notes: 'Automation code lives under tests/ instead of production modules.'
   - name: 'Security review'
     status: 'FAIL'
-    notes: 'No verification that COMPARISON_MODE prevents outbound SMS.'
+    notes: 'Comparison mode kill switch still lowercases env var and lacks integration coverage.'
   - name: 'Performance acceptable'
     status: 'FAIL'
-    notes: 'Performance simulation fails; no empirical data gathered.'
+    notes: 'Performance harness uses real sleeps and times out before collecting metrics.'
   - name: 'Documentation complete'
     status: 'CONCERNS'
-    notes: 'Runbook/VALIDATION.md still list Story 5.5 as future work.'
+    notes: 'VALIDATION.md advertises 24/24 passes with no supporting artefacts.'
   - name: 'Ready for production'
     status: 'FAIL'
-    notes: 'Regression suite failing, readiness decision manual, evidence missing.'
+    notes: 'No production automation or evidence; suites remain red.'
 
 metadata:
-  assessment_duration_minutes: 75
-  files_analyzed: 23
+  assessment_duration_minutes: 45
+  files_analyzed: 18
   test_files_reviewed: 6
-  source_files_reviewed: 5
-  documentation_files_reviewed: 3
-  infrastructure_files_reviewed: 1
-  assessment_method: 'Targeted pytest execution + requirements traceability'
+  source_files_reviewed: 4
+  documentation_files_reviewed: 2
+  infrastructure_files_reviewed: 0
+  assessment_method: 'Targeted pytest execution + documentation audit'
   confidence_level: 'HIGH'
 
 status_history:
@@ -279,10 +251,17 @@ status_history:
     status: FAIL
     reviewer: Quinn (Test Architect)
     notes: 'Automation still missing; new suites fail; readiness gate cannot proceed.'
+  - date: '2025-10-22T05:00:00Z'
+    status: FAIL
+    reviewer: Quinn (Test Architect)
+    notes: 'Suites still red (13.82%/0% coverage); documentation claims GO despite missing automation.'
+  - date: '2025-10-23T05:00:00Z'
+    status: FAIL
+    reviewer: Quinn (Test Architect)
+    notes: 'Coverage gate still stops validation (14%/0%); automation remains under tests/ and dossier still reports GO.'
 
 dev_notes: |
   Commands executed:
+    - `pytest tests/integration/test_validation_campaign.py`
     - `pytest tests/integration/test_readiness_gate.py`
     - `pytest tests/integration/test_evidence_packaging.py`
-    - `pytest tests/integration/test_campaign_performance.py::TestCampaignPerformanceMetrics::test_metrics_validates_execution_threshold -q`
-  All runs failed due to coverage gate and assertion errors, confirming the implementation gaps.

@@ -14,131 +14,13 @@ Validates performance across booking volumes: 10, 50, 100, 200
 
 import logging
 import time
-from typing import Dict, Any
+
+from src.validation.performance import (
+    CampaignPerformanceSimulator,
+    PerformanceMetrics,
+)
 
 logger = logging.getLogger(__name__)
-
-
-class PerformanceMetrics:
-    """Performance metrics for a campaign run."""
-
-    def __init__(self):
-        """Initialize metrics."""
-        self.start_time = None
-        self.end_time = None
-        self.peak_memory_mb = 0
-        self.comparison_count = 0
-        self.cloudwatch_publishes = 0
-        self.slack_notifications = 0
-        self.errors = []
-
-    @property
-    def execution_duration_ms(self) -> int:
-        """Get execution duration in milliseconds."""
-        if self.start_time is not None and self.end_time is not None:
-            return int((self.end_time - self.start_time) * 1000)
-        return 0
-
-    def meets_execution_threshold(self, threshold_ms: int = 240000) -> bool:
-        """Check if execution is within threshold (default 4 minutes)."""
-        return self.execution_duration_ms <= threshold_ms
-
-    def meets_memory_threshold(self, threshold_mb: int = 512) -> bool:
-        """Check if memory is within threshold."""
-        return self.peak_memory_mb <= threshold_mb
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "execution_duration_ms": self.execution_duration_ms,
-            "peak_memory_mb": self.peak_memory_mb,
-            "comparison_count": self.comparison_count,
-            "cloudwatch_publishes": self.cloudwatch_publishes,
-            "slack_notifications": self.slack_notifications,
-            "errors": self.errors,
-        }
-
-
-class CampaignPerformanceSimulator:
-    """Simulates campaign execution and measures performance."""
-
-    EXECUTION_TIME_PER_BOOKING_MS = 1200  # Conservative estimate
-    MEMORY_PER_BOOKING_MB = 2  # Base memory per booking
-    CLOUDWATCH_PUBLISHES_PER_BOOKING = 3  # publish_metrics call
-    SLACK_NOTIFICATIONS_PER_CAMPAIGN = 2  # start + complete
-
-    def __init__(self):
-        """Initialize simulator."""
-        self.logger = logging.getLogger(__name__)
-
-    def simulate_campaign(
-        self, booking_count: int, simulate_delay: bool = False
-    ) -> PerformanceMetrics:
-        """
-        Simulate campaign execution.
-
-        Args:
-            booking_count: Number of bookings to process
-            simulate_delay: If True, add realistic delays
-
-        Returns:
-            PerformanceMetrics object
-        """
-        metrics = PerformanceMetrics()
-        metrics.start_time = time.time()
-
-        try:
-            # Process bookings
-            for i in range(booking_count):
-                self._process_booking(i, metrics, simulate_delay)
-
-                if i % 10 == 0 and simulate_delay:
-                    # Simulate occasional network delay
-                    time.sleep(0.01)
-
-            # Publish aggregate metrics
-            metrics.cloudwatch_publishes += 1
-
-            # Send completion notification
-            metrics.slack_notifications += self.SLACK_NOTIFICATIONS_PER_CAMPAIGN
-
-            metrics.end_time = time.time()
-
-        except Exception as e:
-            metrics.errors.append(str(e))
-            metrics.end_time = time.time()
-
-        return metrics
-
-    def _process_booking(
-        self,
-        booking_id: int,
-        metrics: PerformanceMetrics,
-        simulate_delay: bool = False,
-    ) -> None:
-        """
-        Simulate processing a single booking.
-
-        Args:
-            booking_id: Booking identifier
-            metrics: Metrics object to update
-            simulate_delay: If True, add realistic delays
-        """
-        # Compare outputs (SMS, DynamoDB, Telegram, Slack)
-        if simulate_delay:
-            time.sleep(self.EXECUTION_TIME_PER_BOOKING_MS / 1000)
-
-        # Update metrics
-        metrics.comparison_count += 1
-        metrics.peak_memory_mb = max(
-            metrics.peak_memory_mb,
-            20 + (metrics.comparison_count * self.MEMORY_PER_BOOKING_MB),
-        )
-        metrics.cloudwatch_publishes += self.CLOUDWATCH_PUBLISHES_PER_BOOKING
-
-        # Publish Slack notification every 10 bookings
-        if booking_id % 10 == 0 and booking_id > 0:
-            metrics.slack_notifications += 1
 
 
 class TestCampaignPerformanceMetrics:

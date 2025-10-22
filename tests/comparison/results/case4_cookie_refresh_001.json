@@ -1,11 +1,10 @@
 {
   "metadata": {
     "booking_id": "case4_cookie_refresh_001",
-    "generated_at": "2025-10-22T15:18:18.476988",
-    "version": "1.0",
+    "generated_at": "2025-10-22T17:16:16.840562",
     "container_digest": "local-development",
     "dataset_version": "1.0",
-    "parity_run_timestamp": "2025-10-22T15:18:18.477757"
+    "parity_run_timestamp": "2025-10-22T17:16:16.841558"
   },
   "statistics": {
     "booking_id": "case4_cookie_refresh_001",
@@ -13,21 +12,19 @@
     "critical_mismatches": 0,
     "warning_mismatches": 0,
     "parity_status": "PASS",
-    "timestamp": "2025-10-22T15:18:18.476981"
+    "timestamp": "2025-10-22T17:16:16.840553"
   },
   "mismatches": [],
-  "canonical_outputs": {
-    "legacy": {
-      "sms": [],
-      "db_records": [],
-      "telegram": [],
-      "actions": []
-    },
-    "refactored": {
-      "sms": [],
-      "db_records": [],
-      "telegram": [],
-      "actions": []
-    }
+  "legacy_output": {
+    "sms": [],
+    "db_records": [],
+    "telegram": [],
+    "actions": []
+  },
+  "refactored_output": {
+    "sms": [],
+    "db_records": [],
+    "telegram": [],
+    "actions": []
   }
 }

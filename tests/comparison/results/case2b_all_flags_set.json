@@ -1,11 +1,10 @@
 {
   "metadata": {
     "booking_id": "case2b_all_flags_set",
-    "generated_at": "2025-10-22T15:18:27.719126",
-    "version": "1.0",
+    "generated_at": "2025-10-22T17:16:25.937758",
     "container_digest": "local-development",
     "dataset_version": "1.0",
-    "parity_run_timestamp": "2025-10-22T15:18:27.720147"
+    "parity_run_timestamp": "2025-10-22T17:16:25.939561"
   },
   "statistics": {
     "booking_id": "case2b_all_flags_set",
@@ -13,21 +12,19 @@
     "critical_mismatches": 0,
     "warning_mismatches": 0,
     "parity_status": "PASS",
-    "timestamp": "2025-10-22T15:18:27.719118"
+    "timestamp": "2025-10-22T17:16:25.937742"
   },
   "mismatches": [],
-  "canonical_outputs": {
-    "legacy": {
-      "sms": [],
-      "db_records": [],
-      "telegram": [],
-      "actions": []
-    },
-    "refactored": {
-      "sms": [],
-      "db_records": [],
-      "telegram": [],
-      "actions": []
-    }
+  "legacy_output": {
+    "sms": [],
+    "db_records": [],
+    "telegram": [],
+    "actions": []
+  },
+  "refactored_output": {
+    "sms": [],
+    "db_records": [],
+    "telegram": [],
+    "actions": []
   }
 }

@@ -786,9 +786,7 @@ class TestSlackEnabledRegression:
         from unittest.mock import Mock
         from src.utils.logger import StructuredLogger
 
-        engine = RuleEngine(
-            str(Path(__file__).parent.parent.parent / "config" / "rules.yaml")
-        )
+        engine = RuleEngine(str(Path(__file__).parent.parent.parent / "config" / "rules.yaml"))
 
         # Register condition evaluators
         engine.register_condition("booking_not_in_db", booking_not_in_db)

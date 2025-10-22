@@ -251,6 +251,80 @@ class ComparisonMetricsPublisher:
             self.logger.error(f"Failed to publish comparison metrics: {e}")
             # Don't raise - metrics publishing should not fail the Lambda
 
+    def publish_metrics(
+        self,
+        booking_id: str,
+        legacy_sms_count: int,
+        refactored_sms_count: int,
+        match_percentage: float,
+        critical_mismatches: int,
+        warning_mismatches: int,
+    ) -> None:
+        """
+        Publish individual booking comparison metrics to CloudWatch.
+
+        Args:
+            booking_id: Unique booking identifier
+            legacy_sms_count: SMS count from legacy Lambda
+            refactored_sms_count: SMS count from new Lambda
+            match_percentage: Percentage of matching outputs
+            critical_mismatches: Count of critical discrepancies
+            warning_mismatches: Count of warning discrepancies
+        """
+        try:
+            timestamp = datetime.now(timezone.utc)
+
+            metric_data = [
+                {
+                    "MetricName": "sms_sent_old",
+                    "Value": legacy_sms_count,
+                    "Unit": "Count",
+                    "Timestamp": timestamp,
+                    "Dimensions": [
+                        {"Name": "LambdaVersion", "Value": "legacy"},
+                        {"Name": "BookingId", "Value": booking_id},
+                    ],
+                },
+                {
+                    "MetricName": "sms_sent_new",
+                    "Value": refactored_sms_count,
+                    "Unit": "Count",
+                    "Timestamp": timestamp,
+                    "Dimensions": [
+                        {"Name": "LambdaVersion", "Value": "new"},
+                        {"Name": "BookingId", "Value": booking_id},
+                    ],
+                },
+                {
+                    "MetricName": "match_percentage",
+                    "Value": match_percentage,
+                    "Unit": "Percent",
+                    "Timestamp": timestamp,
+                    "Dimensions": [{"Name": "BookingId", "Value": booking_id}],
+                },
+                {
+                    "MetricName": "critical_mismatches",
+                    "Value": critical_mismatches,
+                    "Unit": "Count",
+                    "Timestamp": timestamp,
+                    "Dimensions": [{"Name": "BookingId", "Value": booking_id}],
+                },
+                {
+                    "MetricName": "warning_mismatches",
+                    "Value": warning_mismatches,
+                    "Unit": "Count",
+                    "Timestamp": timestamp,
+                    "Dimensions": [{"Name": "BookingId", "Value": booking_id}],
+                },
+            ]
+
+            self.cloudwatch_client.put_metric_data(Namespace=self.NAMESPACE, MetricData=metric_data)
+            self.logger.debug(f"Published metrics for booking {booking_id}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to publish metrics for booking {booking_id}: {e}")
+            # Don't raise - metrics publishing should not fail the Lambda
+
 
 class ComparisonLogger:
     """
@@ -394,7 +468,7 @@ def compare_sms_payloads(old_payload: str, new_payload: str) -> Tuple[bool, int,
 
     # Character-by-character comparison
     diff_count = 0
-    diff_positions = []
+    diff_positions: list[str] = []
     max_samples = 10  # Increased from 5 to capture more context for debugging
 
     for i, (old_char, new_char) in enumerate(zip(old_payload, new_payload)):

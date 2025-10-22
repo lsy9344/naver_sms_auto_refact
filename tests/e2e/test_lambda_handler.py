@@ -106,12 +106,13 @@ def mock_booking_api():
 def mock_rule_engine():
     """Mock RuleEngine for processing."""
     with patch("src.main.RuleEngine") as mock_engine_class:
-        mock_engine = Mock()
+        mock_engine = MagicMock()
         mock_engine.process_booking.return_value = [
             ActionResult(
                 rule_name="Test Rule", action_type="send_sms", success=True, message="SMS sent"
             )
         ]
+        mock_engine.rules = []  # Empty rules list for roster building
         mock_engine_class.return_value = mock_engine
         yield mock_engine
 
@@ -282,20 +283,20 @@ def test_process_all_bookings_success():
         status="RC03",
     )
 
-    # Mock engine
-    mock_engine = Mock()
-    mock_engine.process_booking.return_value = [
-        ActionResult(
-            rule_name="Test Rule", action_type="send_sms", success=True, message="SMS sent"
-        )
-    ]
+    # Mock engine - return a list of ActionResults
+    test_action_result = ActionResult(
+        rule_name="Test Rule", action_type="send_sms", success=True, message="SMS sent"
+    )
+    mock_engine = MagicMock()
+    mock_engine.process_booking.return_value = [test_action_result]
+    mock_engine.rules = []
 
     # Mock booking repo
-    mock_repo = Mock()
+    mock_repo = MagicMock()
     mock_repo.get_booking.return_value = None
 
     # Mock settings
-    mock_settings_obj = Mock()
+    mock_settings_obj = MagicMock()
 
     # Call function
     results, summary = process_all_bookings(
@@ -339,9 +340,8 @@ def test_process_all_bookings_with_failures():
         status="RC03",
     )
 
-    # Mock engine with mixed results
-    mock_engine = Mock()
-    mock_engine.process_booking.return_value = [
+    # Mock engine with mixed results - return a list of ActionResults
+    test_results = [
         ActionResult(
             rule_name="Test Rule 1", action_type="send_sms", success=True, message="SMS sent"
         ),
@@ -353,10 +353,13 @@ def test_process_all_bookings_with_failures():
             error="DynamoDB error",
         ),
     ]
+    mock_engine = MagicMock()
+    mock_engine.process_booking.return_value = test_results
+    mock_engine.rules = []
 
-    mock_repo = Mock()
+    mock_repo = MagicMock()
     mock_repo.get_booking.return_value = None
-    mock_settings_obj = Mock()
+    mock_settings_obj = MagicMock()
 
     results, summary = process_all_bookings(
         bookings=[booking], engine=mock_engine, booking_repo=mock_repo, settings=mock_settings_obj
@@ -402,20 +405,20 @@ def test_process_all_bookings_handles_exceptions():
         status="RC03",
     )
 
-    # Mock engine that raises exception on first booking
-    mock_engine = Mock()
+    # Mock engine that raises exception on first booking - side_effect with list for second call
+    success_result = ActionResult(
+        rule_name="Test Rule", action_type="send_sms", success=True, message="SMS sent"
+    )
+    mock_engine = MagicMock()
     mock_engine.process_booking.side_effect = [
         Exception("Processing error"),
-        [
-            ActionResult(
-                rule_name="Test Rule", action_type="send_sms", success=True, message="SMS sent"
-            )
-        ],
+        [success_result],  # Second call returns a list
     ]
+    mock_engine.rules = []
 
-    mock_repo = Mock()
+    mock_repo = MagicMock()
     mock_repo.get_booking.return_value = None
-    mock_settings_obj = Mock()
+    mock_settings_obj = MagicMock()
 
     results, summary = process_all_bookings(
         bookings=[booking1, booking2],

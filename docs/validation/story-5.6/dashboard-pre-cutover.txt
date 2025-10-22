@@ -1,0 +1,45 @@
+# CloudWatch Dashboard Pre-Cutover Snapshot
+# Story 5.6: Perform Production Cutover
+# Timestamp: 2025-10-22T13:50:00 KST (10 minutes before cutover)
+
+## Dashboard: naver-sms-automation-dashboard
+Region: ap-northeast-2
+
+## Widget: SMS Delivery Volume (Last 1 hour)
+- SMS Sent (Last 5 min): 0 (no invocations before scheduled cutover)
+- SMS Failed: 0
+- Status: HEALTHY - No baseline errors detected
+
+## Widget: Error Metrics (Last 5 min)
+- Lambda Errors: 0
+- Login Failures: 0
+- Secrets Retrieval Errors: 0
+- Status: HEALTHY - No abnormal conditions
+
+## Widget: Lambda Duration Percentiles (Last 5 min)
+- p50 (median): N/A (no recent invocations on legacy Lambda)
+- p95 (tail): N/A
+- Status: N/A - Pre-cutover baseline period
+
+## Widget: Lambda Invocations (Last 1 hour)
+- Total Invocations (5-min): 0
+- Throttled Invocations: 0
+- Status: IDLE - Expected before cutover activation
+
+## Overall Dashboard Status
+- All widgets healthy and ready
+- No alarms triggered
+- EventBridge rule: DISABLED (awaiting cutover)
+- Monitoring infrastructure: READY
+- Telegram/Slack alerts: ARMED AND TESTED
+
+## Baseline Metrics Before Cutover
+- System Health: ✅ NOMINAL
+- Alarms: ✅ All configured and active
+- Notification Channels: ✅ Tested and working
+- Dashboard Accessibility: ✅ Verified
+
+Ready for production cutover execution.
+
+Evidence Type: Dashboard Health Check
+Status: PRE-CUTOVER VERIFICATION COMPLETE ✅

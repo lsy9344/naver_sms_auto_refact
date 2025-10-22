@@ -23,11 +23,11 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
-from tests.validation_environment import (
+from src.validation.environment import (
     ValidationEnvironmentSetup,
     create_default_validation_environment,
 )
-from tests.comparison.diff_reporter import DiffReporter
+from src.comparison.diff_reporter import DiffReporter
 from src.notifications.slack_service import SlackWebhookClient
 
 logger = logging.getLogger(__name__)
@@ -199,9 +199,9 @@ class TestValidationCampaignComparison:
         with summary_path.open("r") as f:
             summary = f.read()
 
-        assert "Total Bookings Tested: 3" in summary
-        assert "Passed: 3" in summary
-        assert "Pass Rate: 100.0%" in summary
+        assert "**Total Bookings Tested:** 3" in summary
+        assert "**Passed:** 3" in summary
+        assert "**Pass Rate:** 100.0%" in summary
 
     def test_diff_reporter_includes_slack_webhook_comparison(self, tmp_path):
         """TECH-001: Diff reporter compares Slack webhook outputs."""
@@ -285,7 +285,7 @@ class TestValidationCampaignSlack:
         status = client.get_webhook_status()
 
         assert status["webhook_configured"]
-        assert "test" in status["webhook_url_masked"]
+        assert "hooks.slack.com" in status["webhook_url_masked"]
 
     @patch("requests.Session.post")
     def test_slack_validation_started_notification(self, mock_post):
@@ -370,7 +370,7 @@ class TestValidationCampaignSuccessCriteria:
         critical = sum(s["critical_mismatches"] for s in all_stats)
         pass_rate = (passed / len(all_stats) * 100) if all_stats else 0
 
-        assert pass_rate == 66.67
+        assert round(pass_rate, 2) == 66.67
         assert critical == 2
 
 

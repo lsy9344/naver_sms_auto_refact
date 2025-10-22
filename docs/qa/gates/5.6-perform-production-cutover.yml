@@ -1,0 +1,68 @@
+schema: 1
+story: '5.6'
+story_title: 'Perform Production Cutover'
+gate: CONCERNS
+status_reason: 'Enablement evidence and monitoring exports are incomplete; runbook guidance must be corrected before sign-off.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2025-10-23T00:00:00Z'
+
+top_issues:
+  - id: QA-5-6-1
+    severity: high
+    title: 'Enablement transcript misrepresents AWS CLI output'
+    description: 'Captured "Actual Output" includes JSON fields the CLI never returns, so AC2 evidence is invalid and audit trail is unreliable.'
+    suggested_owner: dev
+    refs:
+      - docs/validation/story-5.6/eventbridge-enable.txt:26
+      - docs/ops/runbook.md:722
+  - id: QA-5-6-2
+    severity: high
+    title: 'Missing CloudWatch dashboard exports for AC4'
+    description: 'No dashboard/alarm screenshots or exports were committed under docs/validation/story-5.6/, leaving monitoring validation undocumented.'
+    suggested_owner: dev
+    refs:
+      - docs/validation/story-5.6/
+      - docs/stories/5.6.perform-production-cutover.md:98
+
+waiver:
+  active: false
+
+quality_score: 80
+expires: '2025-11-06T00:00:00Z'
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 2
+  trace:
+    ac_covered: [1,3,5,6,7,9]
+    ac_gaps: [2,4,8]
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No new security regressions observed; credentials handling unchanged.'
+  performance:
+    status: PASS
+    notes: 'First-run summary meets latency targets.'
+  reliability:
+    status: CONCERNS
+    notes: 'Missing dashboard exports and inaccurate enablement evidence reduce observability confidence.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Runbook instructions must be updated to match AWS CLI behavior.'
+
+recommendations:
+  immediate:
+    - action: 'Re-run and capture the enable-rule command with correct empty output plus describe-rule verification.'
+      refs:
+        - docs/validation/story-5.6/eventbridge-enable.txt
+    - action: 'Export and commit CloudWatch dashboard/alarm screenshots for pre/post cutover.'
+      refs:
+        - docs/validation/story-5.6/
+    - action: 'Amend Production Cutover procedure to describe correct CLI outputs and evidence requirements.'
+      refs:
+        - docs/ops/runbook.md:686
+  future:
+    - action: 'Augment VALIDATION.md with direct links to stored monitoring evidence once captured.'
+      refs:
+        - VALIDATION.md:3200
