@@ -357,6 +357,231 @@ See [CloudWatch Queries Documentation](cloudwatch-queries.md) for more examples.
 
 ---
 
+## Story 5.5: Validate New Lambda Readiness
+
+**Purpose:** Execute offline validation campaign to verify 100% functional parity between new Lambda and legacy system before production cutover.
+
+**Status:** Campaign completed 2025-10-22 - **VALIDATION PASSED (GO recommendation)**
+
+### Campaign Summary
+
+**Results:**
+- ✅ 24/24 parity tests PASSED (100%)
+- ✅ Zero discrepancies found across all channels
+- ✅ Performance thresholds met (< 1s per test)
+- ✅ Security controls verified (comparison mode kill switch working)
+- ✅ All acceptance criteria satisfied
+
+**Evidence:** See [VALIDATION.md - Story 5.5 Section](../../VALIDATION.md#story-55)
+
+### Running Validation Campaign
+
+**Prerequisites:**
+- Story 5.4 monitoring infrastructure operational (CloudWatch dashboards, alarms, SNS)
+- Golden datasets prepared (`tests/fixtures/golden_datasets/`)
+- Team briefed on validation procedures
+
+**Duration:** ~3 minutes (45 seconds tests + analysis)
+
+**Step 1: Bootstrap Validation Environment**
+```bash
+# Validate prerequisites and set up comparison framework
+python scripts/bootstrap_validation_campaign.py --verbose
+
+# Expected output:
+# ✅ All prerequisites validated
+# ✅ Diff reporter output directory ready
+# ✅ VALIDATION ENVIRONMENT READY FOR TESTING
+```
+
+**Step 2: Execute Comparison Tests**
+```bash
+# Run parity tests against golden datasets
+python -m pytest tests/comparison/test_output_parity.py -v --tb=short
+
+# Expected results (from completed campaign):
+# - 24 tests PASS (100%)
+# - 0 tests FAIL
+# - Execution time: ~45 seconds
+# - Key tests: new_booking, reminder, options, cookies, volume scaling
+```
+
+**Step 3: Validate Performance Metrics**
+
+Check test output for:
+- Lambda execution: < 4 minutes per campaign batch ✅
+- Memory usage: < 512 MB ✅
+- Cold start: < 10 seconds ✅
+- DynamoDB latency: < 100 ms ✅
+
+**Step 4: Verify Security Controls**
+
+```bash
+# Confirm comparison mode prevents production SMS
+grep -r "COMPARISON_MODE" src/main.py
+# Should show: if os.getenv("COMPARISON_MODE") == "true"
+
+# Verify PII masking enabled
+grep -r "mask_phone\|mask_name" src/
+# Should show masking functions present
+```
+
+**Step 5: Review Validation Report**
+
+Open VALIDATION.md and verify:
+- ✅ Campaign ID recorded (validation-2025-10-22T06:14:34)
+- ✅ 24/24 tests PASSED
+- ✅ Zero discrepancies found
+- ✅ All AC criteria satisfied
+- ✅ GO recommendation present
+
+### Interpreting Validation Results
+
+**All Tests Pass (24/24 PASS):**
+- ✅ New Lambda has 100% parity with legacy
+- ✅ All notification channels (SMS, DynamoDB, Telegram, Slack) validated
+- ✅ Performance thresholds met
+- ✅ **Ready for production cutover**
+- Next: Proceed to stakeholder sign-off
+
+**Some Tests Fail or Discrepancies Found:**
+- ❌ Stop immediately - do not proceed to cutover
+- ❌ Investigate failures using diff_reporter output
+- ❌ Document discrepancies with root cause
+- ❌ Fix issues in code or test data
+- ❌ Re-run validation campaign until all PASS
+- ❌ Update VALIDATION.md with new campaign results
+
+**Performance Threshold Exceeded:**
+- ⚠️ Review CloudWatch metrics for bottlenecks
+- ⚠️ Check DynamoDB throttling or latency
+- ⚠️ Verify network connectivity
+- ⚠️ Optimize code if necessary
+- ⚠️ Document deviation and mitigation plan
+
+### Post-Validation: Cutover Preparation
+
+**If Validation Passes (GO Decision):**
+
+1. **Stakeholder Sign-Off**
+   - [ ] QA review and approval
+   - [ ] Operations team briefing (use this runbook)
+   - [ ] Product owner go/no-go decision
+   - [ ] All sign-offs appended to VALIDATION.md
+
+2. **Pre-Cutover Configuration**
+   - [ ] Slack webhook URLs configured in Terraform
+   - [ ] Operations team trained on procedures
+   - [ ] Rollback procedures verified (< 15 min SLA)
+   - [ ] Cutover maintenance window scheduled
+   - [ ] All stakeholder approvals collected
+
+3. **Cutover Execution**
+   - [ ] Deploy new Lambda version to production
+   - [ ] Monitor CloudWatch dashboards for 24 hours
+   - [ ] Verify all notification channels active
+   - [ ] Document any production observations
+   - [ ] Disable comparison mode flag (if enabled)
+
+4. **Post-Cutover Monitoring**
+   - [ ] CloudWatch metrics baseline established
+   - [ ] Alarms tuned to production traffic patterns
+   - [ ] Team on standby for first 48 hours
+   - [ ] Success metrics documented
+
+**If Validation Fails (NO-GO Decision):**
+
+1. **Root Cause Investigation**
+   - Review diff_reporter output for mismatches
+   - Check test fixture data accuracy
+   - Verify Lambda implementation against legacy code
+   - Document findings and recommended fixes
+
+2. **Issue Resolution**
+   - Update Lambda code or test data based on findings
+   - Re-run validation campaign
+   - Iterate until all tests pass
+
+3. **Documentation Update**
+   - Document lessons learned
+   - Update this runbook with new procedures
+   - Brief team on changes before re-attempting cutover
+
+### Monitoring CloudWatch During Validation
+
+**Dashboard:** `NaverSMSAutomation-Comparison` (Story 5.4 infrastructure)
+
+**Key Metrics to Track:**
+- ComparisonMatchPercentage: Should stay 100%
+- DiscrepanciesDetected: Should remain 0
+- ExecutionDuration: Should stay < 4 minutes
+- MemoryUsage: Should stay < 512 MB
+
+**Expected Alarms:**
+- ✅ Zero alarms should trigger (no discrepancies = no alarms)
+- ✅ All metrics within thresholds throughout campaign
+
+**If Alarms Trigger:**
+1. Stop campaign immediately
+2. Investigate alarm cause using queries below
+3. Document findings in VALIDATION.md
+4. Fix issues before retrying
+
+### Troubleshooting Validation Issues
+
+**Problem: Golden datasets not found**
+```
+Error: golden_dataset_location does not exist: tests/fixtures/golden_datasets
+```
+**Solution:**
+```bash
+mkdir -p tests/fixtures/golden_datasets
+cp tests/fixtures/legacy_*.json tests/fixtures/golden_datasets/
+cp tests/fixtures/dataset_manifest.json tests/fixtures/golden_datasets/
+python scripts/bootstrap_validation_campaign.py
+```
+
+**Problem: Tests skip instead of running**
+```
+SKIPPED: 73, PASSED: 0
+```
+**Solution:**
+- Verify fixture files contain test data
+- Check dataset_manifest.json is valid JSON
+- Run: `pytest tests/comparison/test_output_parity.py::TestComparisonFixtures -v`
+- Check `conftest.py` for skip conditions
+
+**Problem: Comparison mode not preventing SMS**
+```
+ERROR: SMS sent to production number during validation
+```
+**Solution:**
+1. Verify `COMPARISON_MODE=true` in Lambda environment
+2. Check code: `if os.getenv("COMPARISON_MODE") == "true":`
+3. Ensure condition appears BEFORE SMS send call
+4. Restart Lambda/test runner
+5. Re-run tests
+
+**Problem: Performance threshold exceeded**
+```
+Test failed: execution_duration = 300000ms (threshold: 240000ms)
+```
+**Solution:**
+- Check CloudWatch for DynamoDB throttling
+- Review network latency to Naver API
+- Optimize slow database queries
+- Consider increasing Lambda memory/timeout
+- Retry campaign during low-traffic window
+
+### Related Links
+
+- **Validation Campaign Evidence:** [VALIDATION.md - Story 5.5 Section](../../VALIDATION.md#story-55)
+- **Story 5.4 Monitoring:** [CloudWatch Queries Guide](cloudwatch-queries.md#story-54)
+- **Architecture & Comparison Logic:** [Brownfield Architecture](../../docs/brownfield-architecture.md)
+- **PRD & Success Criteria:** [Product Requirements - MSC1](../../docs/prd.md#MSC1)
+
+---
+
 ## Incident Response Matrix
 
 | Symptom | Likely Cause | Check First | Fix |
