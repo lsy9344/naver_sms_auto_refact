@@ -330,7 +330,7 @@ Suggested template structure:
   actions:
     - type: "send_slack"
       params:
-        channel: "#operations"
+        channel: "#naver_sms_auto_notify"
         template_name: "expert_correction_digest"
 
 # Holiday Event Customer List
@@ -348,7 +348,7 @@ Suggested template structure:
   actions:
     - type: "send_slack"
       params:
-        channel: "#marketing"
+        channel: "#naver_sms_auto_notify"
         message: "Holiday booking: {{booking.name}} - {{booking.phone}} - {{booking.store_id}}"
 ```
 

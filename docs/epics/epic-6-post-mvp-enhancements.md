@@ -402,7 +402,7 @@ channel: "#your-channel-name"  # Any Slack channel your bot has access to
     - type: "send_slack"
       params:
         template_name: "holiday_event_customer_list"
-        channel: "#marketing"
+        channel: "#naver_sms_auto_notify"
         template_params:
           bookings: "{{ bookings_in_date_range }}"
 ```

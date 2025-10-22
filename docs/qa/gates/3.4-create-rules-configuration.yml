@@ -58,7 +58,7 @@ acceptance_criteria:
   - number: 1
     description: 'rules.yaml defines 3 current rules + 2 disabled templates with enabled flag'
     status: PASS
-    evidence: 'src/config/rules.yaml: active core rules and disabled templates retained.'
+    evidence: 'config/rules.yaml: active core rules and disabled templates retained.'
 
   - number: 2
     description: 'Each rule uses condition/action identifiers with parameters matching legacy behavior'

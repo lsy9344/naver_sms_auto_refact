@@ -451,7 +451,7 @@ class TestHasOptionKeyword:
 
     def test_keywords_override_params_no_match(self):
         """Test: Explicit keywords list respected when no match"""
-        booking = Mock(option=False, option_keywords=["네이버", "인스타"])
+        booking = Mock(option=False, option_keywords=["네이버", "인스타"], has_pro_edit_option=False)
         settings = Mock(option_keywords=["네이버", "인스타"])
         context = {"booking": booking, "settings": settings}
         assert has_option_keyword(context, keywords=["전문가 보정"]) is False

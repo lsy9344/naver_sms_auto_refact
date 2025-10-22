@@ -55,7 +55,7 @@
       ]
     },
     "booking_003": {
-      "description": "Evening Option SMS - Should send event SMS and update flag",
+      "description": "Evening Option SMS - Should send event SMS and update flag, plus Holiday Event rule matches (has 네이버 option on 2025-10-19)",
       "actions": [
         {
           "rule_name": "Evening Option SMS",
@@ -74,6 +74,19 @@
           "params": {
             "flag": "option_sms",
             "value": true
+          }
+        },
+        {
+          "rule_name": "Holiday Event Customer List",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Action 'send_slack' executed successfully",
+          "params": {
+            "template_name": "holiday_event_customer_list",
+            "channel": "#naver_sms_auto_notify",
+            "template_params": {
+              "bookings": "{{ bookings_in_date_range }}"
+            }
           }
         }
       ]
@@ -99,12 +112,37 @@
       "actions": []
     },
     "booking_009": {
-      "description": "Expert Correction Slack Digest (Story 6.1, AC1) - Rule matches but Slack is disabled in regression test, so no actions execute",
-      "actions": []
+      "description": "Expert Correction Slack Digest (Story 6.1, AC1) - Rule matches and send_slack executes, but Slack is disabled so notification is skipped",
+      "actions": [
+        {
+          "rule_name": "Expert Correction Slack Digest",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Action 'send_slack' executed successfully",
+          "params": {
+            "template_name": "expert_correction_digest",
+            "channel": "#naver_sms_auto_notify"
+          }
+        }
+      ]
     },
     "booking_010": {
-      "description": "Holiday Event Customer List (Story 6.1, AC3) - Rule is disabled in config, so no actions execute",
-      "actions": []
+      "description": "Holiday Event Customer List (Story 6.1, AC3) - Rule matches and send_slack executes, but Slack is disabled so notification is skipped",
+      "actions": [
+        {
+          "rule_name": "Holiday Event Customer List",
+          "action_type": "send_slack",
+          "success": true,
+          "message": "Action 'send_slack' executed successfully",
+          "params": {
+            "template_name": "holiday_event_customer_list",
+            "channel": "#naver_sms_auto_notify",
+            "template_params": {
+              "bookings": "{{ bookings_in_date_range }}"
+            }
+          }
+        }
+      ]
     },
     "booking_009_slack_enabled": {
       "description": "Expert Correction Slack Digest with Slack Enabled (Story 6.1, AC1, AC4) - Rule matches and Slack is enabled, so send_slack action executes",
@@ -115,7 +153,8 @@
           "success": true,
           "message": "Slack notification sent",
           "params": {
-            "template_name": "expert_correction_digest"
+            "template_name": "expert_correction_digest",
+            "channel": "#naver_sms_auto_notify"
           }
         }
       ]

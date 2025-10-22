@@ -124,7 +124,7 @@ def main() -> int:
         # Determine paths
         script_dir = Path(__file__).parent
         project_root = script_dir.parent
-        rules_config = project_root / "src" / "config" / "rules.yaml"
+        rules_config = project_root / "config" / "rules.yaml"
         rules_schema = project_root / "src" / "config" / "rules.schema.json"
 
         logger.info(f"Loading rules from: {rules_config}")

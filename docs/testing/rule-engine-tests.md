@@ -521,7 +521,7 @@ When adding new features:
 ## References
 
 - **Architecture:** `docs/brownfield-architecture.md` (Section: Testing Infrastructure Plan)
-- **Rule Configuration:** `src/config/rules.yaml`
+- **Rule Configuration:** `config/rules.yaml`
 - **Rule Schema:** `src/config/rules.schema.json`
 - **Production Fixtures:** `tests/fixtures/legacy_*.json`
 - **Test Results:** `htmlcov/index.html` (after coverage run)

@@ -10,7 +10,7 @@
 
 ### Overview
 
-The SMS automation system uses a declarative YAML-based rule engine to define when and how SMS messages are sent. All rules are centrally configured in `src/config/rules.yaml` and validated against `src/config/rules.schema.json`.
+The SMS automation system uses a declarative YAML-based rule engine to define when and how SMS messages are sent. All rules are centrally configured in `config/rules.yaml` and validated against `src/config/rules.schema.json`.
 
 ### YAML Structure
 
@@ -382,7 +382,7 @@ Send notification to Slack. Currently disabled in template rules.
 actions:
   - type: "send_slack"
     params:
-      channel: "#sms-automation"
+      channel: "#naver_sms_auto_notify"
       message: "SMS sent to customer"
 ```
 
@@ -462,7 +462,7 @@ Should show your new rule in the output without errors.
 **Step 4:** Commit and deploy
 
 ```bash
-git add src/config/rules.yaml
+git add config/rules.yaml
 git commit -m "Add new rule: [rule name]"
 ```
 
@@ -691,13 +691,13 @@ rules:
 Track changes with Git:
 
 ```bash
-git log --oneline src/config/rules.yaml
+git log --oneline config/rules.yaml
 # Shows all commits affecting rules
 
 git show <commit>
 # Shows exact changes made in that commit
 
-git blame src/config/rules.yaml
+git blame config/rules.yaml
 # Shows who last changed each line
 ```
 

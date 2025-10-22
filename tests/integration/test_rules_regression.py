@@ -514,7 +514,7 @@ def fixtures_dir():
 def settings(fixtures_dir):
     """Load settings and rules."""
     project_root = Path(__file__).parent.parent.parent
-    rules_config = project_root / "src" / "config" / "rules.yaml"
+    rules_config = project_root / "config" / "rules.yaml"
     rules_schema = project_root / "src" / "config" / "rules.schema.json"
 
     settings = Settings()
@@ -528,7 +528,7 @@ def rule_engine(settings):
     from unittest.mock import Mock
     from src.utils.logger import StructuredLogger
 
-    engine = RuleEngine(str(Path(__file__).parent.parent.parent / "src" / "config" / "rules.yaml"))
+    engine = RuleEngine(str(Path(__file__).parent.parent.parent / "config" / "rules.yaml"))
 
     # Register condition evaluators
     engine.register_condition("booking_not_in_db", booking_not_in_db)
@@ -538,6 +538,7 @@ def rule_engine(settings):
     engine.register_condition("booking_status", booking_status)
     engine.register_condition("has_option_keyword", has_option_keyword)
     engine.register_condition("date_range", date_range)
+    engine.register_condition("has_multiple_options", has_multiple_options)
 
     # Create services for action executors
     db_repo = InMemoryBookingRepository()
@@ -786,7 +787,7 @@ class TestSlackEnabledRegression:
         from src.utils.logger import StructuredLogger
 
         engine = RuleEngine(
-            str(Path(__file__).parent.parent.parent / "src" / "config" / "rules.yaml")
+            str(Path(__file__).parent.parent.parent / "config" / "rules.yaml")
         )
 
         # Register condition evaluators

@@ -39,7 +39,7 @@ class TestRulesSchema:
     def settings(self):
         """Load settings with rules and schema."""
         project_root = Path(__file__).parent.parent.parent
-        rules_config = project_root / "src" / "config" / "rules.yaml"
+        rules_config = project_root / "config" / "rules.yaml"
         rules_schema = project_root / "src" / "config" / "rules.schema.json"
 
         settings = Settings()
@@ -58,7 +58,7 @@ class TestRulesSchema:
         """Test Case 1: Valid rules.yaml loads successfully without errors."""
         assert settings.rules is not None
         assert len(settings.rules) > 0
-        assert len(settings.rules) == 6  # 3 enabled + 3 disabled templates
+        assert len(settings.rules) == 8  # 5 enabled (3 core + 2 Slack) + 3 disabled templates
 
     def test_missing_name_field(self, schema):
         """Test Case 2: Missing required field 'name' produces ValidationError."""
