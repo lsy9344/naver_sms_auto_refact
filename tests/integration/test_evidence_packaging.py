@@ -15,18 +15,8 @@ Validates that:
 
 import json
 import logging
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
 
-import pytest
-
-from src.validation.evidence import (
-    EvidenceArtifact,
-    EvidenceCollector,
-    EvidencePackage,
-    EvidencePackager,
-)
+from src.validation.evidence import EvidenceCollector, EvidencePackager
 
 logger = logging.getLogger(__name__)
 

@@ -129,9 +129,13 @@ def mock_stores_yaml():
             }
         }
     }
-    with patch("builtins.open", create=True) as mock_open:
+    mock_file = MagicMock()
+    mock_file.__enter__.return_value = mock_file
+    mock_file.__exit__.return_value = None
+    with patch("builtins.open", return_value=mock_file):
         with patch("yaml.safe_load", return_value=stores_config):
-            yield stores_config
+            with patch("src.main.Settings.load_slack_webhook_url", return_value=None):
+                yield stores_config
 
 
 @pytest.fixture

@@ -14,17 +14,8 @@ Validates that:
 
 import json
 import logging
-from datetime import datetime
-from typing import Any, Dict, List
 
-import pytest
-
-from src.validation.readiness import (
-    GoNoGoDecision,
-    ReadinessCriteria,
-    ReadinessReport,
-    ReadinessValidator,
-)
+from src.validation.readiness import GoNoGoDecision, ReadinessValidator
 
 logger = logging.getLogger(__name__)
 

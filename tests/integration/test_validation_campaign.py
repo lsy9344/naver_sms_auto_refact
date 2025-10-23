@@ -17,18 +17,14 @@ Test Coverage:
 import json
 import logging
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any, List
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
-import pytest
-
+from src.comparison.diff_reporter import DiffReporter
+from src.notifications.slack_service import SlackWebhookClient
 from src.validation.environment import (
     ValidationEnvironmentSetup,
     create_default_validation_environment,
 )
-from src.comparison.diff_reporter import DiffReporter
-from src.notifications.slack_service import SlackWebhookClient
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +73,7 @@ class TestValidationCampaignBootstrap:
         config = create_default_validation_environment()
         config.execution_duration_threshold_ms = 0  # Invalid threshold
 
-        setup = ValidationEnvironmentSetup(config)
+        _ = ValidationEnvironmentSetup(config)
         errors = config.validate()
 
         assert len(errors) > 0

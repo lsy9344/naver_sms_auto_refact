@@ -1,6 +1,6 @@
 # Comparison Report: case2b_all_flags_set
 **Scenario:** CASE 2B: Already Processed - All Flags Set
-**Generated:** 2025-10-22T22:14:38.742584
+**Generated:** 2025-10-23T23:30:01.048348
 
 ## Summary
 - **Total Mismatches:** 0

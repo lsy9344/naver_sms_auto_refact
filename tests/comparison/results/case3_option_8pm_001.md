@@ -1,6 +1,6 @@
 # Comparison Report: case3_option_8pm_001
 **Scenario:** CASE 3: Option Keyword Trigger at 8 PM
-**Generated:** 2025-10-22T22:14:25.666892
+**Generated:** 2025-10-23T23:29:47.942036
 
 ## Summary
 - **Total Mismatches:** 0
