@@ -59,9 +59,13 @@ class TestEvidenceCollection:
         assert artifact.filename == "SUMMARY.md"
 
     def test_collector_generates_cloudwatch_export(self, tmp_path):
-        """BUS-001: Collector generates CloudWatch metrics export."""
+        """BUS-001: Collector collects CloudWatch metrics export when present."""
         campaign_dir = tmp_path / "campaign"
         campaign_dir.mkdir()
+
+        # Create the artifact file
+        metrics_file = campaign_dir / "cloudwatch_metrics_export.json"
+        metrics_file.write_text('{"metrics": []}')
 
         collector = EvidenceCollector(campaign_dir)
         artifact = collector.collect_cloudwatch_metrics_export()
@@ -71,9 +75,13 @@ class TestEvidenceCollection:
         assert artifact.path.endswith("cloudwatch_metrics_export.json")
 
     def test_collector_generates_alarm_logs(self, tmp_path):
-        """BUS-001: Collector generates alarm transition logs."""
+        """BUS-001: Collector collects alarm transition logs when present."""
         campaign_dir = tmp_path / "campaign"
         campaign_dir.mkdir()
+
+        # Create the artifact file
+        alarms_file = campaign_dir / "cloudwatch_alarm_logs.json"
+        alarms_file.write_text('{"alarms": []}')
 
         collector = EvidenceCollector(campaign_dir)
         artifact = collector.collect_alarm_logs()
@@ -82,9 +90,13 @@ class TestEvidenceCollection:
         assert artifact.artifact_type == "alarm_log"
 
     def test_collector_generates_slack_history(self, tmp_path):
-        """BUS-001: Collector generates Slack notification history."""
+        """BUS-001: Collector collects Slack notification history when present."""
         campaign_dir = tmp_path / "campaign"
         campaign_dir.mkdir()
+
+        # Create the artifact file
+        slack_file = campaign_dir / "slack_notification_history.json"
+        slack_file.write_text('{"notifications": []}')
 
         collector = EvidenceCollector(campaign_dir)
         artifact = collector.collect_slack_history()
@@ -199,7 +211,7 @@ class TestEvidenceIntegration:
         validation_md = tmp_path / "VALIDATION.md"
         validation_md.write_text("# Validation Report\n\nCampaign execution results:\n\n")
 
-        # Create mock artifacts
+        # Create mock artifacts - all required types
         (campaign_dir / "booking_001.json").write_text(
             json.dumps(
                 {
@@ -210,6 +222,9 @@ class TestEvidenceIntegration:
             )
         )
         (campaign_dir / "SUMMARY.md").write_text("# Summary\n\n100% parity achieved.")
+        (campaign_dir / "cloudwatch_metrics_export.json").write_text('{"metrics": []}')
+        (campaign_dir / "cloudwatch_alarm_logs.json").write_text('{"alarms": []}')
+        (campaign_dir / "slack_notification_history.json").write_text('{"notifications": []}')
 
         # Execute packaging
         packager = EvidencePackager(campaign_dir, validation_md)

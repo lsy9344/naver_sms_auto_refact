@@ -91,7 +91,9 @@ class EvidenceCollector:
             with report_path.open("w", encoding="utf-8") as file:
                 json.dump(readiness_report, file, indent=2, default=str)
         return self._build_artifact(
-            report_path, "readiness_report", "Automated readiness gate validation report"
+            report_path,
+            "readiness_report",
+            "Automated readiness gate validation report",
         )
 
     def collect_cloudwatch_metrics_export(self) -> Optional[EvidenceArtifact]:
@@ -103,7 +105,9 @@ class EvidenceCollector:
             )
             return None
         return self._build_artifact(
-            metrics_path, "metric_export", "CloudWatch metrics snapshot during validation campaign"
+            metrics_path,
+            "metric_export",
+            "CloudWatch metrics snapshot during validation campaign",
         )
 
     def collect_alarm_logs(self) -> Optional[EvidenceArtifact]:
@@ -115,7 +119,9 @@ class EvidenceCollector:
             )
             return None
         return self._build_artifact(
-            alarms_path, "alarm_log", "CloudWatch alarm transition history during campaign"
+            alarms_path,
+            "alarm_log",
+            "CloudWatch alarm transition history during campaign",
         )
 
     def collect_slack_history(self) -> Optional[EvidenceArtifact]:
@@ -299,7 +305,8 @@ class EvidencePackager:
                     rel_path = Path(artifact.path)
 
                 lines.append(
-                    f"| [{artifact.filename}]({rel_path}) | {artifact.description} | {artifact.timestamp} |"
+                    f"| [{artifact.filename}]({rel_path}) | "
+                    f"{artifact.description} | {artifact.timestamp} |"
                 )
 
             lines.append("")

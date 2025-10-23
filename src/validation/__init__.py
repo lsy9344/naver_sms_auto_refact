@@ -5,21 +5,19 @@ from .environment import (
     ValidationEnvironmentSetup,
     create_default_validation_environment,
 )
-from .readiness import (
-    GoNoGoDecision,
-    ReadinessCriteria,
-    ReadinessReport,
-    ReadinessValidator,
-)
 from .evidence import (
     EvidenceArtifact,
     EvidenceCollector,
     EvidencePackage,
     EvidencePackager,
 )
-from .performance import (
-    CampaignPerformanceSimulator,
-    PerformanceMetrics,
+from .orchestrator import ValidationCampaignOrchestrator
+from .performance import CampaignPerformanceSimulator, PerformanceMetrics
+from .readiness import (
+    GoNoGoDecision,
+    ReadinessCriteria,
+    ReadinessReport,
+    ReadinessValidator,
 )
 
 __all__ = [
@@ -34,6 +32,7 @@ __all__ = [
     "EvidenceCollector",
     "EvidencePackage",
     "EvidencePackager",
+    "ValidationCampaignOrchestrator",
     "CampaignPerformanceSimulator",
     "PerformanceMetrics",
 ]

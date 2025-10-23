@@ -119,11 +119,13 @@ class ReadinessValidator:
         status = parity_percent == 100.0
         return ReadinessCriteria(
             name="100% Parity Across All Bookings",
-            description="All compared bookings show 100% parity between legacy and refactored Lambda",
+            description=(
+                "All compared bookings show 100% parity " "between legacy and refactored Lambda"
+            ),
             required=True,
             status=status,
             evidence=f"{passed}/{total} bookings passed ({parity_percent:.1f}%)",
-            impact="If failed: Some bookings have mismatches; investigate before cutover",
+            impact=("If failed: Some bookings have mismatches; " "investigate before cutover"),
         )
 
     def _validate_zero_critical_mismatches(
@@ -133,11 +135,11 @@ class ReadinessValidator:
         status = total_critical == 0
         return ReadinessCriteria(
             name="Zero Critical Mismatches",
-            description="No critical severity mismatches detected across all comparisons",
+            description=("No critical severity mismatches detected across all comparisons"),
             required=True,
             status=status,
             evidence=f"{total_critical} critical mismatches found",
-            impact="If failed: Critical issues must be remediated before cutover",
+            impact=("If failed: Critical issues must be remediated before cutover"),
         )
 
     def _validate_sms_channel(self, comparison_stats: List[Dict[str, Any]]) -> ReadinessCriteria:
@@ -214,12 +216,12 @@ class ReadinessValidator:
         status = webhooks_configured > 0 and webhook_failures == 0
         return ReadinessCriteria(
             name="Slack Webhook Integration",
-            description="Slack webhook endpoints configured and tested successfully",
+            description=("Slack webhook endpoints configured and tested successfully"),
             required=True,
             status=status,
             evidence=(
-                "Webhooks: "
-                f"{webhooks_configured} configured, {webhooks_tested} tested, {webhook_failures} failures"
+                f"Webhooks: {webhooks_configured} configured, "
+                f"{webhooks_tested} tested, {webhook_failures} failures"
             ),
             impact="If failed: Slack notifications may not deliver during campaign",
         )
@@ -236,10 +238,11 @@ class ReadinessValidator:
             required=True,
             status=status,
             evidence=(
-                "Metrics: "
-                f"{metrics_published} published, {metrics_failed} failures, dashboard verified: {dashboard_verified}"
+                f"Metrics: {metrics_published} published, "
+                f"{metrics_failed} failures, "
+                f"dashboard verified: {dashboard_verified}"
             ),
-            impact="If failed: Monitoring and alerting during campaign will not work",
+            impact=("If failed: Monitoring and alerting during campaign will not work"),
         )
 
     def _validate_comparison_mode_enabled(self) -> ReadinessCriteria:
@@ -275,10 +278,14 @@ class ReadinessValidator:
         msc1_met = passed == total and critical == 0 and slack_working
         return ReadinessCriteria(
             name="MSC1 Success Criteria Met",
-            description="PRD MSC1: 100% parity, all channels working, zero critical mismatches",
+            description=(
+                "PRD MSC1: 100% parity, all channels working, " "zero critical mismatches"
+            ),
             required=True,
             status=msc1_met,
-            evidence=f"Parity: {passed}/{total}, Critical: {critical}, Slack: {slack_working}",
+            evidence=(
+                f"Parity: {passed}/{total}, Critical: {critical}, " f"Slack: {slack_working}"
+            ),
             impact="If failed: Story acceptance criteria not met; cannot cutover",
         )
 

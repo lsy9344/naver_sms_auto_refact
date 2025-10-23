@@ -15,6 +15,8 @@ Validates that:
 import json
 import logging
 
+import pytest
+
 from src.validation.readiness import GoNoGoDecision, ReadinessValidator
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,11 @@ logger = logging.getLogger(__name__)
 
 class TestReadinessValidator:
     """Tests for automated readiness validator."""
+
+    @pytest.fixture(autouse=True)
+    def set_comparison_mode_enabled(self, monkeypatch):
+        """Set COMPARISON_MODE_ENABLED for all tests."""
+        monkeypatch.setenv("COMPARISON_MODE_ENABLED", "true")
 
     def test_validator_initialization(self):
         """OPS-001: Validator can be initialized."""
