@@ -97,7 +97,16 @@ def test_event_payload_matches_legacy(legacy_payloads):
 
 @pytest.mark.parametrize(
     "store_id",
-    ["1051707", "951291", "1462519", "1120125", "1285716", "1473826", "1466783", "867589"],
+    [
+        "1051707",
+        "951291",
+        "1462519",
+        "1120125",
+        "1285716",
+        "1473826",
+        "1466783",
+        "867589",
+    ],
 )
 def test_guide_payload_matches_legacy(store_id, legacy_payloads):
     stub = HttpStub()

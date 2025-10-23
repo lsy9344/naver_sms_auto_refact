@@ -216,7 +216,7 @@ class PerformanceHarness:
                 "compliant": all(m <= THRESHOLDS["memory_mb"] for m in memories),
             },
             "dynamodb_latency": {
-                "max_ms": round(max(dynamodb_latencies), 2) if dynamodb_latencies else 0,
+                "max_ms": (round(max(dynamodb_latencies), 2) if dynamodb_latencies else 0),
                 "threshold_ms": THRESHOLDS["dynamodb_latency_ms"],
                 "compliant": (
                     all(lat <= THRESHOLDS["dynamodb_latency_ms"] for lat in dynamodb_latencies)

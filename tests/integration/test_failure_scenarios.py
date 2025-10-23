@@ -17,11 +17,9 @@ These tests validate that when external services fail, the system:
 """
 
 import pytest
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
+from datetime import datetime
 
-from src.rules.engine import RuleEngine, ActionResult
+from src.rules.engine import RuleEngine
 
 
 class TestNaverAPIFailureHandling:
@@ -87,7 +85,7 @@ rules:
         engine.register_action("log_event", log_event)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Verify fallback rule executed
         assert len([r for r in results if "API Failure Fallback" in r.rule_name]) > 0
@@ -112,7 +110,7 @@ rules:
         engine.register_action("log_event", log_event)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Telegram alert should be sent
         assert len(alert_sent) > 0
@@ -137,7 +135,7 @@ rules:
         engine.register_action("log_event", log_event)
 
         context = {"error": "429 Too Many Requests"}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Should send alert about rate limiting
         assert len(alerts) > 0
@@ -162,7 +160,7 @@ rules:
         engine.register_action("log_event", log_event)
 
         context = {"error": "401 Unauthorized"}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Authentication failure should trigger alert
         assert len(results) > 0
@@ -226,7 +224,7 @@ rules:
         engine.register_action("send_slack", lambda ctx, **p: None)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Verify error handling
         assert any(r.success is False for r in results)
@@ -252,7 +250,7 @@ rules:
         engine.register_action("send_slack", send_slack)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Critical alert should be sent
         assert len(critical_alerts) > 0
@@ -277,7 +275,7 @@ rules:
         engine.register_action("send_slack", send_slack)
 
         context = {"error": "Provisioned throughput exceeded"}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Throttle alert should be sent
         assert len(throttle_alerts) > 0
@@ -340,7 +338,7 @@ rules:
         engine.register_action("mark_sms_retry_needed", mark_sms_retry_needed)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Error handling should occur
         assert any(not r.success for r in results)
@@ -365,7 +363,7 @@ rules:
         engine.register_action("mark_sms_retry_needed", mark_sms_retry_needed)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Retry should be marked
         assert any("retry" in str(r) for r in retry_needed)
@@ -393,7 +391,7 @@ rules:
         engine.register_action("mark_sms_retry_needed", mark_sms_retry_needed)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Validation error should be logged
         assert any(not r.success for r in results)
@@ -436,7 +434,7 @@ rules:
         engine.register_action("send_telegram", send_telegram)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Telegram should be called
         assert len(telegram_calls) > 0
@@ -462,7 +460,7 @@ rules:
         engine.register_action("send_telegram", send_telegram)
 
         context = {}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # All messages should be valid
         assert len(telegram_messages) > 0
@@ -483,7 +481,7 @@ rules:
 
         # Simulate critical error in context
         context = {"critical_error": "Database connection lost"}
-        results = engine.process_booking(context)
+        engine.process_booking(context)
 
         # Alert should have been sent
         assert len(critical_alerts) > 0
@@ -551,7 +549,7 @@ rules:
 
         context = {}
         try:
-            results = engine.process_booking(context)
+            engine.process_booking(context)
             # Even if primary fails, summary should be sent
             assert "summary_sent" in completed
         except Exception as e:
@@ -590,8 +588,8 @@ rules:
 
         context = {}
         try:
-            results = engine.process_booking(context)
-        except:
+            engine.process_booking(context)
+        except Exception:
             pass
 
         # Error context should be captured

@@ -1,6 +1,6 @@
 # Comparison Report: case5_empty_response
 **Scenario:** CASE 5: Empty Booking Response
-**Generated:** 2025-10-23T23:29:53.883189
+**Generated:** 2025-10-24T02:29:54.646223
 
 ## Summary
 - **Total Mismatches:** 0

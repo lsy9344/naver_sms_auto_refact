@@ -67,7 +67,9 @@ class TestOutputParity:
                 logger.warning(f"Could not update container metadata: {e}")
 
     @pytest.mark.parametrize(
-        "booking_id", FACTORY.list_all_scenarios(), ids=lambda x: x  # Use booking_id as test ID
+        "booking_id",
+        FACTORY.list_all_scenarios(),
+        ids=lambda x: x,  # Use booking_id as test ID
     )
     def test_parity_new_booking_confirmation(self, booking_id: str):
         """Test parity for new booking confirmation scenarios."""

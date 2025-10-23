@@ -91,7 +91,8 @@ RUN_LIVE = os.getenv("RUN_NAVER_LIVE_TESTS") == "1"
 
 
 @pytest.mark.skipif(
-    not RUN_LIVE, reason="Set RUN_NAVER_LIVE_TESTS=1 with test credentials to run live checks"
+    not RUN_LIVE,
+    reason="Set RUN_NAVER_LIVE_TESTS=1 with test credentials to run live checks",
 )
 class TestNaverAuthenticatorLive:
     """Live integration tests with real Naver (MANUAL ONLY)"""

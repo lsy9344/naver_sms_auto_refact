@@ -92,7 +92,13 @@ class ParityValidator:
             error_msg = f"Legacy handler error: {e}"
             logger.error(error_msg)
             self.execution_errors.append(error_msg)
-            return {"error": str(e), "sms": [], "db_records": [], "telegram": [], "actions": []}
+            return {
+                "error": str(e),
+                "sms": [],
+                "db_records": [],
+                "telegram": [],
+                "actions": [],
+            }
 
     def execute_refactored_handler(
         self, scenario_context: Dict[str, Any], mock_services: Dict[str, Any] = None
@@ -151,7 +157,13 @@ class ParityValidator:
             error_msg = f"Refactored handler error: {e}"
             logger.error(error_msg)
             self.execution_errors.append(error_msg)
-            return {"error": str(e), "sms": [], "db_records": [], "telegram": [], "actions": []}
+            return {
+                "error": str(e),
+                "sms": [],
+                "db_records": [],
+                "telegram": [],
+                "actions": [],
+            }
 
     def compare_scenario(
         self, scenario_context: Dict[str, Any]

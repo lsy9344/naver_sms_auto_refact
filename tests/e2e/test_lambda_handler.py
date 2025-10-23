@@ -11,7 +11,6 @@ from unittest.mock import Mock, patch, MagicMock
 import pytest
 
 # Import the main module to ensure coverage tracking
-import src.main
 from src.main import lambda_handler, process_all_bookings
 from src.domain.booking import Booking
 from src.rules.engine import ActionResult
@@ -109,7 +108,10 @@ def mock_rule_engine():
         mock_engine = MagicMock()
         mock_engine.process_booking.return_value = [
             ActionResult(
-                rule_name="Test Rule", action_type="send_sms", success=True, message="SMS sent"
+                rule_name="Test Rule",
+                action_type="send_sms",
+                success=True,
+                message="SMS sent",
             )
         ]
         mock_engine.rules = []  # Empty rules list for roster building
@@ -304,7 +306,10 @@ def test_process_all_bookings_success():
 
     # Call function
     results, summary = process_all_bookings(
-        bookings=[booking], engine=mock_engine, booking_repo=mock_repo, settings=mock_settings_obj
+        bookings=[booking],
+        engine=mock_engine,
+        booking_repo=mock_repo,
+        settings=mock_settings_obj,
     )
 
     # Verify results
@@ -347,7 +352,10 @@ def test_process_all_bookings_with_failures():
     # Mock engine with mixed results - return a list of ActionResults
     test_results = [
         ActionResult(
-            rule_name="Test Rule 1", action_type="send_sms", success=True, message="SMS sent"
+            rule_name="Test Rule 1",
+            action_type="send_sms",
+            success=True,
+            message="SMS sent",
         ),
         ActionResult(
             rule_name="Test Rule 2",
@@ -366,7 +374,10 @@ def test_process_all_bookings_with_failures():
     mock_settings_obj = MagicMock()
 
     results, summary = process_all_bookings(
-        bookings=[booking], engine=mock_engine, booking_repo=mock_repo, settings=mock_settings_obj
+        bookings=[booking],
+        engine=mock_engine,
+        booking_repo=mock_repo,
+        settings=mock_settings_obj,
     )
 
     # Verify mixed results

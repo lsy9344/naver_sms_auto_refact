@@ -25,7 +25,11 @@ from src.notifications.sms_service import SensSmsClient
 from src.notifications.slack_service import SlackWebhookClient
 from src.rules.engine import RuleEngine, ActionResult
 from src.rules.conditions import register_conditions
-from src.rules.actions import register_actions, ActionServicesBundle, SlackTemplateLoader
+from src.rules.actions import (
+    register_actions,
+    ActionServicesBundle,
+    SlackTemplateLoader,
+)
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -173,7 +177,10 @@ def lambda_handler(event, context):
             # AC 4, 5, 6: Process bookings through rule engine
             # ============================================================
             all_results, summary = process_all_bookings(
-                bookings=all_bookings, engine=engine, booking_repo=booking_repo, settings=settings
+                bookings=all_bookings,
+                engine=engine,
+                booking_repo=booking_repo,
+                settings=settings,
             )
 
             logger.info(
@@ -188,7 +195,9 @@ def lambda_handler(event, context):
             try:
                 telegram_creds = settings.load_telegram_credentials()
                 send_telegram_summary(
-                    telegram_creds=telegram_creds, summary=summary, all_results=all_results
+                    telegram_creds=telegram_creds,
+                    summary=summary,
+                    all_results=all_results,
                 )
             except Exception as e:
                 logger.warning(f"Failed to send Telegram summary: {e}")
@@ -366,7 +375,10 @@ def _build_holiday_event_roster(
 
 
 def process_all_bookings(
-    bookings: List[Booking], engine: RuleEngine, booking_repo: BookingRepository, settings: Settings
+    bookings: List[Booking],
+    engine: RuleEngine,
+    booking_repo: BookingRepository,
+    settings: Settings,
 ) -> Tuple[List[ActionResult], Dict[str, Any]]:
     """
     Process all bookings through rule engine.
@@ -450,7 +462,9 @@ def process_all_bookings(
 
 
 def send_telegram_summary(
-    telegram_creds: Dict[str, str], summary: Dict[str, Any], all_results: List[ActionResult]
+    telegram_creds: Dict[str, str],
+    summary: Dict[str, Any],
+    all_results: List[ActionResult],
 ) -> None:
     """
     Send summary notification to Telegram.
@@ -533,7 +547,8 @@ if __name__ == "__main__":
             self.invoked_function_arn = "arn:aws:lambda:local:local"
 
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     result = lambda_handler({}, MockContext())

@@ -92,7 +92,10 @@ class NaverAuthenticator:
                 logger.warning(msg, operation="naver_login_cached", error="Cached cookie invalid")
                 return self.login(None)
             else:
-                logger.info("Cached cookie validation successful", operation="naver_login_cached")
+                logger.info(
+                    "Cached cookie validation successful",
+                    operation="naver_login_cached",
+                )
                 return cached_cookies
 
     def get_session(self):

@@ -307,7 +307,7 @@ class SlackWebhookClient:
         """Return webhook configuration status."""
         return {
             "webhook_configured": self.webhook_url is not None,
-            "webhook_url_masked": self._mask_url(self.webhook_url) if self.webhook_url else None,
+            "webhook_url_masked": (self._mask_url(self.webhook_url) if self.webhook_url else None),
             "max_retries": self.max_retries,
             "retry_delay_seconds": self.retry_delay_seconds,
         }

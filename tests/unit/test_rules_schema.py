@@ -251,7 +251,10 @@ class TestRulesSchema:
                     "enabled": True,
                     "conditions": [{"type": "booking_not_in_db"}],
                     "actions": [
-                        {"type": "send_sms", "params": {}}  # Missing required 'template' parameter
+                        {
+                            "type": "send_sms",
+                            "params": {},
+                        }  # Missing required 'template' parameter
                     ],
                 }
             ]
@@ -271,7 +274,10 @@ class TestRulesSchema:
                     "name": "Test Rule",
                     "enabled": True,
                     "conditions": [
-                        {"type": "flag_not_set", "params": {}}  # Missing required 'flag' parameter
+                        {
+                            "type": "flag_not_set",
+                            "params": {},
+                        }  # Missing required 'flag' parameter
                     ],
                     "actions": [{"type": "create_db_record"}],
                 }
@@ -372,7 +378,10 @@ class TestRulesSchema:
                     "conditions": [
                         {
                             "type": "date_range",
-                            "params": {"start_date": "2025-10-19", "end_date": "2025-10-21"},
+                            "params": {
+                                "start_date": "2025-10-19",
+                                "end_date": "2025-10-21",
+                            },
                         }
                     ],
                     "actions": [{"type": "create_db_record"}],

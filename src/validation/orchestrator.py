@@ -97,8 +97,12 @@ class ValidationCampaignOrchestrator:
 
         # Send completion notification
         if self.slack_client:
-            pass_rate = self._calculate_pass_rate(comparison_stats)
-            self.slack_client.send_validation_completed(campaign_id, len(bookings), pass_rate)
+            total_tests = len(bookings)
+            passed_tests = sum(1 for s in comparison_stats if s.get("parity_status") == "PASS")
+            failed_tests = total_tests - passed_tests
+            self.slack_client.send_validation_completed(
+                campaign_id, total_tests, passed_tests, failed_tests
+            )
 
         self.logger.info(
             f"Campaign {campaign_id} complete. Decision: {readiness_report.decision.value}"
@@ -124,16 +128,21 @@ class ValidationCampaignOrchestrator:
             refactored_output = booking  # In real scenario, this would be new Lambda output
 
             # Compare outputs using production diff_reporter
-            mismatches, stats = self.diff_reporter.compare_booking_outputs(
+            mismatches, stats = self.diff_reporter.compare_outputs(
                 booking_id=booking_id,
                 canonical_legacy=legacy_output,
                 canonical_refactored=refactored_output,
             )
 
-            # Write artifacts
-            if mismatches:
-                self.diff_reporter.write_json_report(booking_id, mismatches, stats)
-                self.diff_reporter.write_markdown_report(booking_id, mismatches, stats)
+            # Write artifacts using supported method
+            self.diff_reporter.write_reports(
+                booking_id=booking_id,
+                scenario="validation_campaign",
+                mismatches=mismatches,
+                stats=stats,
+                canonical_legacy=legacy_output,
+                canonical_refactored=refactored_output,
+            )
 
             comparison_stats.append(stats)
 
@@ -145,20 +154,19 @@ class ValidationCampaignOrchestrator:
         passed_bookings = sum(1 for s in comparison_stats if s.get("parity_status") == "PASS")
         total_critical = sum(s.get("critical_mismatches", 0) for s in comparison_stats)
 
-        # Publish summary metrics
+        # Publish summary metrics using the correct ComparisonSummary signature
         from src.monitoring.comparison import ComparisonSummary
 
         summary = ComparisonSummary(
             run_id=self.config.campaign_id,
-            total_bookings_tested=total_bookings,
-            bookings_passed=passed_bookings,
-            bookings_failed=total_bookings - passed_bookings,
+            lambda_version="refactored",
+            invocation_time=datetime.utcnow().isoformat(),
+            bookings_processed=total_bookings,
+            total_mismatches=total_critical,
             match_percentage=(
                 (passed_bookings / total_bookings * 100) if total_bookings > 0 else 0
             ),
-            critical_mismatches=total_critical,
-            warning_mismatches=sum(s.get("warning_mismatches", 0) for s in comparison_stats),
-            test_duration_seconds=0,  # TODO: Track actual duration
+            error_count=total_bookings - passed_bookings,
         )
 
         self.metrics_publisher.publish_comparison_summary(summary)
@@ -214,10 +222,13 @@ class ValidationCampaignOrchestrator:
             campaign_id=campaign_id, readiness_report=readiness_report.to_dict()
         )
 
-        # Update VALIDATION.md with evidence links
-        packager.update_validation_md(evidence_package)
+        # Update VALIDATION.md with evidence links and capture actual update status
+        validation_md_updated = packager.update_validation_md(evidence_package)
 
-        return evidence_package.to_dict()
+        # Return evidence package with actual update status
+        result = evidence_package.to_dict()
+        result["validation_md_updated"] = validation_md_updated
+        return result
 
     def _calculate_pass_rate(self, comparison_stats: List[Dict[str, Any]]) -> float:
         """Calculate campaign pass rate."""

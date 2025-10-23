@@ -63,12 +63,16 @@ class DiffReporter:
         mismatches.extend(telegram_mismatches)
 
         action_mismatches = self._compare_lists(
-            "actions", canonical_legacy.get("actions", []), canonical_refactored.get("actions", [])
+            "actions",
+            canonical_legacy.get("actions", []),
+            canonical_refactored.get("actions", []),
         )
         mismatches.extend(action_mismatches)
 
         slack_mismatches = self._compare_lists(
-            "slack", canonical_legacy.get("slack", []), canonical_refactored.get("slack", [])
+            "slack",
+            canonical_legacy.get("slack", []),
+            canonical_refactored.get("slack", []),
         )
         mismatches.extend(slack_mismatches)
 

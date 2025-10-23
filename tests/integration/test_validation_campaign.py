@@ -17,6 +17,7 @@ Test Coverage:
 import json
 import logging
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.comparison.diff_reporter import DiffReporter
@@ -25,6 +26,7 @@ from src.validation.environment import (
     ValidationEnvironmentSetup,
     create_default_validation_environment,
 )
+from src.validation.orchestrator import ValidationCampaignOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -452,3 +454,163 @@ class TestValidationCampaignIntegration:
 
         for filename in required_files:
             assert (output_dir / filename).exists(), f"Missing {filename}"
+
+
+class TestValidationCampaignOrchestratorEndToEnd:
+    """Test complete orchestrator end-to-end workflow with production modules."""
+
+    @patch("src.monitoring.comparison.boto3.client")
+    @patch("requests.Session.post")
+    def test_orchestrator_runs_complete_campaign(self, mock_post, mock_boto3):
+        """TECH-001 & BUS-001: Orchestrator executes complete campaign end-to-end."""
+        # Setup mocks
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        mock_cloudwatch = MagicMock()
+        mock_boto3.return_value = mock_cloudwatch
+
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Create config and orchestrator
+            config = create_default_validation_environment()
+            config.campaign_id = "orch-e2e-test"
+            config.diff_reporter_output_dir = tmp_dir
+            config.slack_webhook_url = "https://hooks.slack.com/test"
+
+            orchestrator = ValidationCampaignOrchestrator(config)
+
+            # Prepare test data
+            bookings = [
+                {
+                    "booking_id": "b-001",
+                    "sms": [{"phone": "010-1234-5678", "status": "sent"}],
+                    "db_records": [{"booking_num": "BK001"}],
+                    "telegram": [],
+                    "slack": [],
+                    "actions": [],
+                },
+                {
+                    "booking_id": "b-002",
+                    "sms": [{"phone": "010-8765-4321", "status": "sent"}],
+                    "db_records": [{"booking_num": "BK002"}],
+                    "telegram": [],
+                    "slack": [],
+                    "actions": [],
+                },
+            ]
+
+            golden_dataset = {
+                "b-001": {
+                    "sms": [{"phone": "010-1234-5678", "status": "sent"}],
+                    "db_records": [{"booking_num": "BK001"}],
+                    "telegram": [],
+                    "slack": [],
+                    "actions": [],
+                },
+                "b-002": {
+                    "sms": [{"phone": "010-8765-4321", "status": "sent"}],
+                    "db_records": [{"booking_num": "BK002"}],
+                    "telegram": [],
+                    "slack": [],
+                    "actions": [],
+                },
+            }
+
+            # Run campaign
+            result = orchestrator.run_campaign(bookings, golden_dataset)
+
+            # Verify result structure
+            assert result["campaign_id"] == "orch-e2e-test"
+            assert "comparison_stats" in result
+            assert "readiness_report" in result
+            assert "evidence_package" in result
+            assert "timestamp" in result
+
+            # Verify comparison stats
+            assert len(result["comparison_stats"]) == 2
+            for stat in result["comparison_stats"]:
+                assert stat["parity_status"] == "PASS"
+                assert stat["critical_mismatches"] == 0
+
+            # Verify readiness report
+            readiness = result["readiness_report"]
+            assert "decision" in readiness
+            assert "confidence_level" in readiness
+
+            # Verify evidence package
+            evidence = result["evidence_package"]
+            assert evidence["campaign_id"] == "orch-e2e-test"
+            assert "artifacts" in evidence
+            assert "manifest" in evidence
+
+            # Verify artifacts were written
+            output_dir = Path(tmp_dir)
+
+            # Artifacts can be in top-level or in campaign subdirectory
+            json_files = list(output_dir.glob("*.json")) + list(output_dir.glob("**/*.json"))
+            md_files = list(output_dir.glob("*.md")) + list(output_dir.glob("**/*.md"))
+
+            # Remove duplicates
+            json_files = list(set(json_files))
+            md_files = list(set(md_files))
+
+            assert len(json_files) >= 2  # At least 2 booking comparisons
+            assert len(md_files) >= 1  # At least summary or booking reports
+
+            # Verify DiffReporter was called (no AttributeError)
+            assert orchestrator.diff_reporter is not None
+
+    @patch("src.monitoring.comparison.boto3.client")
+    def test_orchestrator_collects_evidence_with_validation_md_updated(self, mock_boto3):
+        """BUS-001: Evidence package correctly reports validation_md_updated status."""
+        mock_cloudwatch = MagicMock()
+        mock_boto3.return_value = mock_cloudwatch
+
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Create VALIDATION.md
+            validation_md = Path(tmp_dir) / "VALIDATION.md"
+            validation_md.write_text("# Validation Results\n\n")
+
+            config = create_default_validation_environment()
+            config.campaign_id = "validation-md-test"
+            config.diff_reporter_output_dir = tmp_dir
+            config.slack_webhook_url = None
+
+            orchestrator = ValidationCampaignOrchestrator(config)
+
+            # Run campaign with minimal data
+            bookings = [
+                {
+                    "booking_id": "b-001",
+                    "sms": [],
+                    "db_records": [],
+                    "telegram": [],
+                    "slack": [],
+                    "actions": [],
+                }
+            ]
+
+            golden_dataset = {
+                "b-001": {
+                    "sms": [],
+                    "db_records": [],
+                    "telegram": [],
+                    "slack": [],
+                    "actions": [],
+                }
+            }
+
+            result = orchestrator.run_campaign(bookings, golden_dataset)
+            evidence = result["evidence_package"]
+
+            # Verify validation_md_updated reflects actual status
+            # When _collect_evidence runs, it should update VALIDATION.md
+            assert "validation_md_updated" in evidence
+            # The flag should be True if update_validation_md succeeded
+            updated_status = evidence["validation_md_updated"]
+            assert isinstance(updated_status, bool)

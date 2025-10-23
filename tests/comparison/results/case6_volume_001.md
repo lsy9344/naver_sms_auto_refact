@@ -1,6 +1,6 @@
 # Comparison Report: case6_volume_001
 **Scenario:** CASE 6: High-Volume Processing - Batch 1
-**Generated:** 2025-10-23T23:29:55.310437
+**Generated:** 2025-10-24T02:29:57.031119
 
 ## Summary
 - **Total Mismatches:** 0

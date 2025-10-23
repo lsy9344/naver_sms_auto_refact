@@ -58,7 +58,9 @@ class OutputNormalizer:
         return sorted(normalized, key=lambda x: (x["phone"], x["type"]))
 
     @staticmethod
-    def normalize_dynamodb_outputs(db_records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def normalize_dynamodb_outputs(
+        db_records: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
         """
         Normalize DynamoDB outputs to canonical form.
 
@@ -95,7 +97,9 @@ class OutputNormalizer:
         return sorted(normalized, key=lambda x: (x["booking_num"], x["phone"]))
 
     @staticmethod
-    def normalize_telegram_outputs(telegram_messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def normalize_telegram_outputs(
+        telegram_messages: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
         """
         Normalize Telegram outputs to canonical form.
 

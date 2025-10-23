@@ -209,12 +209,25 @@ class EvidencePackager:
 
         completeness_status, completeness_notes = self._validate_completeness(artifacts)
 
+        # Try to update VALIDATION.md to determine actual update status
+        validation_md_updated = self.update_validation_md(
+            EvidencePackage(
+                campaign_id=campaign_id,
+                generated_at=datetime.utcnow().isoformat(),
+                artifacts=artifacts,
+                manifest=manifest,
+                validation_md_updated=False,  # Will be updated below
+                completeness_status=completeness_status,
+                completeness_notes=completeness_notes,
+            )
+        )
+
         return EvidencePackage(
             campaign_id=campaign_id,
             generated_at=datetime.utcnow().isoformat(),
             artifacts=artifacts,
             manifest=manifest,
-            validation_md_updated=False,
+            validation_md_updated=validation_md_updated,
             completeness_status=completeness_status,
             completeness_notes=completeness_notes,
         )

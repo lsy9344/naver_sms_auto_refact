@@ -68,7 +68,10 @@ class TestMaskPhone:
         test_cases = [
             ("010-5555-1234", "010-****-1234"),
             ("01055551234", "010-****-1234"),
-            ("02-1111-2222", "021-****-2222"),  # Normalized format with 3-digit area code
+            (
+                "02-1111-2222",
+                "021-****-2222",
+            ),  # Normalized format with 3-digit area code
             ("0212345678", "021-****-5678"),
         ]
 

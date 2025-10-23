@@ -10,11 +10,9 @@ This test ensures:
 3. Only bookings with matching keywords are included in the roster
 """
 
-from datetime import datetime, date, timedelta
-from unittest.mock import Mock, MagicMock
-from typing import List, Dict, Any
-
-import pytest
+from datetime import datetime
+from typing import List
+from unittest.mock import Mock
 
 from src.domain.booking import Booking
 from src.main import _build_holiday_event_roster, _get_holiday_event_rule_window
@@ -240,7 +238,7 @@ class TestBuildHolidayEventRoster:
         """Verify date range filtering works together with keyword filtering."""
         in_range_date = datetime(2024, 12, 15, 10, 0, 0)
         before_range_date = datetime(2024, 11, 30, 10, 0, 0)
-        after_range_date = datetime(2025, 1, 5, 10, 0, 0)
+        _ = datetime(2025, 1, 5, 10, 0, 0)  # after_range_date - kept for test clarity
 
         booking_in_range_with_keyword = self._create_booking(
             "BK001",

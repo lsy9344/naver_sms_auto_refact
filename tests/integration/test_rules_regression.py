@@ -307,7 +307,14 @@ class RegressionTestRunner:
         extra_fields = {
             k: v
             for k, v in booking_data.items()
-            if k not in ["customer_phone", "customer_name", "booking_time", "status", "option"]
+            if k
+            not in [
+                "customer_phone",
+                "customer_name",
+                "booking_time",
+                "status",
+                "option",
+            ]
         }
 
         # Store fixture data in extra_fields for action executors

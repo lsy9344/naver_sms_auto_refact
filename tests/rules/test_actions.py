@@ -120,7 +120,11 @@ def action_context(
 
 @pytest.fixture
 def services_bundle(
-    mock_db_repo, mock_sms_service, mock_logger, mock_slack_service, mock_slack_template_loader
+    mock_db_repo,
+    mock_sms_service,
+    mock_logger,
+    mock_slack_service,
+    mock_slack_template_loader,
 ):
     """Create an ActionServicesBundle for testing."""
     return ActionServicesBundle(
