@@ -141,42 +141,66 @@ class ReadinessValidator:
         )
 
     def _validate_sms_channel(self, comparison_stats: List[Dict[str, Any]]) -> ReadinessCriteria:
-        sms_mismatches = 0
-        status = sms_mismatches == 0
+        # Inspect actual comparison data for mismatches
+        total_critical = sum(stat.get("critical_mismatches", 0) for stat in comparison_stats)
+        failed_bookings = sum(1 for stat in comparison_stats if stat.get("parity_status") == "FAIL")
+        total_bookings = len(comparison_stats)
+
+        status = total_critical == 0 and failed_bookings == 0
+        evidence = (
+            f"SMS channel: {failed_bookings}/{total_bookings} bookings failed, "
+            f"{total_critical} critical mismatches across all channels"
+        )
         return ReadinessCriteria(
             name="SMS Channel Parity",
             description="SMS notifications match between legacy and refactored Lambda",
             required=True,
             status=status,
-            evidence=f"SMS channel: {sms_mismatches} mismatches",
+            evidence=evidence,
             impact="If failed: SMS messages may not send correctly",
         )
 
     def _validate_dynamodb_channel(
         self, comparison_stats: List[Dict[str, Any]]
     ) -> ReadinessCriteria:
-        db_mismatches = 0
-        status = db_mismatches == 0
+        # Inspect actual comparison data for mismatches
+        total_critical = sum(stat.get("critical_mismatches", 0) for stat in comparison_stats)
+        failed_bookings = sum(1 for stat in comparison_stats if stat.get("parity_status") == "FAIL")
+        total_bookings = len(comparison_stats)
+
+        status = total_critical == 0 and failed_bookings == 0
+        evidence = (
+            f"DynamoDB channel: {failed_bookings}/{total_bookings} bookings failed, "
+            f"{total_critical} critical mismatches across all channels"
+        )
         return ReadinessCriteria(
             name="DynamoDB Channel Parity",
             description="DynamoDB record writes match between legacy and refactored Lambda",
             required=True,
             status=status,
-            evidence=f"DynamoDB channel: {db_mismatches} mismatches",
+            evidence=evidence,
             impact="If failed: Booking state tracking may diverge",
         )
 
     def _validate_telegram_channel(
         self, comparison_stats: List[Dict[str, Any]]
     ) -> ReadinessCriteria:
-        telegram_mismatches = 0
-        status = telegram_mismatches == 0
+        # Inspect actual comparison data for mismatches
+        total_critical = sum(stat.get("critical_mismatches", 0) for stat in comparison_stats)
+        failed_bookings = sum(1 for stat in comparison_stats if stat.get("parity_status") == "FAIL")
+        total_bookings = len(comparison_stats)
+
+        status = total_critical == 0 and failed_bookings == 0
+        evidence = (
+            f"Telegram channel: {failed_bookings}/{total_bookings} bookings failed, "
+            f"{total_critical} critical mismatches across all channels"
+        )
         return ReadinessCriteria(
             name="Telegram Channel Parity",
             description="Telegram notifications match between legacy and refactored Lambda",
             required=True,
             status=status,
-            evidence=f"Telegram channel: {telegram_mismatches} mismatches",
+            evidence=evidence,
             impact="If failed: Telegram alerts may not fire correctly",
         )
 
@@ -219,13 +243,22 @@ class ReadinessValidator:
         )
 
     def _validate_comparison_mode_enabled(self) -> ReadinessCriteria:
-        comparison_mode_active = True
+        # Read actual COMPARISON_MODE_ENABLED environment variable
+        import os
+
+        comparison_mode_value = os.getenv("COMPARISON_MODE_ENABLED", "false")
+        comparison_mode_active = comparison_mode_value == "true"
+
+        evidence = (
+            f"COMPARISON_MODE_ENABLED={comparison_mode_value} "
+            f"({'ACTIVE - SMS disabled' if comparison_mode_active else 'INACTIVE - SMS WILL SEND'})"
+        )
         return ReadinessCriteria(
             name="Comparison Mode Enabled (No Production SMS)",
             description="Comparison mode is active and prevents production SMS sends",
             required=True,
             status=comparison_mode_active,
-            evidence="COMPARISON_MODE_ENABLED flag confirmed active",
+            evidence=evidence,
             impact="If failed: Validation campaign could send real SMS messages",
         )
 

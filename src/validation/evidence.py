@@ -97,20 +97,11 @@ class EvidenceCollector:
     def collect_cloudwatch_metrics_export(self) -> Optional[EvidenceArtifact]:
         metrics_path = self.campaign_dir / "cloudwatch_metrics_export.json"
         if not metrics_path.exists():
-            metrics_data = {
-                "comparison_metrics": [
-                    {
-                        "MetricName": "ComparisonParity",
-                        "Dimensions": [{"Name": "Campaign", "Value": "story-5.5"}],
-                        "Timestamp": datetime.utcnow().isoformat(),
-                        "Value": 100.0,
-                        "Unit": "Percent",
-                    }
-                ],
-                "exported_at": datetime.utcnow().isoformat(),
-            }
-            with metrics_path.open("w", encoding="utf-8") as file:
-                json.dump(metrics_data, file, indent=2, default=str)
+            self.logger.warning(
+                f"CloudWatch metrics export not found: {metrics_path}. "
+                "Run a real validation campaign to generate this artifact."
+            )
+            return None
         return self._build_artifact(
             metrics_path, "metric_export", "CloudWatch metrics snapshot during validation campaign"
         )
@@ -118,23 +109,11 @@ class EvidenceCollector:
     def collect_alarm_logs(self) -> Optional[EvidenceArtifact]:
         alarms_path = self.campaign_dir / "cloudwatch_alarm_logs.json"
         if not alarms_path.exists():
-            alarm_data = {
-                "alarms": [
-                    {
-                        "AlarmName": "comparison-discrepancies-detected",
-                        "Transitions": [
-                            {
-                                "Timestamp": datetime.utcnow().isoformat(),
-                                "StateValue": "OK",
-                                "StateReason": "No discrepancies detected",
-                            }
-                        ],
-                    }
-                ],
-                "exported_at": datetime.utcnow().isoformat(),
-            }
-            with alarms_path.open("w", encoding="utf-8") as file:
-                json.dump(alarm_data, file, indent=2, default=str)
+            self.logger.warning(
+                f"CloudWatch alarm logs not found: {alarms_path}. "
+                "Run a real validation campaign to generate this artifact."
+            )
+            return None
         return self._build_artifact(
             alarms_path, "alarm_log", "CloudWatch alarm transition history during campaign"
         )
@@ -142,26 +121,11 @@ class EvidenceCollector:
     def collect_slack_history(self) -> Optional[EvidenceArtifact]:
         slack_path = self.campaign_dir / "slack_notification_history.json"
         if not slack_path.exists():
-            slack_data = {
-                "notifications": [
-                    {
-                        "event": "validation_started",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "delivered": True,
-                        "latency_ms": 125,
-                    },
-                    {
-                        "event": "validation_completed",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "delivered": True,
-                        "latency_ms": 145,
-                    },
-                ],
-                "total_notifications": 2,
-                "delivery_success_rate": 1.0,
-            }
-            with slack_path.open("w", encoding="utf-8") as file:
-                json.dump(slack_data, file, indent=2, default=str)
+            self.logger.warning(
+                f"Slack notification history not found: {slack_path}. "
+                "Run a real validation campaign to generate this artifact."
+            )
+            return None
         return self._build_artifact(
             slack_path, "slack_history", "Slack webhook notification delivery history"
         )
