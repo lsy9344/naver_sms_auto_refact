@@ -321,23 +321,32 @@ jobs:
           DEPLOYMENT_LOG="docs/ops/DEPLOYMENTS.md"
           TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
           COMMIT_SHA=${{ github.sha }}
-          COMMIT_MSG=$(git log -1 --pretty=%B $COMMIT_SHA)
-          
+          COMMIT_SHORT="${COMMIT_SHA:0:7}"
+
+          # Get first line of commit message and sanitize it (remove pipes, limit length)
+          COMMIT_MSG=$(git log -1 --pretty=%s "$COMMIT_SHA" | head -c 80 | tr '|' '/')
+
           # Create file if it doesn't exist
           if [ ! -f "$DEPLOYMENT_LOG" ]; then
             mkdir -p $(dirname "$DEPLOYMENT_LOG")
             cat > "$DEPLOYMENT_LOG" << 'EOF'
           # Deployment History
-          
+
           Automated deployments to AWS Lambda from main branch.
-          
+
           | Date | Commit | Message | Status |
           |------|--------|---------|--------|
           EOF
           fi
-          
-          # Add new entry
-          sed -i "5i| $TIMESTAMP | \`${COMMIT_SHA:0:7}\` | $(echo "$COMMIT_MSG" \| head -1) | ✅ Success |" "$DEPLOYMENT_LOG"
+
+          # Add new entry using a temporary file (safer than sed with special chars)
+          {
+            head -n 5 "$DEPLOYMENT_LOG"
+            echo "| $TIMESTAMP | \`$COMMIT_SHORT\` | $COMMIT_MSG | PASS |"
+            tail -n +6 "$DEPLOYMENT_LOG"
+          } > "${DEPLOYMENT_LOG}.tmp"
+
+          mv "${DEPLOYMENT_LOG}.tmp" "$DEPLOYMENT_LOG"
 
       - name: Commit documentation updates
         run: |
@@ -350,11 +359,11 @@ jobs:
             
             # Try to push with error handling
             if git push; then
-              echo "✅ Documentation updated successfully"
+              echo "Documentation updated successfully"
             else
-              echo "⚠️ Failed to push documentation updates"
+              echo "WARNING: Failed to push documentation updates"
               echo "This is likely due to repository permissions."
-              echo "Please check: Settings → Actions → General → Workflow permissions"
+              echo "Please check: Settings -> Actions -> General -> Workflow permissions"
               echo "Ensure 'Read and write permissions' is enabled."
               exit 0  # Don't fail the job, just warn
             fi
