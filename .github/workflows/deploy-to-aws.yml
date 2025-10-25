@@ -177,30 +177,60 @@ jobs:
         id: lambda-update
         run: |
           echo "🚀 Updating Lambda function: $LAMBDA_FUNCTION_NAME"
-          
+
           aws lambda update-function-code \
             --function-name $LAMBDA_FUNCTION_NAME \
             --image-uri ${{ needs.build-and-push.outputs.image-uri }} \
             --region ${{ env.AWS_REGION }} \
             --no-cli-pager > lambda-response.json
-          
+
           # Extract important info
           FUNCTION_ARN=$(jq -r '.FunctionArn' lambda-response.json)
           IMAGE_URI=$(jq -r '.ImageConfigResponse.ImageUri' lambda-response.json)
           LAST_MODIFIED=$(jq -r '.LastModified' lambda-response.json)
-          
+
           echo "function-arn=$FUNCTION_ARN" >> $GITHUB_OUTPUT
           echo "image-uri=$IMAGE_URI" >> $GITHUB_OUTPUT
           echo "last-modified=$LAST_MODIFIED" >> $GITHUB_OUTPUT
 
+      - name: Wait for function code update to complete
+        run: |
+          echo "⏳ Waiting for Lambda function update to complete..."
+          aws lambda wait function-updated \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --region ${{ env.AWS_REGION }}
+          echo "✅ Lambda function code update completed successfully"
+
       - name: Ensure Lambda image handler configuration
         run: |
           echo "🔧 Ensuring Lambda image handler command is src.main.lambda_handler"
-          aws lambda update-function-configuration \
-            --function-name $LAMBDA_FUNCTION_NAME \
-            --image-config '{"Command":["src.main.lambda_handler"]}' \
-            --region ${{ env.AWS_REGION }} \
-            --no-cli-pager
+
+          # Retry logic with exponential backoff for configuration update
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          RETRY_DELAY=5
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if aws lambda update-function-configuration \
+              --function-name $LAMBDA_FUNCTION_NAME \
+              --image-config '{"Command":["src.main.lambda_handler"]}' \
+              --region ${{ env.AWS_REGION }} \
+              --no-cli-pager; then
+              echo "✅ Lambda configuration updated successfully"
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠️ Configuration update failed (attempt $RETRY_COUNT/$MAX_RETRIES)"
+                echo "Waiting ${RETRY_DELAY}s before retry..."
+                sleep $RETRY_DELAY
+                RETRY_DELAY=$((RETRY_DELAY * 2))  # Exponential backoff
+              else
+                echo "❌ Configuration update failed after $MAX_RETRIES attempts"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Wait for Lambda update to complete
         run: |
