@@ -16,8 +16,9 @@ export SENS_SECRET_KEY="your_sens_secret_key"
 export SENS_SERVICE_ID="your_sens_service_id"
 export TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
 export TELEGRAM_CHAT_ID="your_telegram_chat_id"
+# For local development only - use Secrets Manager in production
 export SLACK_ENABLED="true"
-export SLACK_WEBHOOK_URL="your_slack_webhook_url"
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX"
 ```
 
 2. **Or create `.env.local` file:**
@@ -30,8 +31,9 @@ SENS_SECRET_KEY=your_sens_secret_key
 SENS_SERVICE_ID=your_sens_service_id
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_CHAT_ID=your_telegram_chat_id
+# For local development only - use Secrets Manager in production
 SLACK_ENABLED=true
-SLACK_WEBHOOK_URL=your_slack_webhook_url
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX
 ```
 
 Then install python-dotenv:
@@ -73,7 +75,8 @@ TELEGRAM_BOT_TOKEN=token
 TELEGRAM_CHAT_ID=chat_id
 
 # Slack configuration (optional - disabled by default)
-# Get webhook URL from https://api.slack.com/messaging/webhooks
+# For production: Store webhook URL in AWS Secrets Manager
+# For local dev: Use config/my_slack_webhook.yaml or set SLACK_WEBHOOK_URL below
 SLACK_ENABLED=true
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX
 
@@ -292,9 +295,9 @@ rules = []
 | Field | Type | Description | Source | Required |
 |-------|------|-------------|--------|----------|
 | `slack_enabled` | bool | Enable/disable Slack notifications | Env (SLACK_ENABLED) | No |
-| `slack_webhook_url` | str | Slack incoming webhook URL | Env/File/Secrets | No* |
+| `slack_webhook_url` | str | Slack incoming webhook URL | **Secrets Manager** (recommended) / File / Env | No* |
 
-*Required only when `slack_enabled=true`
+*Required only when `slack_enabled=true`. **Recommended to store in AWS Secrets Manager for production environments.**
 
 ### Slack Message Templates
 
@@ -475,15 +478,17 @@ Slack integration allows the rule engine to send notifications through Slack web
 
 Slack webhook URL is loaded with the following priority:
 
-1. **`SLACK_WEBHOOK_URL` environment variable** (direct override, highest priority)
+1. **AWS Secrets Manager** `naver-sms-automation/slack-credentials` (production - RECOMMENDED)
 2. **`config/my_slack_webhook.yaml`** (local development)
-3. **AWS Secrets Manager** `naver-sms-automation/slack-credentials` (production)
+3. **`SLACK_WEBHOOK_URL` environment variable** (emergency override only)
 
 ### Enable/Disable Slack Notifications
 
 Slack notifications are **disabled by default**. Enable them explicitly:
 
-#### Option 1: Environment Variable
+#### Option 1: Environment Variable (NOT RECOMMENDED for production)
+
+⚠️ **WARNING:** Only use environment variables for **LOCAL DEVELOPMENT**. For production, use Secrets Manager (Option 3).
 
 ```bash
 export SLACK_ENABLED=true
@@ -491,7 +496,7 @@ export SLACK_ENABLED=true
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX"
 ```
 
-#### Option 2: Local Configuration File
+#### Option 2: Local Configuration File (Local Development)
 
 Create `config/my_slack_webhook.yaml`:
 
@@ -506,7 +511,9 @@ Then enable:
 export SLACK_ENABLED=true
 ```
 
-#### Option 3: AWS Secrets Manager (Production)
+#### Option 3: AWS Secrets Manager (RECOMMENDED for Production) ✅
+
+**This is the secure way to store Slack webhook URLs in production.**
 
 Create secret in Secrets Manager:
 
@@ -521,11 +528,18 @@ aws secretsmanager create-secret \
 
 **Note:** Get your webhook URL from https://api.slack.com/messaging/webhooks
 
-Then enable:
+Then enable in Lambda environment:
 
 ```bash
 export SLACK_ENABLED=true
 ```
+
+**Advantages:**
+- ✅ Webhook URL is encrypted at rest in AWS
+- ✅ Access is logged via CloudTrail
+- ✅ Easy to rotate credentials without redeploying
+- ✅ Lambda role permissions control access
+- ✅ No secrets in code or environment variables
 
 ### Slack Message Templates
 
