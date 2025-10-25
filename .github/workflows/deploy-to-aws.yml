@@ -344,16 +344,70 @@ jobs:
           if [ "${{ needs.deploy-lambda.result }}" = "success" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
             echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
             echo "message=Deployment to AWS Lambda successful" >> $GITHUB_OUTPUT
           elif [ "${{ needs.deploy-lambda.result }}" = "skipped" ]; then
             echo "status=skipped" >> $GITHUB_OUTPUT
             echo "emoji=⏭️" >> $GITHUB_OUTPUT
+            echo "color=warning" >> $GITHUB_OUTPUT
             echo "message=Deployment skipped (PR or non-main branch)" >> $GITHUB_OUTPUT
           else
             echo "status=failure" >> $GITHUB_OUTPUT
             echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
             echo "message=Deployment to AWS Lambda failed" >> $GITHUB_OUTPUT
           fi
+
+      - name: Send Slack Notification
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "title": "${{ steps.status.outputs.emoji }} ${{ steps.status.outputs.message }}",
+                  "title_link": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                  "fields": [
+                    {
+                      "title": "Workflow",
+                      "value": "${{ github.workflow }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Status",
+                      "value": "Test: ${{ needs.test.result }} | Build: ${{ needs.build-and-push.result }} | Deploy: ${{ needs.deploy-lambda.result }}",
+                      "short": false
+                    },
+                    {
+                      "title": "Branch",
+                      "value": "${{ github.ref_name }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Author",
+                      "value": "${{ github.actor }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Commit",
+                      "value": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }} | ${{ github.sha }}>",
+                      "short": true
+                    },
+                    {
+                      "title": "Repository",
+                      "value": "${{ github.repository }}",
+                      "short": true
+                    }
+                  ],
+                  "footer": "GitHub Actions",
+                  "ts": "$(date +%s)"
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Create deployment notification
         run: |
