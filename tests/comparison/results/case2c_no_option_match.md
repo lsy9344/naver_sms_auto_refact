@@ -1,6 +1,6 @@
 # Comparison Report: case2c_no_option_match
 **Scenario:** CASE 2C: No Option Match - Should not trigger option SMS
-**Generated:** 2025-10-25T03:13:19.948644
+**Generated:** 2025-10-25T10:16:50.222616
 
 ## Summary
 - **Total Mismatches:** 0

@@ -1,6 +1,6 @@
 # Comparison Report: case4_cookie_refresh_001
 **Scenario:** CASE 4: Cookie Expiry - Forced Session Refresh
-**Generated:** 2025-10-25T03:12:58.049649
+**Generated:** 2025-10-25T10:16:40.485050
 
 ## Summary
 - **Total Mismatches:** 0
