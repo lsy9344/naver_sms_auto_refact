@@ -2,17 +2,17 @@ default:
   fromNumber: "01055814318"
 stores:
   "1051707":
-    name: "다비스튜디오 화성점"
+    name: "다비스튜디오 화성 새솔점"
     fromNumber: "01055814318"
     templates:
       guide: "1051707"
   "1120125":
-    name: "다비스튜디오 수원 금곡점"
+    name: "다비스튜디오 수원 호매실점"
     fromNumber: "01055814318"
     templates:
       guide: "1120125"
   "1285716":
-    name: "다비스튜디오 동탄점"
+    name: "다비스튜디오 화성 동탄점"
     fromNumber: "01055814318"
     templates:
       guide: "1285716"
@@ -37,7 +37,7 @@ stores:
     templates:
       guide: "867589"
   "951291":
-    name: "다비스튜디오 안산 당곡점"
+    name: "다비스튜디오 안산 중앙점"
     fromNumber: "01055814318"
     templates:
       guide: "951291"

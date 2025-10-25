@@ -1,10 +1,10 @@
 {
   "metadata": {
     "booking_id": "case6_volume_002",
-    "generated_at": "2025-10-24T02:29:59.520072",
+    "generated_at": "2025-10-25T03:13:07.753859",
     "container_digest": "local-development",
     "dataset_version": "1.0",
-    "parity_run_timestamp": "2025-10-24T02:29:59.523498"
+    "parity_run_timestamp": "2025-10-25T03:13:07.759360"
   },
   "statistics": {
     "booking_id": "case6_volume_002",
@@ -12,7 +12,7 @@
     "critical_mismatches": 0,
     "warning_mismatches": 0,
     "parity_status": "PASS",
-    "timestamp": "2025-10-24T02:29:59.520064"
+    "timestamp": "2025-10-25T03:13:07.753854"
   },
   "mismatches": [],
   "legacy_output": {

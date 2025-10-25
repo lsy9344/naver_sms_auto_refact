@@ -73,8 +73,10 @@ class SensSmsClient:
         self._timestamp_provider = timestamp_provider
         self.max_retries = max_retries
         self.retry_delay_seconds = retry_delay_seconds
+        self.last_skip_reason: Optional[str] = None
 
         self.settings = settings or Settings()
+        self._refresh_feature_flags()
         self.credentials = credentials or self.settings.load_sens_credentials()
         self.access_key = self.credentials["access_key"]
         self.secret_key = self.credentials["secret_key"]
@@ -98,26 +100,26 @@ class SensSmsClient:
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
-    def send_confirm_sms(self, phone: str, store_id: Optional[str] = None) -> None:
+    def send_confirm_sms(self, phone: str, store_id: Optional[str] = None) -> bool:
         """Send booking confirmation SMS."""
         template = self._get_template("booking_confirm")
         payload = self._build_payload(template, phone, store_id)
-        self._dispatch(payload, store_id, phone, action="send_confirm_sms")
+        return self._dispatch(payload, store_id, phone, action="send_confirm_sms")
 
-    def send_guide_sms(self, store_id: str, phone: str) -> None:
+    def send_guide_sms(self, store_id: str, phone: str) -> bool:
         """Send store specific guide SMS."""
         if not store_id:
             raise ValueError("store_id is required for guide SMS")
         template_key = self._get_store_template(store_id, "guide")
         template = self._get_template(("guide", template_key))
         payload = self._build_payload(template, phone, store_id)
-        self._dispatch(payload, store_id, phone, action="send_guide_sms")
+        return self._dispatch(payload, store_id, phone, action="send_guide_sms")
 
-    def send_event_sms(self, phone: str, store_id: Optional[str] = None) -> None:
+    def send_event_sms(self, phone: str, store_id: Optional[str] = None) -> bool:
         """Send event/review SMS."""
         template = self._get_template("event")
         payload = self._build_payload(template, phone, store_id)
-        self._dispatch(payload, store_id, phone, action="send_event_sms")
+        return self._dispatch(payload, store_id, phone, action="send_event_sms")
 
     # ------------------------------------------------------------------ #
     # Internal helpers
@@ -128,11 +130,29 @@ class SensSmsClient:
         store_id: Optional[str],
         phone: str,
         action: str,
-    ) -> None:
+    ) -> bool:
         """Send payload to SENS with retry handling."""
         url = f"{self.SENS_URL}{self.uri}"
         body = json.dumps(payload)  # ensure_ascii=True preserves legacy behaviour
         masked_phone = self._mask_phone(phone)
+
+        self._refresh_feature_flags()
+        allowed, reason = self._is_delivery_allowed()
+        if not allowed:
+            self.last_skip_reason = reason
+            self.logger.info(
+                "SMS delivery skipped",
+                operation=action,
+                context={
+                    "status": "skipped",
+                    "store_id": store_id,
+                    "phone_masked": masked_phone,
+                    "reason": reason,
+                },
+            )
+            return False
+
+        self.last_skip_reason = None
 
         for attempt in range(1, self.max_retries + 1):
             timestamp = self._timestamp_provider()
@@ -164,7 +184,7 @@ class SensSmsClient:
                         "phone_masked": masked_phone,
                     },
                 )
-                return
+                return True
             except Exception as exc:  # noqa: BLE001 - we need to retry on any failure
                 if attempt >= self.max_retries:
                     self.logger.error(
@@ -192,6 +212,33 @@ class SensSmsClient:
                     error=str(exc),
                 )
                 time.sleep(self.retry_delay_seconds * attempt)
+
+        return True
+
+    def _refresh_feature_flags(self) -> None:
+        """Refresh feature flag values from settings."""
+        try:
+            self._delivery_enabled = self.settings.is_sens_delivery_enabled()
+        except AttributeError:
+            self._delivery_enabled = True
+
+        try:
+            self._comparison_mode_enabled = self.settings.is_comparison_mode_enabled()
+        except AttributeError:
+            self._comparison_mode_enabled = False
+
+    def _is_delivery_allowed(self) -> tuple[bool, str]:
+        """
+        Determine whether outbound delivery is permitted.
+
+        Returns:
+            Tuple (allowed, reason). When allowed is False, reason holds explanation.
+        """
+        if not getattr(self, "_delivery_enabled", True):
+            return False, "SENS_DELIVERY_ENABLED is false"
+        if getattr(self, "_comparison_mode_enabled", False):
+            return False, "COMPARISON_MODE_ENABLED is true"
+        return True, ""
 
     def _build_payload(
         self,

@@ -23,12 +23,14 @@ from src.database.dynamodb_client import BookingRepository
 from src.domain.booking import Booking
 from src.notifications.sms_service import SensSmsClient
 from src.notifications.slack_service import SlackWebhookClient
+from src.notifications.telegram_service import TelegramBotClient
 from src.rules.engine import RuleEngine, ActionResult
 from src.rules.conditions import register_conditions
 from src.rules.actions import (
     register_actions,
     ActionServicesBundle,
     SlackTemplateLoader,
+    TelegramTemplateLoader,
 )
 from src.utils.logger import get_logger
 
@@ -160,13 +162,45 @@ def lambda_handler(event, context):
                     logger.error(f"Failed to initialize Slack services: {e}; disabling Slack")
                     slack_enabled = False
 
+            # Initialize Telegram service
+            telegram_service = None
+            telegram_template_loader = None
+            try:
+                telegram_template_loader = TelegramTemplateLoader(logger=logger)
+            except FileNotFoundError:
+                logger.warning(
+                    "Telegram template configuration not found; template-based messages disabled"
+                )
+            except Exception as e:
+                logger.error(f"Failed to load Telegram templates: {e}")
+
+            try:
+                telegram_creds = settings.load_telegram_credentials()
+                if telegram_creds:
+                    telegram_service = TelegramBotClient(
+                        bot_token=telegram_creds.get("bot_token"),
+                        chat_id=telegram_creds.get("chat_id"),
+                        logger=logger,
+                    )
+                    logger.info("Telegram service initialized")
+                else:
+                    logger.warning("Telegram credentials not configured")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Telegram service: {e}")
+
             services_bundle = ActionServicesBundle(
                 db_repo=booking_repo,
                 sms_service=sms_service,
                 logger=logger,
-                settings_dict={"slack_enabled": slack_enabled},
+                settings_dict={
+                    "slack_enabled": slack_enabled,
+                    "sens_delivery_enabled": settings.is_sens_delivery_enabled(),
+                    "comparison_mode_enabled": settings.is_comparison_mode_enabled(),
+                },
                 slack_service=slack_service,
                 slack_template_loader=slack_template_loader,
+                telegram_template_loader=telegram_template_loader,
+                telegram_service=telegram_service,
             )
 
             register_actions(engine, services_bundle)

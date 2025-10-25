@@ -24,7 +24,12 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "[SMS] Confirmation sent to customer"
+            "template_name": "sms_confirmation",
+            "template_params": {
+              "customer_name": "{{ booking.name }}",
+              "customer_phone": "{{ booking.phone }}",
+              "booking_number": "{{ booking.booking_num }}"
+            }
           }
         }
       ]

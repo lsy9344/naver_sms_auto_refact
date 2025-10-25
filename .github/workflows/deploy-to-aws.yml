@@ -1,0 +1,379 @@
+name: Build, Test & Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "config/**"
+      - "Dockerfile"
+      - "requirements.txt"
+      - ".github/workflows/deploy-to-aws.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "config/**"
+      - "Dockerfile"
+      - "requirements.txt"
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY_NAME: naver-sms-automation
+  LAMBDA_FUNCTION_NAME: naverplace_send_inform
+  AWS_ACCOUNT_ID: 654654307503
+
+jobs:
+  # ============================================================================
+  # TESTING PHASE
+  # ============================================================================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit & integration tests
+        run: |
+          pytest tests/unit tests/integration tests/comparison -v \
+            --cov=src --cov-report=term-missing --cov-report=json \
+            --junit-xml=test-results.xml
+        env:
+          MOCK_AWS: "true"
+
+      - name: Run security scan (Bandit)
+        run: |
+          bandit -c .bandit --severity-level medium --confidence-level medium -r src \
+            --exit-zero --format json -o bandit-report.json
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results.xml
+            coverage.json
+            bandit-report.json
+          retention-days: 30
+
+      - name: Check coverage threshold
+        run: |
+          pytest tests/ --cov=src --cov-fail-under=80 \
+            --cov-report=term-missing
+
+  # ============================================================================
+  # DOCKER BUILD & ECR PUSH PHASE
+  # ============================================================================
+  build-and-push:
+    name: Build Docker Image & Push to ECR
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      image-uri: ${{ steps.image.outputs.image-uri }}
+      image-tag: ${{ steps.image.outputs.image-tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Docker image
+        id: image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+          COMMIT_SHORT: ${{ github.sha }}
+        run: |
+          # Build image
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:latest \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:${COMMIT_SHORT:0:7} .
+          
+          # Push all tags
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:${COMMIT_SHORT:0:7}
+          
+          # Output image URI
+          echo "image-uri=$ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Image scan results
+        run: |
+          echo "📦 Image pushed to ECR"
+          echo "Registry: ${{ steps.login-ecr.outputs.registry }}"
+          echo "Repository: $ECR_REPOSITORY_NAME"
+          echo "Image URI: ${{ steps.image.outputs.image-uri }}"
+
+  # ============================================================================
+  # LAMBDA DEPLOYMENT PHASE
+  # ============================================================================
+  deploy-lambda:
+    name: Deploy to Lambda
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update Lambda function code
+        id: lambda-update
+        run: |
+          echo "🚀 Updating Lambda function: $LAMBDA_FUNCTION_NAME"
+          
+          aws lambda update-function-code \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --image-uri ${{ needs.build-and-push.outputs.image-uri }} \
+            --region ${{ env.AWS_REGION }} \
+            --no-cli-pager > lambda-response.json
+          
+          # Extract important info
+          FUNCTION_ARN=$(jq -r '.FunctionArn' lambda-response.json)
+          IMAGE_URI=$(jq -r '.ImageConfigResponse.ImageUri' lambda-response.json)
+          LAST_MODIFIED=$(jq -r '.LastModified' lambda-response.json)
+          
+          echo "function-arn=$FUNCTION_ARN" >> $GITHUB_OUTPUT
+          echo "image-uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+          echo "last-modified=$LAST_MODIFIED" >> $GITHUB_OUTPUT
+
+      - name: Wait for Lambda update to complete
+        run: |
+          echo "⏳ Waiting for Lambda update to complete..."
+          for i in {1..30}; do
+            STATE=$(aws lambda get-function \
+              --function-name $LAMBDA_FUNCTION_NAME \
+              --region ${{ env.AWS_REGION }} \
+              --query 'Configuration.State' --output text)
+            
+            if [ "$STATE" = "Active" ]; then
+              echo "✅ Lambda is Active"
+              break
+            fi
+            
+            echo "State: $STATE (attempt $i/30)"
+            sleep 5
+          done
+
+      - name: Test Lambda invocation
+        id: lambda-test
+        run: |
+          echo "🧪 Testing Lambda invocation..."
+          
+          aws lambda invoke \
+            --function-name $LAMBDA_FUNCTION_NAME \
+            --region ${{ env.AWS_REGION }} \
+            --payload '{}' \
+            --log-type Tail \
+            lambda-test-response.json
+          
+          # Check response
+          if [ -s lambda-test-response.json ]; then
+            echo "✅ Lambda invocation successful"
+            cat lambda-test-response.json | head -100
+          else
+            echo "⚠️ Lambda returned empty response"
+          fi
+
+      - name: Check Lambda CloudWatch logs
+        if: always()
+        run: |
+          echo "📋 Fetching latest CloudWatch logs..."
+          
+          LOG_GROUP="/aws/lambda/$LAMBDA_FUNCTION_NAME"
+          
+          # Get latest log stream
+          LATEST_STREAM=$(aws logs describe-log-streams \
+            --log-group-name "$LOG_GROUP" \
+            --order-by LastEventTime \
+            --descending \
+            --max-items 1 \
+            --region ${{ env.AWS_REGION }} \
+            --query 'logStreams[0].logStreamName' \
+            --output text)
+          
+          if [ "$LATEST_STREAM" != "None" ] && [ -n "$LATEST_STREAM" ]; then
+            echo "Latest log stream: $LATEST_STREAM"
+            aws logs get-log-events \
+              --log-group-name "$LOG_GROUP" \
+              --log-stream-name "$LATEST_STREAM" \
+              --region ${{ env.AWS_REGION }} \
+              --limit 50 \
+              --query 'events[*].message' \
+              --output text
+          else
+            echo "No log streams found yet"
+          fi
+
+      - name: Create deployment summary
+        run: |
+          cat > deployment-summary.txt << EOF
+          ============================================
+          AWS LAMBDA DEPLOYMENT SUMMARY
+          ============================================
+          
+          Deployment Status: ✅ SUCCESS
+          
+          Lambda Function:
+            Name: $LAMBDA_FUNCTION_NAME
+            ARN: ${{ steps.lambda-update.outputs.function-arn }}
+            Region: ${{ env.AWS_REGION }}
+            Updated: ${{ steps.lambda-update.outputs.last-modified }}
+          
+          Container Image:
+            URI: ${{ needs.build-and-push.outputs.image-uri }}
+            Tag: ${{ needs.build-and-push.outputs.image-tag }}
+            Registry: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          
+          Git Context:
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref }}
+            Author: ${{ github.actor }}
+          
+          ============================================
+          EOF
+          
+          cat deployment-summary.txt
+
+      - name: Upload deployment summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-summary
+          path: deployment-summary.txt
+          retention-days: 30
+
+  # ============================================================================
+  # DOCUMENTATION UPDATES
+  # ============================================================================
+  update-docs:
+    name: Update Documentation
+    runs-on: ubuntu-latest
+    needs: deploy-lambda
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update deployment log
+        run: |
+          DEPLOYMENT_LOG="docs/ops/DEPLOYMENTS.md"
+          TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          COMMIT_SHA=${{ github.sha }}
+          COMMIT_MSG=$(git log -1 --pretty=%B $COMMIT_SHA)
+          
+          # Create file if it doesn't exist
+          if [ ! -f "$DEPLOYMENT_LOG" ]; then
+            mkdir -p $(dirname "$DEPLOYMENT_LOG")
+            cat > "$DEPLOYMENT_LOG" << 'EOF'
+          # Deployment History
+          
+          Automated deployments to AWS Lambda from main branch.
+          
+          | Date | Commit | Message | Status |
+          |------|--------|---------|--------|
+          EOF
+          fi
+          
+          # Add new entry
+          sed -i "5i| $TIMESTAMP | \`${COMMIT_SHA:0:7}\` | $(echo "$COMMIT_MSG" \| head -1) | ✅ Success |" "$DEPLOYMENT_LOG"
+
+      - name: Commit documentation updates
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if [ -n "$(git status -s)" ]; then
+            git add docs/ops/DEPLOYMENTS.md
+            git commit -m "docs: update deployment history [skip ci]"
+            git push
+          else
+            echo "No documentation changes to commit"
+          fi
+
+  # ============================================================================
+  # NOTIFICATIONS
+  # ============================================================================
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [test, build-and-push, deploy-lambda]
+    if: always()
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [ "${{ needs.deploy-lambda.result }}" = "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "message=Deployment to AWS Lambda successful" >> $GITHUB_OUTPUT
+          elif [ "${{ needs.deploy-lambda.result }}" = "skipped" ]; then
+            echo "status=skipped" >> $GITHUB_OUTPUT
+            echo "emoji=⏭️" >> $GITHUB_OUTPUT
+            echo "message=Deployment skipped (PR or non-main branch)" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "message=Deployment to AWS Lambda failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create deployment notification
+        run: |
+          cat > notification.txt << EOF
+          ${{ steps.status.outputs.emoji }} ${{ steps.status.outputs.message }}
+          
+          Workflow: ${{ github.workflow }}
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+          Author: ${{ github.actor }}
+          
+          Repository: ${{ github.repository }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          
+          cat notification.txt
+
+      - name: Print deployment details
+        run: |
+          echo "════════════════════════════════════════"
+          echo "📊 GITHUB ACTIONS DEPLOYMENT SUMMARY"
+          echo "════════════════════════════════════════"
+          echo ""
+          echo "Test Phase: ${{ needs.test.result }}"
+          echo "Build Phase: ${{ needs.build-and-push.result }}"
+          echo "Deploy Phase: ${{ needs.deploy-lambda.result }}"
+          echo ""
+          echo "════════════════════════════════════════"

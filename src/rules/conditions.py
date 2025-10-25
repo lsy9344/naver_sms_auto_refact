@@ -450,34 +450,37 @@ def has_multiple_options(
     context: Dict[str, Any], keywords: list, min_count: int = 1, **params
 ) -> bool:
     """
-    Evaluate if booking has at least min_count matching option keywords.
+    Evaluate if booking has an option with matching keyword and sufficient bookingCount.
 
     Inspects booking's option keywords against a provided keyword list and
-    ensures at least min_count keywords match. Supports graceful handling of
-    various option formats (string, dict, object).
+    checks if the matching option's bookingCount >= min_count. This enables
+    filtering customers who selected specific options (e.g., professional edit)
+    multiple times (e.g., "전문가 보정" selected 2+ times).
 
     Args:
         context: Dictionary containing:
-            - booking: Booking object with option_keywords attribute
-            - settings: Settings object with configuration (optional)
-        keywords: List of keywords to match against option keywords
-        min_count: Minimum number of keywords to match (default: 1)
+            - booking: Booking object with option_keywords/bookingOptionJson attribute
+        keywords: List of keywords to match against option names
+        min_count: Minimum bookingCount required for a matching option (default: 1)
         **params: Additional parameters (unused)
 
     Returns:
-        bool: True if at least min_count keywords match, False otherwise
+        bool: True if any option matches keyword AND has bookingCount >= min_count, False otherwise
 
     Reference:
         Story 6.4: Add Multi-Option Condition Evaluator
         docs/epics/epic-6-post-mvp-enhancements.md#new-condition-evaluators
 
     Example:
-        >>> booking = Mock(option_keywords=['네이버', '원본'])
+        >>> booking = Mock(option_keywords=[
+        ...     {'name': '전문가 보정 1컷 (4인까지)', 'bookingCount': 2},
+        ...     {'name': '일반 옵션', 'bookingCount': 1}
+        ... ])
         >>> context = {'booking': booking}
-        >>> has_multiple_options(context, keywords=['네이버', '인스타', '원본'], min_count=2)
-        True  # Matched 2 keywords
-        >>> has_multiple_options(context, keywords=['인스타'], min_count=1)
-        False  # No matches
+        >>> has_multiple_options(context, keywords=['전문가 보정'], min_count=2)
+        True  # Matched "전문가 보정" with bookingCount=2
+        >>> has_multiple_options(context, keywords=['전문가 보정'], min_count=3)
+        False  # bookingCount=2 < min_count=3
     """
     try:
         booking = context.get("booking")
@@ -503,16 +506,18 @@ def has_multiple_options(
             logger.debug("has_multiple_options: No option_keywords on booking")
             return False
 
-        # Count matches: iterate through booking options and check against keyword list
-        match_count = 0
+        # Check each option: find matching keyword and verify bookingCount
         for option in booking_options:
             # Handle both string, dict, and object option formats
             if isinstance(option, str):
                 option_name = option
+                booking_count = 1  # Default to 1 for string-only options
             elif isinstance(option, dict):
                 option_name = option.get("name", "")
+                booking_count = option.get("bookingCount", 0)
             else:
                 option_name = getattr(option, "name", "")
+                booking_count = getattr(option, "bookingCount", 0)
 
             if not option_name:
                 continue
@@ -520,24 +525,106 @@ def has_multiple_options(
             # Check if any keyword matches this option
             for keyword in keywords:
                 if keyword in option_name:
-                    match_count += 1
+                    # Found a match - check if bookingCount meets threshold
+                    result = booking_count >= min_count
                     logger.debug(
                         f"has_multiple_options: Matched keyword '{keyword}' "
-                        f"in option '{option_name}' (match_count={match_count})"
+                        f"in option '{option_name}' with bookingCount={booking_count}, "
+                        f"min_count={min_count}, result={result}"
                     )
-                    break  # Count each option only once per keyword match
+                    if result:
+                        return True
+                    break  # Move to next option
 
-        # Check if match count meets minimum threshold
-        result = match_count >= min_count
-
+        # No matching option found with sufficient bookingCount
         logger.debug(
-            f"has_multiple_options: keywords={keywords}, min_count={min_count}, "
-            f"match_count={match_count}, result={result}"
+            f"has_multiple_options: No option matched keywords={keywords} "
+            f"with bookingCount >= {min_count}"
         )
-        return result
+        return False
 
     except Exception as e:
         logger.error(f"has_multiple_options error: {e}", exc_info=True)
+        return False
+
+
+def sms_send_failed(
+    context: Dict[str, Any],
+    template: Optional[str] = None,
+    lookback_minutes: int = 5,
+    failure_threshold: int = 1,
+    **params,
+) -> bool:
+    """
+    Evaluate if SMS sending has failed recently.
+
+    Checks context['sms_failure'] for recent failures.
+    Supports filtering by template type (confirmation, guide, event).
+
+    This condition enables alert rules to detect and respond to SMS delivery
+    failures immediately, triggering operational notifications to ops teams.
+
+    Args:
+        context: Dictionary containing:
+            - sms_failure: Optional dict with failure context if SMS send failed
+              Keys: template (str), booking_num (str), error (str), timestamp (datetime)
+        template: Optional SMS template type filter ('confirm', 'guide', 'event')
+        lookback_minutes: Time window to check (reserved for future enhancement)
+        failure_threshold: Minimum failures to trigger (reserved for future enhancement)
+        **params: Additional parameters (unused)
+
+    Returns:
+        bool: True if SMS failure detected matching criteria, False otherwise
+
+    Example:
+        >>> context = {
+        ...     'sms_failure': {
+        ...         'template': 'guide',
+        ...         'booking_num': '12345_001',
+        ...         'error': 'SENS API timeout'
+        ...     }
+        ... }
+        >>> sms_send_failed(context, template='guide')
+        True
+        >>> sms_send_failed(context, template='confirm')
+        False  # Template mismatch
+        >>> sms_send_failed(context)
+        True  # No template filter, any failure matches
+
+    Reference:
+        Story: SMS Failure Alert Monitoring
+        Condition detects: SmsServiceError exceptions from send_sms action
+        Triggered from: Rule engine when ActionExecutionError occurs
+    """
+    try:
+        # Check if SMS failure data exists in context
+        sms_failure = context.get("sms_failure")
+
+        if sms_failure is None:
+            logger.debug("sms_send_failed: No sms_failure in context")
+            return False
+
+        # If template filter specified, verify it matches
+        if template is not None:
+            failure_template = sms_failure.get("template")
+            if failure_template != template:
+                logger.debug(
+                    f"sms_send_failed: Template mismatch - "
+                    f"expected '{template}', got '{failure_template}'"
+                )
+                return False
+
+        # Failure detected and matches criteria (if any filters specified)
+        logger.debug(
+            f"sms_send_failed: SMS failure detected - "
+            f"template={sms_failure.get('template')}, "
+            f"booking_num={sms_failure.get('booking_num')}, "
+            f"error={sms_failure.get('error')}"
+        )
+        return True
+
+    except Exception as e:
+        logger.error(f"sms_send_failed error: {e}", exc_info=True)
         return False
 
 
@@ -572,6 +659,7 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
         - has_multiple_options: True if booking has minimum matching option keywords
         - date_range: True if booking falls within date range
         - has_pro_edit_option: True if booking has professional edit option
+        - sms_send_failed: True if SMS delivery failed or raised errors
 
     Reference:
         Integration pattern: docs/brownfield-architecture.md:1070-1145
@@ -585,12 +673,13 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     engine.register_condition("has_multiple_options", has_multiple_options)
     engine.register_condition("date_range", date_range)
     engine.register_condition("has_pro_edit_option", has_pro_edit_option)
+    engine.register_condition("sms_send_failed", sms_send_failed)
 
     logger.info(
-        "Registered 9 condition evaluators with RuleEngine: "
+        "Registered 10 condition evaluators with RuleEngine: "
         "booking_not_in_db, time_before_booking, flag_not_set, "
         "current_hour, booking_status, has_option_keyword, "
-        "has_multiple_options, date_range, has_pro_edit_option"
+        "has_multiple_options, date_range, has_pro_edit_option, sms_send_failed"
     )
 
 

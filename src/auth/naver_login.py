@@ -6,6 +6,8 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 from ..utils.logger import get_logger
 
@@ -54,27 +56,37 @@ class NaverAuthenticator:
         userid = self.username
         userpw = self.password
         dynamodb_session = self.session_manager
+        delay = 0
 
+        logger.info("로그인")
         if not cached_cookies:
             logger.info("Starting fresh Naver login", operation="naver_login")
-            msg = "No cached cookies, proceeding with Selenium login"
-            logger.debug(msg, operation="naver_login")
+            logger.debug(
+                "No cached cookies, proceeding with Selenium login", operation="naver_login"
+            )
 
-            driver.get("https://nid.naver.com/nidlogin.login")
-            time.sleep(uniform(2, 4))
+            driver.refresh()
 
-            driver.execute_script(f"document.getElementsByName('id')[0].value='{userid}'")
-            time.sleep(uniform(0.7, 1.3))
-            driver.execute_script(f"document.getElementsByName('pw')[0].value='{userpw}'")
-            time.sleep(uniform(0.7, 1.3))
+            driver.get("https://nid.naver.com/nidlogin.login?mode=form&url=https://www.naver.com/")
 
-            driver.find_element(By.ID, "log.login").click()
-            time.sleep(uniform(2.5, 5))
+            login_btn = driver.find_element(By.ID, "log.login")
 
-            driver.get("https://new.smartplace.naver.com/")
-            time.sleep(uniform(2, 4))
+            driver.execute_script(
+                f"document.querySelector('input[id=\"id\"]').setAttribute('value', '{userid}')"
+            )
+            time.sleep(uniform(delay + 0.33643, delay + 0.54354))
+            driver.execute_script(
+                f"document.querySelector('input[id=\"pw\"]').setAttribute('value', '{userpw}')"
+            )
+            time.sleep(uniform(delay + 0.33643, delay + 0.54354))
+            login_btn.click()
+            time.sleep(uniform(delay + 0.63643, delay + 0.94354))
+
+            time.sleep(1)
+
+            WebDriverWait(driver, 10).until(EC.url_contains("naver.com"))
+
             cookies = driver.get_cookies()
-
             session_cookie = json.dumps(cookies)
             dynamodb_session.put_item(Item={"id": "1", "cookies": session_cookie})
 
@@ -83,10 +95,11 @@ class NaverAuthenticator:
             for cookie in cached_cookies:
                 driver.add_cookie(cookie)
 
-            driver.get("https://new.smartplace.naver.com/profile")
-            logger.debug("Validating cached cookie", operation="naver_login_cached")
-            time.sleep(uniform(1, 2.5))
+            driver.get("https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR")
+            driver.implicitly_wait(10)
 
+            logger.debug("Validating cached cookie", operation="naver_login_cached")
+            time.sleep(3)
             if "login" in driver.current_url:
                 msg = "Cookie validation failed, re-authenticating"
                 logger.warning(msg, operation="naver_login_cached", error="Cached cookie invalid")

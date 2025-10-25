@@ -627,10 +627,10 @@ class TestHasMultipleOptions:
     """Story 6.4: has_multiple_options - Check if booking has minimum matching option keywords"""
 
     def test_sufficient_keyword_matches(self):
-        """Test: Returns True when match count >= min_count"""
-        booking = Mock(option_keywords=["네이버 Pay", "원본 방식"])
+        """Test: Returns True when option's bookingCount >= min_count"""
+        booking = Mock(option_keywords=[{"name": "전문가 보정 1컷 (4인까지)", "bookingCount": 2}])
         context = {"booking": booking}
-        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=2)
+        result = has_multiple_options(context, keywords=["전문가 보정"], min_count=2)
         assert result is True
 
     def test_exact_minimum_matches(self):
@@ -669,42 +669,55 @@ class TestHasMultipleOptions:
         assert result is False
 
     def test_dict_format_options(self):
-        """Test: Handles dict-format options"""
-        booking = Mock(option_keywords=[{"name": "네이버 Pay"}, {"name": "원본"}])
+        """Test: Handles dict-format options with bookingCount"""
+        booking = Mock(
+            option_keywords=[
+                {"name": "전문가 보정 1컷", "bookingCount": 2},
+                {"name": "배경 수정", "bookingCount": 1},
+            ]
+        )
         context = {"booking": booking}
-        result = has_multiple_options(context, keywords=["네이버", "원본"], min_count=2)
+        result = has_multiple_options(context, keywords=["전문가 보정"], min_count=2)
         assert result is True
 
     def test_mixed_format_options(self):
-        """Test: Handles mixed format options (string, dict, object)"""
+        """Test: Handles mixed format options (string, dict, object) with bookingCount"""
         option_obj = Mock()
-        option_obj.name = "원본 방식"
-        booking = Mock(option_keywords=["네이버 Pay", {"name": "인스타"}, option_obj])
+        option_obj.name = "전문가 보정"
+        option_obj.bookingCount = 3
+        booking = Mock(
+            option_keywords=[
+                "일반 옵션",  # String format, no bookingCount, defaults to 1
+                {"name": "배경 수정", "bookingCount": 2},  # Dict format
+                option_obj,  # Object format with bookingCount=3
+            ]
+        )
         context = {"booking": booking}
-        result = has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=3)
+        result = has_multiple_options(context, keywords=["전문가 보정"], min_count=3)
         assert result is True
 
     def test_higher_min_count(self):
-        """Test: Supports higher min_count values"""
-        booking = Mock(option_keywords=["네이버", "인스타", "원본"])
+        """Test: Supports higher min_count values for bookingCount"""
+        booking = Mock(
+            option_keywords=[
+                {"name": "전문가 보정", "bookingCount": 3},
+                {"name": "배경 수정", "bookingCount": 1},
+            ]
+        )
         context = {"booking": booking}
-        assert (
-            has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=3)
-            is True
-        )
-        assert (
-            has_multiple_options(context, keywords=["네이버", "인스타", "원본"], min_count=4)
-            is False
-        )
+        assert has_multiple_options(context, keywords=["전문가 보정"], min_count=3) is True
+        assert has_multiple_options(context, keywords=["전문가 보정"], min_count=4) is False
 
-    def test_duplicate_option_names_counted_once(self):
-        """Test: Each option is counted only once even if multiple keywords match"""
-        booking = Mock(option_keywords=["네이버-원본-인스타"])
+    def test_single_option_with_booking_count(self):
+        """Test: Single option matching uses its bookingCount for comparison"""
+        booking = Mock(option_keywords=[{"name": "전문가 보정", "bookingCount": 2}])
         context = {"booking": booking}
-        # Only one option, should count as 1 even though 3 keywords match within it
-        result = has_multiple_options(context, keywords=["네이버", "원본", "인스타"], min_count=1)
+        # Single option with bookingCount=2
+        result = has_multiple_options(context, keywords=["전문가 보정"], min_count=1)
         assert result is True
-        result = has_multiple_options(context, keywords=["네이버", "원본", "인스타"], min_count=2)
+        result = has_multiple_options(context, keywords=["전문가 보정"], min_count=2)
+        assert result is True
+        result = has_multiple_options(context, keywords=["전문가 보정"], min_count=3)
         assert result is False
 
     def test_missing_booking(self):

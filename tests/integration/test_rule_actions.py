@@ -18,6 +18,7 @@ from src.rules.actions import (
     send_slack,
     log_event,
     register_actions,
+    TelegramTemplateLoader,
 )
 from src.domain.booking import Booking
 
@@ -111,12 +112,31 @@ def mock_slack_template_loader():
 
 
 @pytest.fixture
+def mock_telegram_template_loader():
+    """Create a mock Telegram template loader."""
+    loader = Mock()
+    loader.render.return_value = {"text": "Rendered Telegram message", "parse_mode": "Markdown"}
+    return loader
+
+
+@pytest.fixture
+def mock_telegram_service():
+    """Create a mock Telegram service."""
+    service = Mock()
+    service.send_message = Mock()
+    service.send_notification = Mock()
+    return service
+
+
+@pytest.fixture
 def services_bundle(
     mock_db_repo,
     mock_sms_service,
     mock_logger,
     mock_slack_service,
     mock_slack_template_loader,
+    mock_telegram_service,
+    mock_telegram_template_loader,
 ):
     """Create a services bundle for integration testing."""
     return ActionServicesBundle(
@@ -126,6 +146,8 @@ def services_bundle(
         logger=mock_logger,
         slack_service=mock_slack_service,
         slack_template_loader=mock_slack_template_loader,
+        telegram_template_loader=mock_telegram_template_loader,
+        telegram_service=mock_telegram_service,
     )
 
 
@@ -139,6 +161,8 @@ def action_context(booking, services_bundle):
         sms_service=services_bundle.sms_service,
         slack_service=services_bundle.slack_service,
         slack_template_loader=services_bundle.slack_template_loader,
+        telegram_template_loader=services_bundle.telegram_template_loader,
+        telegram_service=services_bundle.telegram_service,
         logger=services_bundle.logger,
     )
 
@@ -392,11 +416,17 @@ class TestNotificationActions:
             sms_service=services_bundle.sms_service,
             slack_service=services_bundle.slack_service,
             slack_template_loader=services_bundle.slack_template_loader,
+            telegram_template_loader=services_bundle.telegram_template_loader,
+            telegram_service=services_bundle.telegram_service,
             logger=services_bundle.logger,
         )
 
         # Send Telegram notification
         send_telegram(context, message="Test booking confirmed")
+        services_bundle.telegram_service.send_message.assert_called_once_with(
+            text="Test booking confirmed",
+            parse_mode="Markdown",
+        )
         assert services_bundle.logger.info.called
 
         # Send Slack notification (disabled by default)
@@ -413,6 +443,41 @@ class TestNotificationActions:
 
         # Should now call info
         assert services_bundle.logger.info.called
+
+    def test_telegram_template_rendering_with_real_loader(
+        self,
+        booking,
+        mock_telegram_service,
+        mock_logger,
+    ):
+        """Ensure Telegram templates render with real loader configuration."""
+        loader = TelegramTemplateLoader(logger=mock_logger)
+        context = ActionContext(
+            booking=booking,
+            settings_dict={"slack_enabled": False},
+            db_repo=Mock(),
+            sms_service=Mock(),
+            slack_service=None,
+            slack_template_loader=None,
+            telegram_template_loader=loader,
+            telegram_service=mock_telegram_service,
+            logger=mock_logger,
+        )
+
+        send_telegram(
+            context,
+            template_name="sms_confirmation",
+            template_params={
+                "customer_name": booking.name,
+                "customer_phone": booking.phone,
+                "booking_number": booking.booking_num,
+            },
+        )
+
+        mock_telegram_service.send_message.assert_called_once()
+        call_kwargs = mock_telegram_service.send_message.call_args.kwargs
+        assert "[sms]" in call_kwargs["text"].lower()
+        assert booking.phone in call_kwargs["text"]
 
 
 class TestLoggingActions:

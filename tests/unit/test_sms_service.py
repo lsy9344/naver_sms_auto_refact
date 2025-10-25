@@ -42,7 +42,26 @@ class HttpStub:
         return SimpleNamespace(status_code=status_code, text=text)
 
 
-def build_client(http_stub: HttpStub, *, env_override: Optional[str] = None, max_retries: int = 1):
+class StubSettings:
+    def __init__(self, *, delivery_enabled: bool = True, comparison_mode_enabled: bool = False):
+        self._delivery_enabled = delivery_enabled
+        self._comparison_mode_enabled = comparison_mode_enabled
+
+    def is_sens_delivery_enabled(self) -> bool:
+        return self._delivery_enabled
+
+    def is_comparison_mode_enabled(self) -> bool:
+        return self._comparison_mode_enabled
+
+
+def build_client(
+    http_stub: HttpStub,
+    *,
+    env_override: Optional[str] = None,
+    max_retries: int = 1,
+    delivery_enabled: bool = True,
+    comparison_mode_enabled: bool = False,
+):
     credentials = {
         "access_key": LEGACY_ACCESS_KEY,
         "secret_key": LEGACY_SECRET_KEY,
@@ -52,7 +71,10 @@ def build_client(http_stub: HttpStub, *, env_override: Optional[str] = None, max
     if env_override is not None:
         os.environ["SENS_FROM_MAP_JSON"] = env_override
     client = SensSmsClient(
-        settings=None,
+        settings=StubSettings(
+            delivery_enabled=delivery_enabled,
+            comparison_mode_enabled=comparison_mode_enabled,
+        ),
         credentials=credentials,
         templates_path=TEMPLATES_PATH,
         stores_path=STORES_PATH,
@@ -146,3 +168,29 @@ def test_retry_and_failure(caplog):
     assert len(stub.requests) == 2
     failure_logs = [record for record in caplog.records if record.levelname == "ERROR"]
     assert failure_logs, "Expected failure log record"
+
+
+def test_sens_delivery_disabled_skips_requests(caplog):
+    stub = HttpStub()
+    client = build_client(stub, delivery_enabled=False)
+
+    with caplog.at_level("INFO"):
+        delivered = client.send_confirm_sms("010-0000-9999")
+
+    assert delivered is False
+    assert stub.requests == []
+    assert client.last_skip_reason == "SENS_DELIVERY_ENABLED is false"
+    assert any("SMS delivery skipped" in record.message for record in caplog.records)
+
+
+def test_comparison_mode_skips_requests(caplog):
+    stub = HttpStub()
+    client = build_client(stub, comparison_mode_enabled=True)
+
+    with caplog.at_level("INFO"):
+        delivered = client.send_event_sms("010-1111-2222")
+
+    assert delivered is False
+    assert stub.requests == []
+    assert client.last_skip_reason == "COMPARISON_MODE_ENABLED is true"
+    assert any("SMS delivery skipped" in record.message for record in caplog.records)

@@ -13,6 +13,8 @@ from .actions import (
     send_slack,
     log_event,
     register_actions,
+    SlackTemplateLoader,
+    TelegramTemplateLoader,
 )
 
 __all__ = [
@@ -32,4 +34,6 @@ __all__ = [
     "send_slack",
     "log_event",
     "register_actions",
+    "SlackTemplateLoader",
+    "TelegramTemplateLoader",
 ]

@@ -1,6 +1,6 @@
 # Comparison Report: case1_new_booking_001
 **Scenario:** CASE 1: New Booking Confirmation
-**Generated:** 2025-10-24T02:29:37.469575
+**Generated:** 2025-10-25T03:12:43.395787
 
 ## Summary
 - **Total Mismatches:** 0

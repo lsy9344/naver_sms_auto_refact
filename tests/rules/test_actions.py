@@ -98,6 +98,23 @@ def mock_slack_template_loader():
 
 
 @pytest.fixture
+def mock_telegram_service():
+    """Create a mock TelegramBotClient."""
+    service = Mock()
+    service.send_message.return_value = None
+    service.send_notification.return_value = None
+    return service
+
+
+@pytest.fixture
+def mock_telegram_template_loader():
+    """Create a mock TelegramTemplateLoader."""
+    loader = Mock()
+    loader.render.return_value = {"text": "Rendered Telegram message", "parse_mode": "Markdown"}
+    return loader
+
+
+@pytest.fixture
 def action_context(
     mock_booking,
     mock_db_repo,
@@ -105,6 +122,8 @@ def action_context(
     mock_logger,
     mock_slack_service,
     mock_slack_template_loader,
+    mock_telegram_service,
+    mock_telegram_template_loader,
 ):
     """Create an ActionContext for testing."""
     return ActionContext(
@@ -114,6 +133,8 @@ def action_context(
         sms_service=mock_sms_service,
         slack_service=mock_slack_service,
         slack_template_loader=mock_slack_template_loader,
+        telegram_template_loader=mock_telegram_template_loader,
+        telegram_service=mock_telegram_service,
         logger=mock_logger,
     )
 
@@ -125,6 +146,8 @@ def services_bundle(
     mock_logger,
     mock_slack_service,
     mock_slack_template_loader,
+    mock_telegram_service,
+    mock_telegram_template_loader,
 ):
     """Create an ActionServicesBundle for testing."""
     return ActionServicesBundle(
@@ -132,6 +155,8 @@ def services_bundle(
         sms_service=mock_sms_service,
         slack_service=mock_slack_service,
         slack_template_loader=mock_slack_template_loader,
+        telegram_template_loader=mock_telegram_template_loader,
+        telegram_service=mock_telegram_service,
         logger=mock_logger,
         settings_dict={"slack_enabled": False},
     )
@@ -362,6 +387,10 @@ class TestSendTelegram:
         # Should not raise any exception
         send_telegram(action_context, message="Test message")
 
+        action_context.telegram_service.send_message.assert_called_once_with(
+            text="Test message",
+            parse_mode="Markdown",
+        )
         action_context.logger.info.assert_called_once()
 
     def test_send_telegram_with_params(self, action_context):
@@ -369,6 +398,10 @@ class TestSendTelegram:
         params = {"booking_id": "123", "status": "confirmed"}
         send_telegram(action_context, message="Booking {{booking_id}}", template_params=params)
 
+        action_context.telegram_service.send_message.assert_called_once_with(
+            text="Booking 123",
+            parse_mode="Markdown",
+        )
         action_context.logger.info.assert_called_once()
 
     def test_send_telegram_error_handling(self, action_context):
@@ -415,6 +448,140 @@ class TestSendSlack:
         send_slack(action_context, message="Test message")
 
         action_context.logger.debug.assert_called_once()
+
+
+# ============================================================================
+# Tests: send_telegram
+# ============================================================================
+
+
+class TestSendTelegramDetailed:
+    """Detailed tests for send_telegram action executor."""
+
+    def test_send_telegram_success(self, action_context, mock_telegram_service):
+        """Test successful Telegram message sending."""
+        send_telegram(action_context, message="Test notification")
+
+        mock_telegram_service.send_message.assert_called_once_with(
+            text="Test notification",
+            parse_mode="Markdown",
+        )
+        action_context.logger.info.assert_called_once()
+
+    def test_send_telegram_with_template_name(
+        self,
+        action_context,
+        mock_telegram_service,
+        mock_telegram_template_loader,
+    ):
+        """Test Telegram message rendering via template loader."""
+        mock_telegram_template_loader.render.return_value = {
+            "text": "Rendered Telegram message",
+            "parse_mode": "HTML",
+        }
+
+        send_telegram(
+            action_context,
+            template_name="booking_notification",
+            template_params={"customer": "홍길동"},
+        )
+
+        mock_telegram_template_loader.render.assert_called_once_with(
+            "booking_notification", customer="홍길동"
+        )
+        mock_telegram_service.send_message.assert_called_once_with(
+            text="Rendered Telegram message",
+            parse_mode="HTML",
+        )
+
+    def test_send_telegram_parse_mode_override(self, action_context, mock_telegram_service):
+        """Test explicit parse mode override."""
+        send_telegram(action_context, message="Plain text", parse_mode=None)
+
+        mock_telegram_service.send_message.assert_called_once_with(
+            text="Plain text",
+            parse_mode=None,
+        )
+
+    def test_send_telegram_requires_message_or_template(self, action_context):
+        """Ensure validation triggers when neither message nor template provided."""
+        with pytest.raises(ActionExecutionError) as exc_info:
+            send_telegram(action_context)
+
+        assert isinstance(exc_info.value.original_error, ValueError)
+
+    def test_send_telegram_template_loader_missing(self, action_context, mock_telegram_service):
+        """Ensure missing template loader raises runtime error."""
+        action_context = ActionContext(
+            booking=action_context.booking,
+            settings_dict=action_context.settings_dict,
+            db_repo=action_context.db_repo,
+            sms_service=action_context.sms_service,
+            slack_service=action_context.slack_service,
+            slack_template_loader=action_context.slack_template_loader,
+            telegram_template_loader=None,
+            telegram_service=action_context.telegram_service,
+            logger=action_context.logger,
+        )
+
+        with pytest.raises(ActionExecutionError) as exc_info:
+            send_telegram(action_context, template_name="booking_notification")
+
+        assert isinstance(exc_info.value.original_error, RuntimeError)
+
+    def test_send_telegram_missing_template(
+        self,
+        action_context,
+        mock_telegram_template_loader,
+    ):
+        """Ensure missing template raises wrapped ValueError."""
+        mock_telegram_template_loader.render.side_effect = ValueError("Template not found")
+
+        with pytest.raises(ActionExecutionError) as exc_info:
+            send_telegram(action_context, template_name="unknown_template")
+
+        assert isinstance(exc_info.value.original_error, ValueError)
+
+    def test_send_telegram_when_not_configured(self, action_context):
+        """Test that send_telegram skips when service not configured."""
+        action_context = ActionContext(
+            booking=action_context.booking,
+            settings_dict=action_context.settings_dict,
+            db_repo=action_context.db_repo,
+            sms_service=action_context.sms_service,
+            slack_service=action_context.slack_service,
+            slack_template_loader=action_context.slack_template_loader,
+            telegram_template_loader=action_context.telegram_template_loader,
+            telegram_service=None,
+            logger=action_context.logger,
+        )
+
+        send_telegram(action_context, message="Test message")
+
+        action_context.logger.warning.assert_called_once()
+
+    def test_send_telegram_service_error(self, action_context, mock_telegram_service):
+        """Test handling of TelegramServiceError."""
+        from src.notifications.telegram_service import TelegramServiceError
+
+        mock_telegram_service.send_message.side_effect = TelegramServiceError("API error")
+
+        with pytest.raises(ActionExecutionError) as exc_info:
+            send_telegram(action_context, message="Test message")
+
+        assert exc_info.value.executor_name == "send_telegram"
+        assert exc_info.value.booking_id == "1051707_12345"
+        action_context.logger.error.assert_called_once()
+
+    def test_send_telegram_unexpected_error(self, action_context, mock_telegram_service):
+        """Test handling of unexpected errors."""
+        mock_telegram_service.send_message.side_effect = RuntimeError("Unexpected error")
+
+        with pytest.raises(ActionExecutionError) as exc_info:
+            send_telegram(action_context, message="Test message")
+
+        assert exc_info.value.executor_name == "send_telegram"
+        action_context.logger.error.assert_called()
 
 
 # ============================================================================

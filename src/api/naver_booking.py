@@ -10,6 +10,7 @@ Reference: docs/brownfield-architecture.md - Naver Booking API Details
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import logging
+import time
 
 import requests
 
@@ -31,6 +32,7 @@ class NaverBookingAPIClient:
     # Booking status codes
     STATUS_CONFIRMED = "RC03"  # Reservation Confirmed
     STATUS_COMPLETED = "RC08"  # Reservation Completed
+    PAGE_SIZE = 50  # Matches legacy lambda pagination size
 
     def __init__(self, session: requests.Session, option_keywords: Optional[List[str]] = None):
         """
@@ -43,35 +45,126 @@ class NaverBookingAPIClient:
         self.session = session
         self.option_keywords = option_keywords or ["네이버", "인스타", "원본"]
 
+    def _build_query_params(
+        self,
+        status: str,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        page: int,
+        size: int,
+    ) -> Dict[str, Any]:
+        """
+        Build query parameters exactly like legacy implementation.
+
+        Preserves optional fields with default values so behaviour stays identical.
+        """
+        params: Dict[str, Any] = {
+            "bizItemTypes": "STANDARD",
+            "bookingStatusCodes": status,
+            "dateDropdownType": "ENTIRE",
+            "dateFilter": "USEDATE",
+            "maxDays": "31",
+            "nPayChargedStatusCodes": "",
+            "orderBy": "",
+            "orderByStartDate": "ASC",
+            "paymentStatusCodes": "",
+            "searchValue": "",
+            "page": str(page),
+            "size": str(size),
+        }
+
+        if start_date and end_date:
+            params["startDateTime"] = start_date
+            params["endDateTime"] = end_date
+
+        return params
+
+    def _count_bookings(
+        self,
+        store_id: str,
+        status: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> int:
+        """
+        Count total bookings matching criteria.
+
+        Implements lambda_function.py:303-326 (count_items).
+
+        Args:
+            store_id: Business ID
+            status: Booking status code (RC03 or RC08)
+            start_date: Optional start date in ISO format
+            end_date: Optional end date in ISO format
+
+        Returns:
+            Total count of bookings, or 0 if error
+        """
+        headers = {
+            "authority": "partner.booking.naver.com",
+            "accept": "*/*",
+            "accept-language": "en-US,en;q=0.9",
+            "referer": f"https://partner.booking.naver.com/bizes/{store_id}/booking-list-view",
+            "x-booking-naver-role": "OWNER",
+        }
+
+        # Build base params for counting (legacy count_items)
+        params = self._build_query_params(
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            page=0,
+            size=self.PAGE_SIZE,
+        )
+        params["noCache"] = round(datetime.now().timestamp() * 1000)
+
+        url = f"{self.BASE_URL}/v3.1/businesses/{store_id}/bookings/count"
+
+        try:
+            response = self.session.get(url, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            count = response.json().get("count", 0)
+            logger.debug(f"Count API returned {count} bookings for store {store_id}")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to count bookings for store {store_id}: {e}")
+            return 0
+
     def get_bookings(
         self,
         store_id: str,
         status: str = STATUS_CONFIRMED,
-        date_filter: str = "USEDATE",
-        page: int = 0,
-        size: int = 20,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> List[Booking]:
         """
-        Fetch bookings for a specific store.
+        Fetch all bookings for a specific store with pagination.
 
-        Implements API call logic from lambda_function.py:329-388.
+        Implements lambda_function.py:329-388 (get_items).
+        Fetches all bookings in 50-item pages (size=50) like legacy code.
 
         Args:
             store_id: Business ID (biz_id)
             status: Booking status code (RC03 or RC08)
-            date_filter: Filter type (default: "USEDATE")
-            page: Page number for pagination
-            size: Page size
+            start_date: Optional start date in ISO format for date range query
+            end_date: Optional end date in ISO format for date range query
 
         Returns:
-            List of Booking domain objects
+            List of all Booking domain objects across all pages
 
         Raises:
             requests.RequestException: If API call fails
         """
-        logger.info(f"Fetching bookings for store {store_id} with status {status}")
+        logger.info(f"Fetching all bookings for store {store_id} with status {status}")
 
-        # Build headers matching legacy implementation (lines 305-317)
+        # Count total bookings first (lambda_function.py:349)
+        total_count = self._count_bookings(store_id, status, start_date, end_date)
+
+        if total_count == 0:
+            logger.info(f"No bookings found for store {store_id}")
+            return []
+
+        # Build headers for bookings fetch
         headers = {
             "authority": "partner.booking.naver.com",
             "referer": f"https://partner.booking.naver.com/bizes/{store_id}/booking-list-view",
@@ -81,43 +174,60 @@ class NaverBookingAPIClient:
             "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
         }
 
-        # Build query parameters
-        params = {
-            "bizItemTypes": "STANDARD",
-            "bookingStatusCodes": status,
-            "dateFilter": date_filter,
-            "page": page,
-            "size": size,
-        }
-
-        # Make API request
         url = f"{self.BASE_URL}/api/businesses/{store_id}/bookings"
+        page_size = self.PAGE_SIZE
+        all_bookings = []
 
-        try:
-            response = self.session.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
+        # Paginate through results (lambda_function.py:352-387)
+        num_pages = (total_count + page_size - 1) // page_size
+        for page_idx in range(num_pages):
+            try:
+                # Build params with noCache for each request (lambda_function.py:354)
+                params = self._build_query_params(
+                    status=status,
+                    start_date=start_date,
+                    end_date=end_date,
+                    page=page_idx,
+                    size=page_size,
+                )
+                params["noCache"] = round(datetime.now().timestamp() * 1000)
 
-            data = response.json()
-            bookings_data = data if isinstance(data, list) else []
+                logger.debug(f"Fetching page {page_idx} for store {store_id}")
 
-            logger.info(f"Retrieved {len(bookings_data)} bookings for store {store_id}")
+                response = self.session.get(url, headers=headers, params=params, timeout=10)
+                response.raise_for_status()
 
-            # Transform to Booking domain objects
-            bookings = []
-            for booking_data in bookings_data:
-                try:
-                    booking = self._transform_booking(booking_data, store_id)
-                    bookings.append(booking)
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to transform booking {booking_data.get('bookingId')}: {e}"
-                    )
+                data = response.json()
+                bookings_data = data if isinstance(data, list) else []
 
-            return bookings
+                logger.debug(f"Retrieved {len(bookings_data)} bookings on page {page_idx}")
 
-        except requests.RequestException as e:
-            logger.error(f"Failed to fetch bookings for store {store_id}: {e}")
-            raise
+                # Transform to Booking domain objects (lambda_function.py:358-383)
+                for booking_data in bookings_data:
+                    try:
+                        booking = self._transform_booking(booking_data, store_id)
+                        all_bookings.append(booking)
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to transform booking {booking_data.get('bookingId')}: {e}"
+                        )
+
+                # Sleep 1 second between pages (lambda_function.py:384)
+                if page_idx < num_pages - 1:
+                    time.sleep(1)
+
+                logger.info(
+                    f"Completed page {page_idx + 1}/{num_pages} for store {store_id}, "
+                    f"total: {len(all_bookings)}"
+                )
+
+            except requests.RequestException as e:
+                logger.error(f"Failed to fetch page {page_idx} for store {store_id}: {e}")
+                # Continue to next page rather than failing entirely
+                continue
+
+        logger.info(f"Retrieved {len(all_bookings)} total bookings for store {store_id}")
+        return all_bookings
 
     def get_all_confirmed_bookings(self, store_ids: List[str]) -> List[Booking]:
         """
@@ -209,17 +319,19 @@ class NaverBookingAPIClient:
             coupon_name = first_coupon.get("couponName")
 
         # Extract option keywords and option-specific info
-        option_keywords_list: List[str] = []
+        # Store full option objects (not just names) to preserve bookingCount for has_multiple_options
+        option_keywords_list: List[Dict[str, Any]] = []
+        option_names_seen: set = set()
         has_pro_edit_option = False
         pro_edit_count = 0
         has_edit_add_person_option = False
         edit_add_person_count = 0
         for option_item in booking_options:
             option_name = option_item.get("name", "")
-            # Collect all option names as keywords
-            if option_name:
-                if option_name not in option_keywords_list:
-                    option_keywords_list.append(option_name)
+            # Collect full option objects (preserves bookingCount for rule engine)
+            if option_name and option_name not in option_names_seen:
+                option_keywords_list.append(option_item)
+                option_names_seen.add(option_name)
             # Track specific options
             if "전문가 보정" in option_name:
                 has_pro_edit_option = True
@@ -228,10 +340,11 @@ class NaverBookingAPIClient:
                 has_edit_add_person_option = True
                 edit_add_person_count = option_item.get("bookingCount", 0)
 
-        if has_pro_edit_option and all(
-            "전문가 보정" not in keyword for keyword in option_keywords_list
+        # Add pro_edit marker if needed (for backward compatibility)
+        if has_pro_edit_option and not any(
+            "전문가 보정" in item.get("name", "") for item in option_keywords_list
         ):
-            option_keywords_list.append("전문가 보정")
+            option_keywords_list.append({"name": "전문가 보정"})
 
         # Create composite booking_num key
         booking_num = f"{store_id}_{booking_id}"
@@ -321,7 +434,7 @@ class NaverBookingAPIClient:
             True if any option contains a keyword, False otherwise
         """
         for option in booking_options:
-            option_name = option.get("name", "")
+            option_name = option.get("name", "") if isinstance(option, dict) else str(option)
             for keyword in self.option_keywords:
                 if keyword in option_name:
                     logger.debug(f"Option keyword '{keyword}' found in '{option_name}'")

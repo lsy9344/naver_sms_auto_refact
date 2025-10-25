@@ -64,7 +64,9 @@ class Booking:
     pro_edit_count: int = 0
     has_edit_add_person_option: bool = False
     edit_add_person_count: int = 0
-    option_keywords: List[str] = field(default_factory=list)
+    option_keywords: List[Any] = field(
+        default_factory=list
+    )  # Stores option dicts with bookingCount
     extra_fields: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod

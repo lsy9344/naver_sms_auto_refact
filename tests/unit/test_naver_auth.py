@@ -32,14 +32,18 @@ def test_fresh_login_preserves_original_flow(mock_chrome, mock_service):
     driver.get.assert_has_calls(
         [
             call("https://new.smartplace.naver.com/"),
-            call("https://nid.naver.com/nidlogin.login"),
-            call("https://new.smartplace.naver.com/"),
+            call("https://nid.naver.com/nidlogin.login?mode=form&url=https://www.naver.com/"),
         ]
     )
 
-    calls_text = " ".join(str(args) for args, _ in driver.execute_script.call_args_list)
-    assert "document.getElementsByName('id')[0].value='testuser'" in calls_text
-    assert "document.getElementsByName('pw')[0].value='testpass'" in calls_text
+    # Check that execute_script was called with querySelector for both id and pw
+    execute_script_calls = [call[0][0] for call in driver.execute_script.call_args_list]
+    assert any(
+        "querySelector('input[id=" in call and "testuser" in call for call in execute_script_calls
+    )
+    assert any(
+        "querySelector('input[id=" in call and "testpass" in call for call in execute_script_calls
+    )
 
     session_mgr.put_item.assert_called_once()
     payload = session_mgr.put_item.call_args.kwargs["Item"]
@@ -68,7 +72,7 @@ def test_cookie_reuse_returns_cached(mock_chrome, mock_service):
     driver.get.assert_has_calls(
         [
             call("https://new.smartplace.naver.com/"),
-            call("https://new.smartplace.naver.com/profile"),
+            call("https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR"),
         ]
     )
     session_mgr.put_item.assert_not_called()
@@ -91,8 +95,11 @@ def test_cookie_expiry_triggers_recursive_fresh_login(mock_chrome, mock_service)
 
     assert cookies == driver.get_cookies.return_value
     assert session_mgr.put_item.called
-    calls_text = " ".join(str(args) for args, _ in driver.execute_script.call_args_list)
-    assert "document.getElementsByName('id')[0].value='testuser'" in calls_text
+    # Check that execute_script was called with querySelector for id
+    execute_script_calls = [call[0][0] for call in driver.execute_script.call_args_list]
+    assert any(
+        "querySelector('input[id=" in call and "testuser" in call for call in execute_script_calls
+    )
 
 
 @patch("src.auth.naver_login.Service")

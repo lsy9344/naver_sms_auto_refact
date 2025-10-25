@@ -59,6 +59,7 @@ from rules.actions import (
     log_event,
     register_actions,
     ActionServicesBundle,
+    TelegramTemplateLoader,
 )
 
 logger = logging.getLogger(__name__)
@@ -563,11 +564,15 @@ def rule_engine(settings):
     mock_logger.warning = Mock()
     mock_logger.error = Mock()
 
+    telegram_template_loader = TelegramTemplateLoader(logger=mock_logger)
+
     services = ActionServicesBundle(
         db_repo=db_repo,
         sms_service=mock_sms_service,
         slack_service=None,
         slack_template_loader=None,
+        telegram_template_loader=telegram_template_loader,
+        telegram_service=None,
         logger=mock_logger,
         settings_dict={"slack_enabled": False},
     )
@@ -827,12 +832,16 @@ class TestSlackEnabledRegression:
         mock_logger.warning = Mock()
         mock_logger.error = Mock()
 
+        telegram_template_loader = TelegramTemplateLoader(logger=mock_logger)
+
         # KEY CHANGE: slack_enabled set to True for Slack-enabled tests (AC4)
         services = ActionServicesBundle(
             db_repo=db_repo,
             sms_service=mock_sms_service,
             slack_service=mock_slack_service,
             slack_template_loader=mock_slack_template_loader,
+            telegram_template_loader=telegram_template_loader,
+            telegram_service=None,
             logger=mock_logger,
             settings_dict={"slack_enabled": True},  # AC4: Enable Slack for regression
         )

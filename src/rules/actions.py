@@ -19,7 +19,7 @@ Acceptance Criteria Coverage:
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from src.database.dynamodb_client import BookingRepository
 from src.domain.booking import Booking
@@ -41,12 +41,20 @@ except ImportError:
     SlackServiceError = Exception  # type: ignore
 
 try:
+    from src.notifications.telegram_service import TelegramBotClient, TelegramServiceError
+except ImportError:
+    # For testing purposes
+    TelegramBotClient = None  # type: ignore
+    TelegramServiceError = Exception  # type: ignore
+
+try:
     import jinja2
 except ImportError:
     jinja2 = None  # type: ignore
 
 
 _TEMPLATE_PARAM_PATTERN = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*\}\}")
+_PARSE_MODE_UNSET = object()
 
 
 def _lookup_context_value(path: str, context: Dict[str, Any]) -> Any:
@@ -201,6 +209,116 @@ class SlackTemplateLoader:
         return list(self._templates.keys())
 
 
+class TelegramTemplateLoader:
+    """
+    Loader for Telegram message templates from YAML configuration.
+
+    Supports optional parse mode configuration per template and Jinja2 rendering.
+    Templates are cached in memory after first load to minimise file I/O.
+    """
+
+    def __init__(
+        self,
+        template_path: str = "config/telegram_templates.yaml",
+        logger: Optional[StructuredLogger] = None,
+    ):
+        """Initialize template loader."""
+        self.template_path = template_path
+        self.logger = logger
+        self._templates: Dict[str, Dict[str, Any]] = {}
+        self._loaded = False
+
+    def load_templates(self) -> None:
+        """Load templates from YAML file."""
+        if self._loaded:
+            return
+
+        try:
+            import yaml
+
+            with open(self.template_path, "r", encoding="utf-8") as f:
+                content = yaml.safe_load(f) or {}
+
+            normalised: Dict[str, Dict[str, Any]] = {}
+            for name, definition in content.items():
+                if isinstance(definition, str):
+                    normalised[name] = {"text": definition, "parse_mode": None}
+                elif isinstance(definition, dict) and "text" in definition:
+                    normalised[name] = {
+                        "text": definition["text"],
+                        "parse_mode": definition.get("parse_mode"),
+                    }
+                else:
+                    raise ValueError(
+                        f"Invalid template definition for '{name}'. Expected string or mapping with 'text'."
+                    )
+
+            self._templates = normalised
+            self._loaded = True
+
+            if self.logger:
+                self.logger.debug(
+                    f"Loaded {len(self._templates)} Telegram templates",
+                    operation="load_telegram_templates",
+                )
+        except FileNotFoundError as e:
+            if self.logger:
+                self.logger.error(
+                    f"Telegram templates file not found: {self.template_path}",
+                    operation="load_telegram_templates",
+                    error=str(e),
+                )
+            raise
+        except Exception as e:
+            if self.logger:
+                self.logger.error(
+                    "Failed to load Telegram templates",
+                    operation="load_telegram_templates",
+                    error=str(e),
+                )
+            raise
+
+    def render(self, template_name: str, **context: Any) -> Dict[str, Any]:
+        """
+        Render a Telegram template.
+
+        Returns a dict with keys:
+            - text: rendered message string
+            - parse_mode: optional Telegram parse mode override
+        """
+        if not self._loaded:
+            self.load_templates()
+
+        if template_name not in self._templates:
+            raise ValueError(
+                f"Template '{template_name}' not found. Available: {list(self._templates.keys())}"
+            )
+
+        if not jinja2:
+            raise RuntimeError("jinja2 is required for template rendering")
+
+        template_def = self._templates[template_name]
+        template_str = template_def["text"]
+        try:
+            template = jinja2.Template(template_str)
+            rendered = template.render(**context)
+            return {"text": rendered, "parse_mode": template_def.get("parse_mode")}
+        except jinja2.TemplateError as e:
+            if self.logger:
+                self.logger.error(
+                    f"Failed to render Telegram template '{template_name}'",
+                    operation="render_telegram_template",
+                    error=str(e),
+                )
+            raise
+
+    def get_template_names(self) -> list:
+        """Return list of available template names."""
+        if not self._loaded:
+            self.load_templates()
+        return list(self._templates.keys())
+
+
 # ============================================================================
 # Exception Classes
 # ============================================================================
@@ -263,6 +381,8 @@ class ActionContext:
         sms_service: SensSmsClient for SMS sending
         slack_service: SlackWebhookClient for Slack notifications (AC 1, 2)
         slack_template_loader: SlackTemplateLoader for message templates (AC 3)
+        telegram_template_loader: TelegramTemplateLoader for Telegram templates
+        telegram_service: TelegramBotClient for Telegram notifications
         logger: StructuredLogger for logging operations
     """
 
@@ -273,6 +393,8 @@ class ActionContext:
     logger: StructuredLogger
     slack_service: Optional[Any] = None
     slack_template_loader: Optional[Any] = None
+    telegram_template_loader: Optional[Any] = None
+    telegram_service: Optional[Any] = None
 
 
 @dataclass(frozen=True)
@@ -289,6 +411,8 @@ class ActionServicesBundle:
         sms_service: SensSmsClient for SMS via SENS API
         slack_service: SlackWebhookClient for Slack notifications (AC 1, 2)
         slack_template_loader: SlackTemplateLoader for message templates (AC 3)
+        telegram_template_loader: TelegramTemplateLoader for Telegram templates
+        telegram_service: TelegramBotClient for Telegram notifications
         logger: StructuredLogger for structured logging with redaction
         settings_dict: Configuration dictionary
     """
@@ -299,6 +423,8 @@ class ActionServicesBundle:
     settings_dict: Dict[str, Any]
     slack_service: Optional[Any] = None
     slack_template_loader: Optional[Any] = None
+    telegram_template_loader: Optional[Any] = None
+    telegram_service: Optional[Any] = None
 
 
 # ============================================================================
@@ -355,33 +481,45 @@ def send_sms(
             context=log_context,
         )
 
+        delivered = False
         # Route to correct SMS method based on template
         # Accept both "confirm" and "confirmation" as aliases
         if template in ("confirm", "confirmation"):
-            context.sms_service.send_confirm_sms(
+            delivered = context.sms_service.send_confirm_sms(
                 phone=booking.phone,
                 store_id=None,  # Confirmation SMS not store-specific
             )
         elif template == "guide":
             # Extract store_id from booking_num (format: "{biz_id}_{book_id}")
             store_id = booking.booking_num.split("_")[0]
-            context.sms_service.send_guide_sms(
+            delivered = context.sms_service.send_guide_sms(
                 store_id=store_id,
                 phone=booking.phone,
             )
         elif template == "event":
-            context.sms_service.send_event_sms(
+            delivered = context.sms_service.send_event_sms(
                 phone=booking.phone,
                 store_id=None,  # Event SMS not store-specific
             )
         else:
             raise ValueError(f"Unknown template type: {template}")
 
-        logger.info(
-            f"{template} SMS sent successfully",
-            operation=operation,
-            context=log_context,
-        )
+        if delivered:
+            logger.info(
+                f"{template} SMS sent successfully",
+                operation=operation,
+                context=log_context,
+            )
+        else:
+            skip_context = dict(log_context)
+            skip_reason = getattr(context.sms_service, "last_skip_reason", None)
+            if skip_reason:
+                skip_context["reason"] = skip_reason
+            logger.info(
+                "SMS delivery skipped",
+                operation=operation,
+                context=skip_context,
+            )
 
     except SmsServiceError as e:
         logger.error(
@@ -638,65 +776,183 @@ def update_flag(
 
 def send_telegram(
     context: ActionContext,
-    message: str,
-    template_params: Optional[Dict[str, str]] = None,
+    message: Optional[str] = None,
+    template_name: Optional[str] = None,
+    template_params: Optional[Dict[str, Any]] = None,
+    parse_mode: Optional[str] | object = _PARSE_MODE_UNSET,
 ) -> None:
     """
-    Send message via Telegram webhook service.
+    Send message via Telegram Bot API.
 
-    Posts messages to Telegram Bot API with support for template variable
-    substitution. Matches legacy Telegram payload at lambda_function.py:439-446.
+    Supports two modes:
+      1. Direct messages via `message` parameter with optional simple substitutions
+      2. Template-based messages via `template_name` + optional params
 
     Args:
-        context: ActionContext with logger
-        message: Message text to send
-        template_params: Optional dict for variable substitution in message
+        context: ActionContext with telegram_service and logger
+        message: Message text to send (if template_name not provided)
+        template_name: Name of template to render from config/telegram_templates.yaml
+        template_params: Optional dict for variable substitution in message/template
+        parse_mode: Optional Telegram parse mode override (Markdown, HTML, or None)
 
-    Note:
-        This is a placeholder for AC5. Full Telegram service integration
-        will be completed when TelegramService is available from Story 2.2.
+    Raises:
+        ActionExecutionError: Wraps TelegramServiceError/ValueError with context
 
     Example:
         context = ActionContext(...)
-        send_telegram(context, "Booking confirmed for {{booking.phone}}")
+        send_telegram(context, message="Booking confirmed")
+        send_telegram(context, template_name="booking_summary", template_params={"name": "홍길동"})
     """
     logger = context.logger
+    booking = context.booking
     operation = "send_telegram"
 
-    log_context = {
-        "booking_id": context.booking.booking_num,
-        "message_length": len(message),
-    }
+    template_params = template_params or {}
+    final_message: Optional[str] = None
 
     try:
+        # Determine final message text
+        template_render_parse_mode: Optional[str] = None
+        if template_name:
+            if not context.telegram_template_loader:
+                raise RuntimeError("TelegramTemplateLoader not configured in ActionContext")
+
+            rendered = context.telegram_template_loader.render(template_name, **template_params)
+            final_message = rendered["text"]
+            template_render_parse_mode = rendered.get("parse_mode")
+        else:
+            if not message:
+                raise ValueError("Either 'message' or 'template_name' must be provided")
+
+            final_message = message
+            if template_params:
+                for key, value in template_params.items():
+                    pattern = re.compile(r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}")
+                    final_message = pattern.sub(str(value), final_message)
+
+        if not isinstance(final_message, str) or final_message == "":
+            raise ValueError("Telegram message must be a non-empty string")
+
+        # Check if Telegram service is configured
+        if not context.telegram_service:
+            logger.warning(
+                "Telegram service not configured; skipping notification",
+                operation=operation,
+                context={
+                    "booking_id": booking.booking_num,
+                    "template_name": template_name,
+                },
+            )
+            return
+
+        # Determine parse mode precedence: explicit override > template > default
+        if parse_mode is not _PARSE_MODE_UNSET:
+            final_parse_mode = cast(Optional[str], parse_mode)
+        else:
+            if template_name:
+                final_parse_mode = template_render_parse_mode
+            else:
+                final_parse_mode = "Markdown"
+
+        log_context = {
+            "booking_id": booking.booking_num,
+            "message_length": len(final_message),
+            "has_params": bool(template_params),
+            "template_name": template_name,
+            "parse_mode": final_parse_mode,
+        }
+
         logger.debug(
             "Sending Telegram notification",
             operation=operation,
             context=log_context,
         )
 
-        # TODO: Integration with TelegramService when available
-        # For now, just log the action
+        context.telegram_service.send_message(
+            text=final_message,
+            parse_mode=final_parse_mode,
+        )
+
         logger.info(
             "Telegram notification sent",
             operation=operation,
             context=log_context,
         )
 
-    except Exception as e:
+    except ValueError as e:
         logger.error(
-            "Failed to send Telegram notification",
+            "Validation error in send_telegram",
             operation=operation,
-            context=log_context,
+            context={
+                "booking_id": booking.booking_num,
+                "template_name": template_name,
+            },
             error=str(e),
         )
         raise ActionExecutionError(
             executor_name="send_telegram",
-            booking_id=context.booking.booking_num,
+            booking_id=booking.booking_num,
             original_error=e,
             context_data={
-                "message": message[:100],  # Truncate for logging
-                "has_params": template_params is not None,
+                "template_name": template_name,
+                "has_message": message is not None,
+            },
+        ) from e
+
+    except RuntimeError as e:
+        logger.error(
+            "Runtime error in send_telegram",
+            operation=operation,
+            context={
+                "booking_id": booking.booking_num,
+                "template_name": template_name,
+            },
+            error=str(e),
+        )
+        raise ActionExecutionError(
+            executor_name="send_telegram",
+            booking_id=booking.booking_num,
+            original_error=e,
+            context_data={"template_name": template_name},
+        ) from e
+
+    except TelegramServiceError as e:
+        logger.error(
+            "Telegram delivery failed",
+            operation=operation,
+            context={
+                "booking_id": booking.booking_num,
+                "template_name": template_name,
+            },
+            error=str(e),
+        )
+        raise ActionExecutionError(
+            executor_name="send_telegram",
+            booking_id=booking.booking_num,
+            original_error=e,
+            context_data={
+                "template_name": template_name,
+                "message_preview": final_message[:100] if final_message else None,
+            },
+        ) from e
+
+    except Exception as e:
+        logger.error(
+            "Unexpected error in send_telegram",
+            operation=operation,
+            context={
+                "booking_id": booking.booking_num,
+                "template_name": template_name,
+            },
+            error=str(e),
+        )
+        raise ActionExecutionError(
+            executor_name="send_telegram",
+            booking_id=booking.booking_num,
+            original_error=e,
+            context_data={
+                "template_name": template_name,
+                "message_preview": final_message[:100] if final_message else None,
             },
         ) from e
 
@@ -989,6 +1245,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 sms_service=services.sms_service,
                 slack_service=services.slack_service,
                 slack_template_loader=services.slack_template_loader,
+                telegram_template_loader=services.telegram_template_loader,
+                telegram_service=services.telegram_service,
                 logger=services.logger,
             )
             send_sms(action_context, **params)
@@ -1005,6 +1263,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 sms_service=services.sms_service,
                 slack_service=services.slack_service,
                 slack_template_loader=services.slack_template_loader,
+                telegram_template_loader=services.telegram_template_loader,
+                telegram_service=services.telegram_service,
                 logger=services.logger,
             )
             create_db_record(action_context, **params)
@@ -1021,6 +1281,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 sms_service=services.sms_service,
                 slack_service=services.slack_service,
                 slack_template_loader=services.slack_template_loader,
+                telegram_template_loader=services.telegram_template_loader,
+                telegram_service=services.telegram_service,
                 logger=services.logger,
             )
             update_flag(action_context, **params)
@@ -1037,9 +1299,18 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 sms_service=services.sms_service,
                 slack_service=services.slack_service,
                 slack_template_loader=services.slack_template_loader,
+                telegram_template_loader=services.telegram_template_loader,
+                telegram_service=services.telegram_service,
                 logger=services.logger,
             )
-            send_telegram(action_context, **params)
+            resolved_params = dict(params)
+
+            if "template_params" in resolved_params:
+                resolved_params["template_params"] = _resolve_template_params(
+                    resolved_params["template_params"], rule_context
+                )
+
+            send_telegram(action_context, **resolved_params)
 
         def send_slack_wrapper(rule_context: Dict[str, Any], **params: Any) -> None:
             booking = rule_context.get("booking")
@@ -1053,6 +1324,8 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 sms_service=services.sms_service,
                 slack_service=services.slack_service,
                 slack_template_loader=services.slack_template_loader,
+                telegram_template_loader=services.telegram_template_loader,
+                telegram_service=services.telegram_service,
                 logger=services.logger,
             )
             resolved_params = dict(params)
@@ -1082,6 +1355,7 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 sms_service=services.sms_service,
                 slack_service=services.slack_service,
                 slack_template_loader=services.slack_template_loader,
+                telegram_service=services.telegram_service,
                 logger=services.logger,
             )
             # Inject rule_name and action_name from context if not provided
