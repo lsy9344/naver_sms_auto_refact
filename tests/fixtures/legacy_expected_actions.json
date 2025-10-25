@@ -24,18 +24,13 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "template_name": "sms_confirmation",
-            "template_params": {
-              "customer_name": "{{ booking.name }}",
-              "customer_phone": "{{ booking.phone }}",
-              "booking_number": "{{ booking.booking_num }}"
-            }
+            "message": "[예약 확인] {{ booking.name }} 고객 예약이 시스템에 등록되었습니다."
           }
         }
       ]
     },
     "booking_002": {
-      "description": "Two-Hour Reminder - Should send guide SMS and update flag",
+      "description": "Two-Hour Reminder - Should send guide SMS, update flag, and send telegram",
       "actions": [
         {
           "rule_name": "Two-Hour Reminder",
@@ -56,11 +51,20 @@
             "flag": "remind_sms",
             "value": true
           }
+        },
+        {
+          "rule_name": "Two-Hour Reminder",
+          "action_type": "send_telegram",
+          "success": true,
+          "message": "Telegram notification sent",
+          "params": {
+            "message": "[안내] {{ booking.name }} 고객의 예약이 2시간 이내입니다. 자세한 안내를 SMS로 발송했습니다."
+          }
         }
       ]
     },
     "booking_003": {
-      "description": "Evening Option SMS - Should send event SMS and update flag, plus Holiday Event rule matches (has 네이버 option on 2025-10-19)",
+      "description": "Evening Option SMS - Should send event SMS, update flag, and telegram (Holiday Event rule is now disabled)",
       "actions": [
         {
           "rule_name": "Evening Option SMS",
@@ -82,16 +86,12 @@
           }
         },
         {
-          "rule_name": "Holiday Event Customer List",
-          "action_type": "send_slack",
+          "rule_name": "Evening Option SMS",
+          "action_type": "send_telegram",
           "success": true,
-          "message": "Action 'send_slack' executed successfully",
+          "message": "Telegram notification sent",
           "params": {
-            "template_name": "holiday_event_customer_list",
-            "channel": "#naver_sms_auto_notify",
-            "template_params": {
-              "bookings": "{{ bookings_in_date_range }}"
-            }
+            "message": "[이벤트] {{ booking.name }} 고객에게 옵션 관련 이벤트 SMS를 발송했습니다."
           }
         }
       ]
@@ -117,70 +117,20 @@
       "actions": []
     },
     "booking_009": {
-      "description": "Expert Correction Slack Digest (Story 6.1, AC1) - Rule matches and send_slack executes, but Slack is disabled so notification is skipped",
-      "actions": [
-        {
-          "rule_name": "Expert Correction Slack Digest",
-          "action_type": "send_slack",
-          "success": true,
-          "message": "Action 'send_slack' executed successfully",
-          "params": {
-            "template_name": "expert_correction_digest",
-            "channel": "#naver_sms_auto_notify"
-          }
-        }
-      ]
+      "description": "Expert Correction Slack Digest (Story 6.1, AC1) - Rule is now disabled, no actions execute",
+      "actions": []
     },
     "booking_010": {
-      "description": "Holiday Event Customer List (Story 6.1, AC3) - Rule matches and send_slack executes, but Slack is disabled so notification is skipped",
-      "actions": [
-        {
-          "rule_name": "Holiday Event Customer List",
-          "action_type": "send_slack",
-          "success": true,
-          "message": "Action 'send_slack' executed successfully",
-          "params": {
-            "template_name": "holiday_event_customer_list",
-            "channel": "#naver_sms_auto_notify",
-            "template_params": {
-              "bookings": "{{ bookings_in_date_range }}"
-            }
-          }
-        }
-      ]
+      "description": "Holiday Event Customer List (Story 6.1, AC3) - Rule is now disabled, no actions execute",
+      "actions": []
     },
     "booking_009_slack_enabled": {
-      "description": "Expert Correction Slack Digest with Slack Enabled (Story 6.1, AC1, AC4) - Rule matches and Slack is enabled, so send_slack action executes",
-      "actions": [
-        {
-          "rule_name": "Expert Correction Slack Digest",
-          "action_type": "send_slack",
-          "success": true,
-          "message": "Slack notification sent",
-          "params": {
-            "template_name": "expert_correction_digest",
-            "channel": "#naver_sms_auto_notify"
-          }
-        }
-      ]
+      "description": "Expert Correction Slack Digest with Slack Enabled (Story 6.1, AC1, AC4) - Rule is now disabled, no actions execute",
+      "actions": []
     },
     "booking_010_slack_enabled": {
-      "description": "Holiday Event Customer List with Slack Enabled (Story 6.1, AC3, AC4) - Rule matches and Slack is enabled, so send_slack action executes",
-      "actions": [
-        {
-          "rule_name": "Holiday Event Customer List",
-          "action_type": "send_slack",
-          "success": true,
-          "message": "Slack notification sent",
-          "params": {
-            "template_name": "holiday_event_customer_list",
-            "channel": "#naver_sms_auto_notify",
-            "template_params": {
-              "bookings": "{{ bookings_in_date_range }}"
-            }
-          }
-        }
-      ]
+      "description": "Holiday Event Customer List with Slack Enabled (Story 6.1, AC3, AC4) - Rule is now disabled, no actions execute",
+      "actions": []
     }
   }
 }
