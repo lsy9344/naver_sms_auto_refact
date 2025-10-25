@@ -706,15 +706,17 @@ class TestRulesRegression:
             reserve_at=datetime(2025, 10, 20, 10, 0, tzinfo=timezone.utc),
             status="RC03",
             biz_id="1051707",
-            extra_fields={"option_keywords": [
-                {"name": "네이버 Pay 결제", "bookingCount": 2},
-                {"name": "원본 방식", "bookingCount": 1}
-            ]},
+            extra_fields={
+                "option_keywords": [
+                    {"name": "네이버 Pay 결제", "bookingCount": 2},
+                    {"name": "원본 방식", "bookingCount": 1},
+                ]
+            },
         )
         # Add option_keywords to booking instance with bookingCount
         booking.option_keywords = [
             {"name": "네이버 Pay 결제", "bookingCount": 2},
-            {"name": "원본 방식", "bookingCount": 1}
+            {"name": "원본 방식", "bookingCount": 1},
         ]
 
         context = {
@@ -738,9 +740,7 @@ class TestRulesRegression:
             biz_id="1051707",
         )
         # Add option_keywords to booking instance with insufficient bookingCount
-        booking.option_keywords = [
-            {"name": "네이버 Pay", "bookingCount": 1}
-        ]
+        booking.option_keywords = [{"name": "네이버 Pay", "bookingCount": 1}]
 
         context = {
             "booking": booking,
@@ -788,7 +788,7 @@ class TestRulesRegression:
         booking.option_keywords = [
             {"name": "네이버 Pay", "bookingCount": 1},
             {"name": "네이버 보험", "bookingCount": 3},
-            {"name": "인스타", "bookingCount": 1}
+            {"name": "인스타", "bookingCount": 1},
         ]
 
         context = {

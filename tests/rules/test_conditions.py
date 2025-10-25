@@ -781,12 +781,12 @@ class TestRegisterConditions:
     """Test registry helper function"""
 
     def test_register_all_conditions(self):
-        """Test: Registers all 9 condition evaluators"""
+        """Test: Registers all 10 condition evaluators"""
         engine = Mock()
         register_conditions(engine)
 
-        # Verify all 9 conditions registered (including has_multiple_options)
-        assert engine.register_condition.call_count == 9
+        # Verify all 10 conditions registered (including has_multiple_options, has_pro_edit_option, sms_send_failed)
+        assert engine.register_condition.call_count == 10
 
         # Verify correct names registered
         calls = [call[0][0] for call in engine.register_condition.call_args_list]
@@ -825,11 +825,11 @@ class TestRegisterConditions:
         settings = Mock()
         # Should not raise
         register_conditions(engine, settings)
-        assert engine.register_condition.call_count == 9
+        assert engine.register_condition.call_count == 10
 
     def test_register_without_settings(self):
         """Test: Works without settings parameter"""
         engine = Mock()
         # Should not raise
         register_conditions(engine)
-        assert engine.register_condition.call_count == 9
+        assert engine.register_condition.call_count == 10

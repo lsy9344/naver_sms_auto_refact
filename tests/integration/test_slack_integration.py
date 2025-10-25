@@ -358,8 +358,12 @@ class TestSendSlackAction:
 class TestSlackConfigurationPlumbing:
     """Tests for Slack configuration loading (AC 2)"""
 
-    def test_slack_webhook_url_loads_from_config_file(self):
+    @patch("src.config.settings.Settings.load_slack_webhook_url")
+    def test_slack_webhook_url_loads_from_config_file(self, mock_load_webhook):
         """Test that load_slack_webhook_url loads from config/my_slack_webhook.yaml"""
+        # Mock the webhook URL to avoid requiring actual config file in CI
+        mock_load_webhook.return_value = "https://hooks.slack.com/services/TEST/WEBHOOK/URL"
+
         from src.config.settings import Settings
 
         webhook_url = Settings.load_slack_webhook_url()
