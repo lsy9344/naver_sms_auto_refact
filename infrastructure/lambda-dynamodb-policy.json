@@ -1,0 +1,27 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowDynamoDBSessionAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:DeleteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:ap-northeast-2:654654307503:table/session"
+    },
+    {
+      "Sid": "AllowDynamoDBSMSAccess",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:Scan",
+        "dynamodb:Query"
+      ],
+      "Resource": "arn:aws:dynamodb:ap-northeast-2:654654307503:table/sms"
+    }
+  ]
+}

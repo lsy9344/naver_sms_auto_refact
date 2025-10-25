@@ -7290,3 +7290,105 @@ ETA: <10 minutes
 - Missing artifact type: alarm_log
 - Missing artifact type: slack_history
 - Few test reports collected
+
+---
+
+# Validation Evidence: DynamoDB IAM Permission Fix
+
+**Fix Date:** 2025-10-26
+**Executor:** Claude Code
+**Lambda Function:** naverplace_send_inform_v2
+**AWS Region:** ap-northeast-2
+
+---
+
+## Executive Summary
+
+Lambda function `naverplace_send_inform_v2` was experiencing DynamoDB AccessDeniedException errors. This has been successfully resolved by attaching the required DynamoDB permissions to the Lambda execution role.
+
+**Status:** ✅ **COMPLETE**
+
+---
+
+## Problem Description
+
+**Original Error:**
+```
+An error occurred (AccessDeniedException) when calling the PutItem operation:
+User: arn:aws:sts::654654307503:assumed-role/naver-sms-automation-lambda-role/naverplace_send_inform_v2
+is not authorized to perform: dynamodb:PutItem on resource:
+arn:aws:dynamodb:ap-northeast-2:654654307503:table/session
+because no identity-based policy allows the dynamodb:PutItem action
+```
+
+**Root Cause:**
+- Lambda IAM role `naver-sms-automation-lambda-role` had only Secrets Manager permissions
+- No DynamoDB permissions were attached to the role
+- Application requires access to both `session` and `sms` DynamoDB tables
+
+---
+
+## Solution Implemented
+
+### 1. Created DynamoDB IAM Policy
+
+**File:** `infrastructure/lambda-dynamodb-policy.json`
+
+**Permissions Granted:**
+- **session table**: GetItem, PutItem, DeleteItem
+- **sms table**: GetItem, PutItem, UpdateItem, Scan, Query
+
+### 2. Attached Policy to Lambda Role
+
+```bash
+aws iam put-role-policy \
+  --role-name naver-sms-automation-lambda-role \
+  --policy-name LambdaDynamoDBAccess \
+  --policy-document file://infrastructure/lambda-dynamodb-policy.json
+```
+
+### 3. Verification Results
+
+**IAM Role Policies (After Fix):**
+```json
+{
+    "PolicyNames": [
+        "LambdaDynamoDBAccess",
+        "LambdaSecretAccess"
+    ]
+}
+```
+
+**Lambda Invocation (After Fix):**
+- StatusCode: 200 ✅
+- No DynamoDB AccessDeniedException errors ✅
+- Function executes successfully ✅
+
+---
+
+## Validation Checklist
+
+- ✅ DynamoDB policy file created (`infrastructure/lambda-dynamodb-policy.json`)
+- ✅ Policy attached to Lambda execution role as inline policy
+- ✅ Both inline policies present: `LambdaDynamoDBAccess` and `LambdaSecretAccess`
+- ✅ Lambda function invokes successfully without permission errors
+- ✅ DynamoDB tables (`session`, `sms`) are accessible from Lambda
+- ✅ Documentation updated in VALIDATION.md
+
+---
+
+## References
+
+- **DynamoDB Tables:** `session`, `sms`
+- **Lambda Role:** `naver-sms-automation-lambda-role`
+- **Policy Document:** `infrastructure/lambda-dynamodb-policy.json`
+- **DynamoDB Documentation:** `docs/database/dynamodb.md`
+- **Story Reference:** `docs/stories/5.2.create-new-lambda-function.md`
+
+---
+
+## Next Steps
+
+- Continue with Story 5.2 validation campaign
+- Monitor CloudWatch logs for any permission-related issues
+- Ensure Terraform/IaC captures this policy for future deployments
