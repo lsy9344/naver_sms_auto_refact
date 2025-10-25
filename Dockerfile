@@ -98,11 +98,14 @@ COPY config/ ${LAMBDA_TASK_ROOT}/config/
 # Lambda Entrypoint
 # ============================================================================
 # CMD specifies the handler to invoke when Lambda invokes the function:
-#   Format: [module_name, handler_function]
-#   This translates to: python -m main lambda_handler
+#   Format: [module_path.handler_function]
+#   This translates to: import src.main; call src.main.lambda_handler(event, context)
 #
 # Handler contract:
 #   - Accepts event (EventBridge trigger) and context (Lambda context)
 #   - Returns dict with statusCode and body for Lambda response
+#
+# Handler Path:
+#   - src.main.lambda_handler: Module is at src/, function is lambda_handler
 
-CMD ["main.lambda_handler"]
+CMD ["src.main.lambda_handler"]
