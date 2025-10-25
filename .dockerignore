@@ -1,0 +1,89 @@
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.json
+test-results.xml
+bandit-report.json
+
+# Documentation and markdown (not needed in runtime)
+*.md
+docs/
+README.md
+CLAUDE.md
+LICENSE
+
+# CI/CD configuration
+.github/
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# Terraform and infrastructure
+terraform/
+*.tf
+*.tfstate
+*.tfvars
+.terraform/
+
+# Local environment and secrets
+.env
+.env.local
+*.pem
+*.key
+credentials.json
+
+# Build artifacts
+*.log
+*.out
+tmp/
+temp/
+
+# Test fixtures (only if not needed at runtime)
+tests/
+test_*.py
+*_test.py
+
+# Comparison data and legacy code
+tests/fixtures/legacy_*.json
+comparison_results/
+
+# Package manager files
+poetry.lock
+Pipfile.lock
+package-lock.json
+yarn.lock
+
+# OS files
+Thumbs.db
+.directory
