@@ -16,6 +16,8 @@ export SENS_SECRET_KEY="your_sens_secret_key"
 export SENS_SERVICE_ID="your_sens_service_id"
 export TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
 export TELEGRAM_CHAT_ID="your_telegram_chat_id"
+export SLACK_ENABLED="true"
+export SLACK_WEBHOOK_URL="your_slack_webhook_url"
 ```
 
 2. **Or create `.env.local` file:**
@@ -28,6 +30,8 @@ SENS_SECRET_KEY=your_sens_secret_key
 SENS_SERVICE_ID=your_sens_service_id
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_CHAT_ID=your_telegram_chat_id
+SLACK_ENABLED=true
+SLACK_WEBHOOK_URL=your_slack_webhook_url
 ```
 
 Then install python-dotenv:
@@ -67,6 +71,10 @@ SENS_SERVICE_ID=service_id
 # Telegram credentials
 TELEGRAM_BOT_TOKEN=token
 TELEGRAM_CHAT_ID=chat_id
+
+# Slack configuration (optional - disabled by default)
+SLACK_ENABLED=true
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 # AWS configuration (optional - defaults to ap-northeast-2)
 AWS_REGION=ap-northeast-2
@@ -112,6 +120,14 @@ aws secretsmanager create-secret \
     "chat_id": "your_chat_id"
   }' \
   --region ap-northeast-2
+
+# Slack credentials
+aws secretsmanager create-secret \
+  --name naver-sms-automation/slack-credentials \
+  --secret-string '{
+    "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  }' \
+  --region ap-northeast-2
 ```
 
 ### 3. Local Development Fallback Files
@@ -145,6 +161,9 @@ TELEGRAM_CHAT_ID=your_chat_id
   "telegram": {
     "bot_token": "your_bot_token",
     "chat_id": "your_chat_id"
+  },
+  "slack": {
+    "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
   }
 }
 ```
@@ -197,6 +216,28 @@ templates:
       이용 상세 안내 드립니다.
 ```
 
+**`config/my_slack_webhook.yaml` (Slack configuration - local development):**
+
+```yaml
+slack webhook url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+```
+
+**`config/slack_templates.yaml` (Slack message templates):**
+
+```yaml
+templates:
+  expert_correction_digest:
+    blocks:
+      - type: "section"
+        text:
+          type: "mrkdwn"
+          text: |
+            🔔 *Expert Correction Digest*
+            {{ message }}
+            
+            Date: {{ today_date }}
+```
+
 ### 5. Default Values
 
 If not set elsewhere, defaults are used:
@@ -243,6 +284,39 @@ rules = []
 |-------|------|-------------|--------|----------|
 | `telegram_bot_token` | str | Telegram bot token | Env/Secrets | Yes |
 | `telegram_chat_id` | str | Telegram chat ID | Env/Secrets | Yes |
+
+### Slack Configuration (Story 6.2)
+
+| Field | Type | Description | Source | Required |
+|-------|------|-------------|--------|----------|
+| `slack_enabled` | bool | Enable/disable Slack notifications | Env (SLACK_ENABLED) | No |
+| `slack_webhook_url` | str | Slack incoming webhook URL | Env/File/Secrets | No* |
+
+*Required only when `slack_enabled=true`
+
+### Slack Message Templates
+
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `templates` | Dict[str, Template] | Slack message templates | YAML (config/slack_templates.yaml) |
+
+**Template structure:**
+
+```python
+# Templates support Jinja2 templating
+# Example variables: {{ message }}, {{ today_date }}, {% for item in items %}
+template = {
+    "blocks": [  # Slack Block Kit format
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "Message content with {{ variable }}"
+            }
+        }
+    ]
+}
+```
 
 ### Business Configuration
 
@@ -367,6 +441,146 @@ def load() -> "Settings":
 4. **Document in README**
 
 5. **Add tests for validation**
+
+## Slack Webhook Configuration (Story 6.2)
+
+### Overview
+
+Slack integration allows the rule engine to send notifications through Slack webhooks. Notifications are triggered when rule conditions match (e.g., "expert correction" keyword detected).
+
+### Configuration Sources (Priority Order)
+
+Slack webhook URL is loaded with the following priority:
+
+1. **`SLACK_WEBHOOK_URL` environment variable** (direct override, highest priority)
+2. **`config/my_slack_webhook.yaml`** (local development)
+3. **AWS Secrets Manager** `naver-sms-automation/slack-credentials` (production)
+
+### Enable/Disable Slack Notifications
+
+Slack notifications are **disabled by default**. Enable them explicitly:
+
+#### Option 1: Environment Variable
+
+```bash
+export SLACK_ENABLED=true
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+```
+
+#### Option 2: Local Configuration File
+
+Create `config/my_slack_webhook.yaml`:
+
+```yaml
+slack webhook url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+```
+
+Then enable:
+
+```bash
+export SLACK_ENABLED=true
+```
+
+#### Option 3: AWS Secrets Manager (Production)
+
+Create secret in Secrets Manager:
+
+```bash
+aws secretsmanager create-secret \
+  --name naver-sms-automation/slack-credentials \
+  --secret-string '{
+    "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  }' \
+  --region ap-northeast-2
+```
+
+Then enable:
+
+```bash
+export SLACK_ENABLED=true
+```
+
+### Slack Message Templates
+
+Message templates are defined in `config/slack_templates.yaml` using **Slack Block Kit** format with **Jinja2 variable substitution**:
+
+```yaml
+templates:
+  expert_correction_digest:
+    blocks:
+      - type: "section"
+        text:
+          type: "mrkdwn"
+          text: |
+            🔔 *Expert Correction Digest*
+            
+            {{ message }}
+            
+            Total items: {{ item_count }}
+            Date: {{ today_date }}
+  
+  validation_alert:
+    blocks:
+      - type: "section"
+        text:
+          type: "mrkdwn"
+          text: |
+            ⚠️ *Validation Alert*
+            
+            Failures: {{ failure_count }}/{{ total_tests }}
+            Pass rate: {{ pass_rate }}%
+```
+
+### How Templates Are Used
+
+1. **Define in rule configuration:**
+
+```yaml
+rules:
+  - name: "expert_correction_notification"
+    conditions:
+      - type: "keyword_detected"
+        keywords: ["expert correction"]
+    actions:
+      - type: "send_slack"
+        template_name: "expert_correction_digest"
+        variables:
+          message: "Expert correction detected in booking"
+          item_count: 5
+```
+
+2. **Template loader processes Jinja2 variables and renders to Slack**
+
+3. **Webhook client sends rendered message**
+
+### Handling Slack Failures
+
+Slack delivery failures are **non-critical** - they don't block rule execution:
+
+- **Network errors**: Automatically retried up to 3 times with linear backoff
+- **Rate limiting** (HTTP 429): Respected with `Retry-After` header
+- **Invalid webhook**: Logged as warning; rule continues
+- **Webhook disabled**: Gracefully skipped if `SLACK_ENABLED=false`
+
+All failures are logged with structured context for debugging.
+
+### Testing Slack Configuration
+
+```bash
+# Check webhook status programmatically
+python -c "
+from src.notifications.slack_service import SlackWebhookClient
+client = SlackWebhookClient()
+print(client.get_webhook_status())
+"
+
+# Send test notification
+python -c "
+from src.notifications.slack_service import SlackWebhookClient
+client = SlackWebhookClient()
+client.send_slack_webhook_test(webhook_url_masked='https://hooks.slack.com/...', status='success')
+"
+```
 
 ## Troubleshooting
 
@@ -495,6 +709,44 @@ logger = logging.getLogger(__name__)
 logger.info(f"Loaded settings: {settings}")  # Passwords will be ****
 ```
 
+### "Slack webhook URL not configured"
+
+Slack notifications are disabled when webhook URL is not found. Fix:
+
+1. **Check if Slack is enabled:**
+
+```bash
+echo $SLACK_ENABLED
+```
+
+2. **Check environment variable:**
+
+```bash
+echo $SLACK_WEBHOOK_URL
+```
+
+3. **Check local config file:**
+
+```bash
+ls -la config/my_slack_webhook.yaml
+cat config/my_slack_webhook.yaml
+```
+
+4. **Check Secrets Manager:**
+
+```bash
+aws secretsmanager get-secret-value \
+  --secret-id naver-sms-automation/slack-credentials \
+  --region ap-northeast-2
+```
+
+5. **Verify webhook URL format:**
+
+```bash
+# Valid Slack webhook URL should start with:
+https://hooks.slack.com/services/
+```
+
 ## Security Best Practices
 
 ### 1. Never Commit Credentials
@@ -575,6 +827,8 @@ SENS_SECRET_KEY=my_secret_key
 SENS_SERVICE_ID=ncp:sms:kr:service123
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
 TELEGRAM_CHAT_ID=987654321
+SLACK_ENABLED=true
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
 **`config/stores.yaml`:**
@@ -602,9 +856,18 @@ stores:
 All credentials in AWS Secrets Manager:
 
 ```bash
-# Secrets Manager has all credentials
-# Lambda role has permission to read them
-# No .env.local or hardcoded values
+# Create all secrets
+aws secretsmanager create-secret --name naver-sms-automation/naver-credentials ...
+aws secretsmanager create-secret --name naver-sms-automation/sens-credentials ...
+aws secretsmanager create-secret --name naver-sms-automation/telegram-credentials ...
+aws secretsmanager create-secret --name naver-sms-automation/slack-credentials \
+  --secret-string '{"webhook_url": "https://hooks.slack.com/services/..."}'
+
+# Lambda environment: Enable Slack
+export SLACK_ENABLED=true
+
+# Lambda role has permission to read all secrets
+# No hardcoded values or .env.local
 # Configuration is secure and audited
 ```
 
@@ -614,12 +877,16 @@ All credentials in AWS Secrets Manager:
 # Environment: Critical credentials from env vars
 export NAVER_USERNAME=production_user
 export NAVER_PASSWORD=secure_password
+export SLACK_ENABLED=true
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 # Secrets Manager: Less-critical credentials
 aws secretsmanager create-secret --name naver-sms-automation/sens-credentials ...
+aws secretsmanager create-secret --name naver-sms-automation/telegram-credentials ...
 
 # YAML: Business configuration
 # config/stores.yaml contains all stores
+# config/slack_templates.yaml contains Slack message templates
 ```
 
 ## API Reference
@@ -679,6 +946,11 @@ logger.info(f"Configuration loaded: {settings}")
 ## References
 
 - [Settings Dataclass Documentation](../../src/config/settings.py)
+- [Slack Service Documentation](../../src/notifications/slack_service.py)
+- [Slack Integration Tests](../../tests/integration/test_slack_integration.py)
+- [Slack Integration Guide](../testing/slack-integration.md)
+- [Story 6.2: Add Slack Integration](../stories/6.2.add-slack-integration.md)
 - [Dependency Injection Guide](./INTEGRATION.md)
 - [AWS Secrets Manager Documentation](https://docs.aws.amazon.com/secretsmanager/)
-- [Pydantic Documentation](https://pydantic-ai.dev/) (if using pydantic models)
+- [Slack Incoming Webhooks](https://api.slack.com/messaging/webhooks)
+- [Slack Block Kit](https://api.slack.com/block-kit)
