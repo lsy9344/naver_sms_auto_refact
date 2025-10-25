@@ -198,3 +198,4 @@ crash.*.log
 
 # Comparison test results (auto-generated, stored as CI artifacts)
 tests/comparison/results/
+noah-NaverSmsAuto_accessKeys.csv
