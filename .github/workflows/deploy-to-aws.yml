@@ -22,7 +22,7 @@ on:
 env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY_NAME: naver-sms-automation
-  LAMBDA_FUNCTION_NAME: naverplace_send_inform
+  LAMBDA_FUNCTION_NAME: naverplace_send_inform_v2
   AWS_ACCOUNT_ID: 654654307503
 
 jobs:
