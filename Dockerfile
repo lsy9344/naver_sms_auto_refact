@@ -61,14 +61,34 @@ RUN yum update -y && \
     nss \
     atk \
     at-spi2-atk \
+    at-spi2-core \
     cups-libs \
+    dbus-glib \
+    glib2 \
+    gtk3 \
+    pango \
+    cairo \
+    gdk-pixbuf2 \
     libdrm \
-    libxkbcommon \
-    libxcomposite \
-    libxdamage \
-    libxrandr \
+    libX11 \
+    libXcomposite \
+    libXcursor \
+    libXdamage \
+    libXext \
+    libXfixes \
+    libXi \
+    libXrandr \
+    libXrender \
+    libXss \
+    libXtst \
     libgbm \
-    alsa-lib && \
+    libxkbcommon \
+    mesa-libEGL \
+    mesa-libGL \
+    alsa-lib \
+    fontconfig \
+    freetype \
+    xorg-x11-fonts-Type1 && \
     \
     # Download Chrome for Testing (stable version compatible with ARM64)
     wget -q https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.204/linux64/chrome-linux64.zip -O /tmp/chrome.zip && \
@@ -94,7 +114,9 @@ RUN yum update -y && \
 # ============================================================================
 # Layer 2: Export Binary Paths for Selenium
 # ============================================================================
-ENV CHROMEDRIVER_BIN=/usr/bin/chromedriver
+ENV CHROME_BIN=/opt/chrome/chrome
+ENV CHROMEDRIVER_BIN=/opt/chromedriver
+ENV LD_LIBRARY_PATH=/opt/chrome:${LD_LIBRARY_PATH}
 
 # ============================================================================
 # Layer 3: Copy Python dependencies from builder stage

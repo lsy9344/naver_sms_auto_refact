@@ -32,7 +32,7 @@ class NaverAuthenticator:
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--disable-dev-tools")
         chrome_options.add_argument("--no-zygote")
-        chrome_options.add_argument("--single-process")
+        chrome_options.add_argument("--remote-debugging-port=9222")
         chrome_options.add_argument("--user-data-dir=/tmp/user-data")
         chrome_options.add_argument("--data-path=/tmp/data-path")
         chrome_options.add_argument("--homedir=/tmp")
