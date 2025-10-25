@@ -72,10 +72,39 @@ def test_cookie_reuse_returns_cached(mock_chrome, mock_service):
     driver.get.assert_has_calls(
         [
             call("https://new.smartplace.naver.com/"),
+            call("https://naver.com/"),
             call("https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR"),
         ]
     )
     session_mgr.put_item.assert_not_called()
+
+
+@patch("src.auth.naver_login.Service")
+@patch("src.auth.naver_login.webdriver.Chrome")
+def test_cached_cookies_align_to_domains_before_injection(mock_chrome, mock_service):
+    driver = _build_driver_mock()
+    mock_chrome.return_value = driver
+    mock_service.return_value = MagicMock()
+
+    cached_cookies = [
+        {"name": "NID_AUT", "value": "auth", "domain": ".naver.com", "expiry": 1_700_000_000.0},
+        {"name": "NID_SES", "value": "session", "domain": "nid.naver.com"},
+    ]
+
+    session_mgr = Mock()
+    auth = NaverAuthenticator("testuser", "testpass", session_mgr)
+
+    with patch("src.auth.naver_login.time.sleep"):
+        auth.login(cached_cookies=cached_cookies)
+
+    driver.get.assert_any_call("https://naver.com/")
+    driver.get.assert_any_call("https://nid.naver.com/")
+    # Validate the login flow still navigates to the final validation page
+    driver.get.assert_any_call("https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR")
+
+    added_cookie_payload = driver.add_cookie.call_args_list[0][0][0]
+    assert added_cookie_payload["name"] == "NID_AUT"
+    assert added_cookie_payload["expiry"] == 1_700_000_000
 
 
 @patch("src.auth.naver_login.Service")

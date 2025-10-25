@@ -1,8 +1,10 @@
 import json
 import time
+from collections import defaultdict
 from random import uniform
-
+from typing import Any, Dict, List
 from selenium import webdriver
+from selenium.common.exceptions import InvalidCookieDomainException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -92,8 +94,7 @@ class NaverAuthenticator:
 
             return cookies
         else:
-            for cookie in cached_cookies:
-                driver.add_cookie(cookie)
+            self._apply_cached_cookies(cached_cookies)
 
             driver.get("https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR")
             driver.implicitly_wait(10)
@@ -125,3 +126,53 @@ class NaverAuthenticator:
     def cleanup(self):
         if self.driver:
             self.driver.quit()
+
+    def _apply_cached_cookies(self, cached_cookies: List[Dict[str, Any]]) -> None:
+        """Rehydrate Selenium session by aligning domains before adding cookies."""
+        if not self.driver:
+            return
+
+        driver = self.driver
+        cookies_by_domain: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+
+        for cookie in cached_cookies:
+            domain = cookie.get("domain") or "naver.com"
+            cookies_by_domain[domain].append(cookie)
+
+        last_loaded_domain = ""
+        for domain, domain_cookies in cookies_by_domain.items():
+            sanitized_domain = domain.lstrip(".")
+            target_url = f"https://{sanitized_domain}/"
+
+            if last_loaded_domain != sanitized_domain:
+                try:
+                    driver.get(target_url)
+                    last_loaded_domain = sanitized_domain
+                except WebDriverException as exc:
+                    logger.warning(
+                        "Skipping cached cookies for domain due to navigation failure",
+                        extra={
+                            "operation": "naver_login_cached",
+                            "error": str(exc),
+                            "domain": sanitized_domain,
+                        },
+                    )
+                    continue
+
+            for cookie in domain_cookies:
+                cookie_payload = cookie.copy()
+                expiry = cookie_payload.get("expiry")
+                if isinstance(expiry, float):
+                    cookie_payload["expiry"] = int(expiry)
+
+                try:
+                    driver.add_cookie(cookie_payload)
+                except InvalidCookieDomainException as exc:
+                    logger.warning(
+                        "Cached cookie rejected due to domain mismatch",
+                        extra={
+                            "operation": "naver_login_cached",
+                            "error": str(exc),
+                            "domain": sanitized_domain,
+                        },
+                    )
