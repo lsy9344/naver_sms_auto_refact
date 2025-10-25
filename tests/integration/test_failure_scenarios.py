@@ -85,7 +85,7 @@ rules:
         engine.register_action("log_event", log_event)
 
         context = {}
-        engine.process_booking(context)
+        results = engine.process_booking(context)
 
         # Verify fallback rule executed
         assert len([r for r in results if "API Failure Fallback" in r.rule_name]) > 0
@@ -160,7 +160,7 @@ rules:
         engine.register_action("log_event", log_event)
 
         context = {"error": "401 Unauthorized"}
-        engine.process_booking(context)
+        results = engine.process_booking(context)
 
         # Authentication failure should trigger alert
         assert len(results) > 0
@@ -224,7 +224,7 @@ rules:
         engine.register_action("send_slack", lambda ctx, **p: None)
 
         context = {}
-        engine.process_booking(context)
+        results = engine.process_booking(context)
 
         # Verify error handling
         assert any(r.success is False for r in results)
@@ -250,7 +250,7 @@ rules:
         engine.register_action("send_slack", send_slack)
 
         context = {}
-        engine.process_booking(context)
+        results = engine.process_booking(context)
 
         # Critical alert should be sent
         assert len(critical_alerts) > 0
@@ -338,7 +338,7 @@ rules:
         engine.register_action("mark_sms_retry_needed", mark_sms_retry_needed)
 
         context = {}
-        engine.process_booking(context)
+        results = engine.process_booking(context)
 
         # Error handling should occur
         assert any(not r.success for r in results)
@@ -391,7 +391,7 @@ rules:
         engine.register_action("mark_sms_retry_needed", mark_sms_retry_needed)
 
         context = {}
-        engine.process_booking(context)
+        results = engine.process_booking(context)
 
         # Validation error should be logged
         assert any(not r.success for r in results)

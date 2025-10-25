@@ -476,7 +476,7 @@ class TestNotificationActions:
 
         mock_telegram_service.send_message.assert_called_once()
         call_kwargs = mock_telegram_service.send_message.call_args.kwargs
-        assert "[sms]" in call_kwargs["text"].lower()
+        assert "예약 확인 문자 발송 완료" in call_kwargs["text"]
         assert booking.phone in call_kwargs["text"]
 
 
