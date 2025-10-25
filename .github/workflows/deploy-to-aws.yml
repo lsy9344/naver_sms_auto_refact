@@ -247,6 +247,11 @@ jobs:
               sleep $RETRY_DELAY
               ATTEMPT=$((ATTEMPT + 1))
               RETRY_DELAY=$((RETRY_DELAY * 2))
+            elif grep -qi "Connection was closed" "$ERROR_LOG"; then
+              echo "⚠️ Connection to Lambda API closed unexpectedly, retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+              ATTEMPT=$((ATTEMPT + 1))
+              RETRY_DELAY=$((RETRY_DELAY * 2))
             else
               echo "❌ Lambda invocation failed"
               cat "$ERROR_LOG"
