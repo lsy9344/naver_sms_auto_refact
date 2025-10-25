@@ -76,7 +76,7 @@ jobs:
 
       - name: Check coverage threshold
         run: |
-          pytest tests/ --cov=src --cov-fail-under=70 \
+          pytest tests/unit tests/integration tests/comparison --cov=src --cov-fail-under=70 \
             --cov-report=term-missing
         env:
           MOCK_AWS: "true"
