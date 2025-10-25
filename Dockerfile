@@ -45,30 +45,51 @@ FROM public.ecr.aws/lambda/python:3.11
 # ============================================================================
 # Layer 1: System runtime dependencies
 # ============================================================================
-# Only install runtime packages (no gcc, no build tools)
+# Install Chrome and ChromeDriver for Selenium automation
 #
-# Dependencies:
-#   - ca-certificates: For SSL/TLS connections to APIs
-#   - chromium-chromedriver: WebDriver binary for Selenium automation
+# Since Amazon Linux 2 doesn't have chromium in default repos,
+# we download Chrome for Testing binaries directly from Google
 #
-# Chrome Browser:
-#   - Downloaded at runtime by webdriver-manager (saves ~300MB)
-#   - Provides automatic version matching
-#
-# Optimization: Combined into single RUN to minimize layers
+# Chrome for Testing: Provides stable Chrome + ChromeDriver matching versions
+# https://googlechromelabs.github.io/chrome-for-testing/
 
 RUN yum update -y && \
     yum install -y \
     ca-certificates \
-    chromium-chromedriver && \
+    wget \
+    unzip \
+    nss \
+    atk \
+    at-spi2-atk \
+    cups-libs \
+    libdrm \
+    libxkbcommon \
+    libxcomposite \
+    libxdamage \
+    libxrandr \
+    libgbm \
+    alsa-lib && \
+    \
+    # Download Chrome for Testing (stable version compatible with ARM64)
+    wget -q https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.204/linux64/chrome-linux64.zip -O /tmp/chrome.zip && \
+    wget -q https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.204/linux64/chromedriver-linux64.zip -O /tmp/chromedriver.zip && \
+    \
+    # Extract Chrome
+    unzip -q /tmp/chrome.zip -d /opt/ && \
+    mv /opt/chrome-linux64 /opt/chrome && \
+    \
+    # Extract ChromeDriver
+    unzip -q /tmp/chromedriver.zip -d /opt/ && \
+    mv /opt/chromedriver-linux64/chromedriver /opt/chromedriver && \
+    chmod +x /opt/chromedriver && \
     \
     # Create symlinks for compatibility
-    ln -sf /usr/bin/chromedriver /usr/local/bin/chromedriver && \
+    ln -sf /opt/chromedriver /usr/local/bin/chromedriver && \
     \
-    # Cleanup to minimize layer size
+    # Cleanup
+    rm -rf /tmp/chrome.zip /tmp/chromedriver.zip /opt/chromedriver-linux64 && \
     yum clean all && \
-    rm -rf /var/cache/yum && \
-    rm -rf /tmp/*
+    rm -rf /var/cache/yum
 
 # ============================================================================
 # Layer 2: Export Binary Paths for Selenium
