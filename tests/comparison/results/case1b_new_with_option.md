@@ -1,6 +1,6 @@
 # Comparison Report: case1b_new_with_option
 **Scenario:** CASE 1B: New Booking with Option
-**Generated:** 2025-10-25T10:40:21.533839
+**Generated:** 2025-10-25T14:02:25.387153
 
 ## Summary
 - **Total Mismatches:** 0

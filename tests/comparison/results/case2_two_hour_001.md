@@ -1,6 +1,6 @@
 # Comparison Report: case2_two_hour_001
 **Scenario:** CASE 2: Two-Hour Window Reminder
-**Generated:** 2025-10-25T10:40:09.784975
+**Generated:** 2025-10-25T14:02:11.593133
 
 ## Summary
 - **Total Mismatches:** 0
