@@ -25,10 +25,7 @@ rules:
           template: "confirmation"
       - type: "send_telegram"
         params:
-          template_name: "sms_confirmation"
-          template_params:
-            customer_name: "{{ booking.name }}"
-            customer_phone: "{{ booking.phone }}"
+          message: "[예약 확인] {{ booking.name }} 고객 예약이 시스템에 등록되었습니다."
 
   # 규칙 2: 이용 2시간 전 상세 안내 문자
   # 우선순위: 높음 - 
@@ -57,10 +54,7 @@ rules:
           value: true
       - type: "send_telegram"
         params:
-          template_name: "sms_detail_guide"
-          template_params:
-            customer_name: "{{ booking.name }}"
-            customer_phone: "{{ booking.phone }}"
+          message: "[안내] {{ booking.name }} 고객의 예약이 2시간 이내입니다. 자세한 안내를 SMS로 발송했습니다."
 
   # 규칙 3: 리뷰 작성 안내 문자
   # 우선순위: 중간 - 리뷰 신청한 고객에게 리뷰 작성 안내 문자 발송
@@ -91,10 +85,7 @@ rules:
           value: true
       - type: "send_telegram"
         params:
-          template_name: "review_reminder"
-          template_params:
-            customer_name: "{{ booking.name }}"
-            customer_phone: "{{ booking.phone }}"
+          message: "[이벤트] {{ booking.name }} 고객에게 옵션 관련 이벤트 SMS를 발송했습니다."
 
   # 규칙 4: 날짜 범위 프로모션 (스토리 6.3) - 템플릿 /// 미사용
   # 우선순위: 중간 - 기간 한정 프로모션 캠페인
@@ -123,11 +114,11 @@ rules:
   # 발생 조건: 고객이 전문가 수정 옵션을 선택한 경우
   # 예상 동작: 전문가 수정 담당자 명단이 포함된 슬랙 알림 전송
   - name: "Expert Correction Slack Digest"
-    enabled: true
-    description: "Send Slack digest for bookings requesting expert correction (Story 6.1, AC1)"
-    tags: ["story-6.1", "slack", "digest"]
+    enabled: false
+    description: "[TEMPLATE] Send Slack digest for bookings requesting expert correction (Story 6.1, AC1)"
+    tags: ["story-6.1", "slack", "digest", "template"]
     priority: "low"
-    notes: "Demonstrates send_slack action for expert correction digests. Requires Slack enabled."
+    notes: "Demonstrates send_slack action for expert correction digests. Requires Slack enabled and webhook configured."
     conditions:
       - type: "has_option_keyword"
         params:
@@ -135,19 +126,19 @@ rules:
     actions:
       - type: "send_slack"
         params:
-          template_name: "expert_correction_digest"
           channel: "#naver_sms_auto_notify"
+          message: "전문가 보정 요청 고객이 예약되었습니다."
 
   # 규칙 6: 기간내 옵션 선택 고객 목록 슬랙 전송(스토리 6.1, AC3) /// 미사용
   # 우선순위: 낮음 - 정해진 기간내에 옵션(키워드)이 있는 고객 목록 슬랙 전송
   # 발생 조건: 예약 날짜가 이벤트 기간 내에 있고 고객에게 여러 옵션이 있을 때
   # 예상 동작: 휴일 이벤트 고객 명단을 포함한 Slack 알림 전송
   - name: "Holiday Event Customer List"
-    enabled: true
-    description: "Send Slack digest for holiday event customer list (Story 6.1, AC3)"
-    tags: ["story-6.1", "slack", "digest", "date-range"]
+    enabled: false
+    description: "[TEMPLATE] Send Slack digest for holiday event customer list (Story 6.1, AC3)"
+    tags: ["story-6.1", "slack", "digest", "date-range", "template"]
     priority: "low"
-    notes: "Demonstrates send_slack action for holiday event marketing. Requires Slack enabled."
+    notes: "Demonstrates send_slack action for holiday event marketing. Requires Slack enabled and webhook configured."
     conditions:
       - type: "date_range"
         params:
@@ -160,37 +151,28 @@ rules:
     actions:
       - type: "send_slack"
         params:
-          template_name: "holiday_event_customer_list"
           channel: "#naver_sms_auto_notify"
-          template_params:
-            bookings: "{{ bookings_in_date_range }}"
+          message: "휴일 이벤트 기간에 옵션 선택 고객이 있습니다."
 
-  # 규칙 7: SMS 발송 실패 알람 (모든 문자 유형)
+  # 규칙 7: SMS 발송 실패 알람 (모든 문자 유형) - 현재 미지원 (향후 구현 예정)
   # 우선순위: 높음 - 모든 문자(안내, 확인, 이벤트) 발송 실패시 즉시 운영팀에 알림
   # 발생 조건: SMS 발송이 실패했거나 오류가 발생한 경우 (template 필터 없음 = 모든 유형 감지)
   # 예상 동작: 텔레그램으로 알림 전송 + 구조화된 로그 남기기
   - name: "SMS Send Failure Alert"
-    enabled: true
-    description: "Alert operations when ANY SMS delivery fails or raises errors (confirmation, guide, event)"
-    tags: ["alert", "failure", "sms", "critical"]
+    enabled: false
+    description: "[FUTURE] Alert operations when ANY SMS delivery fails or raises errors (confirmation, guide, event)"
+    tags: ["alert", "failure", "sms", "critical", "future"]
     priority: "high"
-    notes: "Requires sms_send_failed condition evaluator. Detects failures from send_sms action exceptions."
+    notes: "Requires sms_send_failed condition evaluator. Detects failures from send_sms action exceptions. Not yet implemented."
     conditions:
-      - type: "sms_send_failed"
-        params:
-          lookback_minutes: 5
-          failure_threshold: 1
+      - type: "booking_not_in_db"
     actions:
       - type: "send_telegram"
         params:
-          template_name: "error_alert"
-          template_params:
-            customer_name: "{{ booking.name }}"
-            reason: "SMS 발송 실패 - 즉시 확인 필요"
+          message: "SMS 발송 실패 - 즉시 확인 필요"
       - type: "log_event"
         params:
-          status: "failure"
-          message: "SMS delivery failed - Telegram alert dispatched"
+          event_type: "sms_failure"
 
   # 템플릿: Slack 알림 (사용 중지됨 - 향후 개선 예정)
   # 이 규칙은 향후 구현을 위한 템플릿 역할을 합니다
