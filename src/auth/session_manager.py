@@ -21,7 +21,7 @@ class SessionManager:
         Initialize SessionManager.
 
         Args:
-            dynamodb_resource: boto3 DynamoDB resource
+            dynamodb_resource: boto3 DynamoDB resource.
         """
         self.dynamodb = dynamodb_resource
         self.table = self.dynamodb.Table("session")
