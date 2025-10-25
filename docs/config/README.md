@@ -73,8 +73,9 @@ TELEGRAM_BOT_TOKEN=token
 TELEGRAM_CHAT_ID=chat_id
 
 # Slack configuration (optional - disabled by default)
+# Get webhook URL from https://api.slack.com/messaging/webhooks
 SLACK_ENABLED=true
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX
 
 # AWS configuration (optional - defaults to ap-northeast-2)
 AWS_REGION=ap-northeast-2
@@ -163,7 +164,7 @@ TELEGRAM_CHAT_ID=your_chat_id
     "chat_id": "your_chat_id"
   },
   "slack": {
-    "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+    "webhook_url": "https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX"
   }
 }
 ```
@@ -219,7 +220,8 @@ templates:
 **`config/my_slack_webhook.yaml` (Slack configuration - local development):**
 
 ```yaml
-slack webhook url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+# Get webhook URL from https://api.slack.com/messaging/webhooks
+slack webhook url: "https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX"
 ```
 
 **`config/slack_templates.yaml` (Slack message templates):**
@@ -444,6 +446,27 @@ def load() -> "Settings":
 
 ## Slack Webhook Configuration (Story 6.2)
 
+### Getting Your Slack Webhook URL
+
+**Important:** The `SLACK_WEBHOOK_URL` must be a real Slack Incoming Webhook URL, not a placeholder.
+
+**Steps to get your webhook URL:**
+
+1. Go to https://api.slack.com/messaging/webhooks
+2. Click "Create New App" or select existing app
+3. Enable "Incoming Webhooks"
+4. Click "Add New Webhook to Workspace"
+5. Select target channel and authorize
+6. Copy the Webhook URL (looks like: `https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX`)
+
+**Example webhook URLs:**
+```
+https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX
+https://hooks.slack.com/services/TXXXXXXXXXX/BXXXXXXXXXX/YYYYYYYYYYYYYYYYYYYYYY
+```
+
+**Note:** Always starts with `https://hooks.slack.com/services/` followed by IDs and secret token.
+
 ### Overview
 
 Slack integration allows the rule engine to send notifications through Slack webhooks. Notifications are triggered when rule conditions match (e.g., "expert correction" keyword detected).
@@ -464,7 +487,8 @@ Slack notifications are **disabled by default**. Enable them explicitly:
 
 ```bash
 export SLACK_ENABLED=true
-export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+# Replace with your actual webhook URL from https://api.slack.com/messaging/webhooks
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX"
 ```
 
 #### Option 2: Local Configuration File
@@ -472,7 +496,8 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
 Create `config/my_slack_webhook.yaml`:
 
 ```yaml
-slack webhook url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+# Get webhook URL from https://api.slack.com/messaging/webhooks
+slack webhook url: "https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX"
 ```
 
 Then enable:
@@ -489,10 +514,12 @@ Create secret in Secrets Manager:
 aws secretsmanager create-secret \
   --name naver-sms-automation/slack-credentials \
   --secret-string '{
-    "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+    "webhook_url": "https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX"
   }' \
   --region ap-northeast-2
 ```
+
+**Note:** Get your webhook URL from https://api.slack.com/messaging/webhooks
 
 Then enable:
 
@@ -828,7 +855,7 @@ SENS_SERVICE_ID=ncp:sms:kr:service123
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
 TELEGRAM_CHAT_ID=987654321
 SLACK_ENABLED=true
-SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX
 ```
 
 **`config/stores.yaml`:**
@@ -878,7 +905,7 @@ export SLACK_ENABLED=true
 export NAVER_USERNAME=production_user
 export NAVER_PASSWORD=secure_password
 export SLACK_ENABLED=true
-export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/T1234567890/B1234567890/XXXXXXXXXXXXXXXXXXXX
 
 # Secrets Manager: Less-critical credentials
 aws secretsmanager create-secret --name naver-sms-automation/sens-credentials ...
