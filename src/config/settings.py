@@ -135,6 +135,7 @@ class Settings:
         # Feature flags (Story 5.4)
         self.sens_delivery_enabled = SENS_DELIVERY_ENABLED
         self.comparison_mode_enabled = COMPARISON_MODE_ENABLED
+        self.telegram_enabled = TELEGRAM_ENABLED
 
     def is_sens_delivery_enabled(self) -> bool:
         """Check if SENS SMS delivery is enabled (Story 5.4 AC 10)."""
@@ -143,6 +144,10 @@ class Settings:
     def is_comparison_mode_enabled(self) -> bool:
         """Check if comparison/validation mode is enabled."""
         return self.comparison_mode_enabled
+
+    def is_telegram_enabled(self) -> bool:
+        """Check if Telegram notifications are permitted."""
+        return self.telegram_enabled
 
     def _get_secrets_client(self):
         """Lazy initialize Secrets Manager client."""

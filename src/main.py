@@ -70,6 +70,7 @@ def lambda_handler(event, context):
 
         # Load settings and credentials
         settings = Settings()
+        telegram_enabled = settings.is_telegram_enabled()
         naver_creds = settings.load_naver_credentials()
         sens_creds = settings.load_sens_credentials()
 
@@ -165,28 +166,33 @@ def lambda_handler(event, context):
             # Initialize Telegram service
             telegram_service = None
             telegram_template_loader = None
-            try:
-                telegram_template_loader = TelegramTemplateLoader(logger=logger)
-            except FileNotFoundError:
-                logger.warning(
-                    "Telegram template configuration not found; template-based messages disabled"
-                )
-            except Exception as e:
-                logger.error(f"Failed to load Telegram templates: {e}")
+            telegram_creds: Optional[Dict[str, str]] = None
 
-            try:
-                telegram_creds = settings.load_telegram_credentials()
-                if telegram_creds:
-                    telegram_service = TelegramBotClient(
-                        bot_token=telegram_creds.get("bot_token"),
-                        chat_id=telegram_creds.get("chat_id"),
-                        logger=logger,
+            if telegram_enabled:
+                try:
+                    telegram_template_loader = TelegramTemplateLoader(logger=logger)
+                except FileNotFoundError:
+                    logger.warning(
+                        "Telegram template configuration not found; template-based messages disabled"
                     )
-                    logger.info("Telegram service initialized")
-                else:
-                    logger.warning("Telegram credentials not configured")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Telegram service: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to load Telegram templates: {e}")
+
+                try:
+                    telegram_creds = settings.load_telegram_credentials()
+                    if telegram_creds:
+                        telegram_service = TelegramBotClient(
+                            bot_token=telegram_creds.get("bot_token"),
+                            chat_id=telegram_creds.get("chat_id"),
+                            logger=logger,
+                        )
+                        logger.info("Telegram service initialized")
+                    else:
+                        logger.warning("Telegram credentials not configured")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Telegram service: {e}")
+            else:
+                logger.info("Telegram notifications disabled via configuration flag")
 
             services_bundle = ActionServicesBundle(
                 db_repo=booking_repo,
@@ -196,6 +202,7 @@ def lambda_handler(event, context):
                     "slack_enabled": slack_enabled,
                     "sens_delivery_enabled": settings.is_sens_delivery_enabled(),
                     "comparison_mode_enabled": settings.is_comparison_mode_enabled(),
+                    "telegram_enabled": telegram_enabled,
                 },
                 slack_service=slack_service,
                 slack_template_loader=slack_template_loader,
@@ -226,15 +233,17 @@ def lambda_handler(event, context):
             # ============================================================
             # AC 6: Send summary notification (Telegram)
             # ============================================================
-            try:
-                telegram_creds = settings.load_telegram_credentials()
-                send_telegram_summary(
-                    telegram_creds=telegram_creds,
-                    summary=summary,
-                    all_results=all_results,
-                )
-            except Exception as e:
-                logger.warning(f"Failed to send Telegram summary: {e}")
+            if telegram_enabled and telegram_creds:
+                try:
+                    send_telegram_summary(
+                        telegram_creds=telegram_creds,
+                        summary=summary,
+                        all_results=all_results,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to send Telegram summary: {e}")
+            else:
+                logger.info("Skipping Telegram summary notification (disabled or unconfigured)")
 
             # ============================================================
             # AC 7: Return success response
@@ -267,8 +276,11 @@ def lambda_handler(event, context):
         # Send error notification
         try:
             settings = Settings()
-            telegram_creds = settings.load_telegram_credentials()
-            notify_telegram_error(telegram_creds, str(e))
+            if settings.is_telegram_enabled():
+                telegram_creds = settings.load_telegram_credentials()
+                notify_telegram_error(telegram_creds, str(e))
+            else:
+                logger.info("Skipping Telegram error notification (disabled)")
         except Exception as notify_err:
             logger.error(f"Failed to send error notification: {notify_err}")
 
@@ -496,7 +508,7 @@ def process_all_bookings(
 
 
 def send_telegram_summary(
-    telegram_creds: Dict[str, str],
+    telegram_creds: Optional[Dict[str, str]],
     summary: Dict[str, Any],
     all_results: List[ActionResult],
 ) -> None:
@@ -510,8 +522,16 @@ def send_telegram_summary(
         summary: Summary statistics dict
         all_results: List of ActionResult objects
     """
-    bot_token = telegram_creds["bot_token"]
-    chat_id = telegram_creds["chat_id"]
+    if not telegram_creds:
+        logger.info("Telegram credentials unavailable; skipping summary notification")
+        return
+
+    bot_token = telegram_creds.get("bot_token")
+    chat_id = telegram_creds.get("chat_id")
+
+    if not bot_token or not chat_id:
+        logger.warning("Telegram credentials incomplete; skipping summary notification")
+        return
 
     # Build message
     message = (
@@ -537,7 +557,9 @@ def send_telegram_summary(
         raise
 
 
-def notify_telegram_error(telegram_creds: Dict[str, str], error_message: str) -> None:
+def notify_telegram_error(
+    telegram_creds: Optional[Dict[str, str]], error_message: str
+) -> None:
     """
     Send error notification to Telegram.
 
@@ -547,8 +569,16 @@ def notify_telegram_error(telegram_creds: Dict[str, str], error_message: str) ->
         telegram_creds: Dict with 'bot_token' and 'chat_id'
         error_message: Error description
     """
-    bot_token = telegram_creds["bot_token"]
-    chat_id = telegram_creds["chat_id"]
+    if not telegram_creds:
+        logger.info("Telegram credentials unavailable; skipping error notification")
+        return
+
+    bot_token = telegram_creds.get("bot_token")
+    chat_id = telegram_creds.get("chat_id")
+
+    if not bot_token or not chat_id:
+        logger.warning("Telegram credentials incomplete; skipping error notification")
+        return
 
     message = (
         f"🚨 Naver SMS Automation Error\n\n"

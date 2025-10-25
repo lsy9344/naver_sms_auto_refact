@@ -36,17 +36,24 @@
       "Resource": "arn:aws:secretsmanager:ap-northeast-2:*:secret:naver-sms-automation/*"
     },
     {
-      "Sid": "CloudWatchLogs",
+      "Sid": "CloudWatchLogsGlobal",
       "Effect": "Allow",
       "Action": [
         "logs:CreateLogGroup",
+        "logs:DescribeLogGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CloudWatchLambdaLogs",
+      "Effect": "Allow",
+      "Action": [
         "logs:CreateLogStream",
         "logs:PutLogEvents",
         "logs:PutRetentionPolicy",
-        "logs:DescribeLogGroups",
         "logs:DeleteLogGroup"
       ],
-      "Resource": "arn:aws:logs:ap-northeast-2:*:log-group:/aws/lambda/naver-sms-automation*"
+      "Resource": "arn:aws:logs:ap-northeast-2:*:log-group:/aws/lambda/naverplace_send_inform_v2*"
     },
     {
       "Sid": "CloudWatchMetrics",
