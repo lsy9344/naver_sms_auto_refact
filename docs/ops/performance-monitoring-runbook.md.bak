@@ -35,7 +35,7 @@ Example from `src/utils/logger.py`:
 {
   "timestamp": "2025-10-20T14:59:00.123Z",
   "level": "INFO",
-  "function": "naverplace_send_inform_v2",
+  "function": "naverplace_send_inform",
   "phase": "authenticate",
   "duration_ms": 2345.67,
   "status": "success",
@@ -216,7 +216,7 @@ fields @duration, @memoryUsed, @initDuration, @message
 
 **AWS Console Steps:**
 1. CloudWatch → Alarms → Create Alarm
-2. Select Log Group: `/aws/lambda/naverplace_send_inform_v2`
+2. Select Log Group: `/aws/lambda/naverplace_send_inform`
 3. Create Metric Filter:
    ```
    [fields duration_ms] | max(duration_ms) > 180000
@@ -263,7 +263,7 @@ aws cloudwatch put-metric-alarm \
 
 ```bash
 aws logs put-metric-filter \
-  --log-group-name "/aws/lambda/naverplace_send_inform_v2" \
+  --log-group-name "/aws/lambda/naverplace_send_inform" \
   --filter-name "HighMemoryUsage" \
   --filter-pattern "[fields @memoryUsed > 400000000]" \
   --metric-transformations \
@@ -280,7 +280,7 @@ aws logs put-metric-filter \
 ```bash
 # Check recent execution times
 aws logs start-query \
-  --log-group-name "/aws/lambda/naverplace_send_inform_v2" \
+  --log-group-name "/aws/lambda/naverplace_send_inform" \
   --start-time $(date -d '1 hour ago' +%s) \
   --end-time $(date +%s) \
   --query-string 'fields @timestamp, duration_ms | filter ispresent(duration_ms) | stats max(duration_ms) as max_duration, avg(duration_ms) as avg_duration'
@@ -290,7 +290,7 @@ aws logs start-query \
 ```bash
 # Check phase breakdown
 aws logs start-query \
-  --log-group-name "/aws/lambda/naverplace_send_inform_v2" \
+  --log-group-name "/aws/lambda/naverplace_send_inform" \
   --start-time $(date -d '1 hour ago' +%s) \
   --end-time $(date +%s) \
   --query-string 'fields phase, duration_ms | stats max(duration_ms) as max_phase_duration by phase | sort max_phase_duration desc'
@@ -312,7 +312,7 @@ aws logs start-query \
 **Step 1: Categorize Errors (2 min)**
 ```bash
 aws logs start-query \
-  --log-group-name "/aws/lambda/naverplace_send_inform_v2" \
+  --log-group-name "/aws/lambda/naverplace_send_inform" \
   --start-time $(date -d '1 hour ago' +%s) \
   --end-time $(date +%s) \
   --query-string 'fields @message, error_code | filter level = "ERROR" | stats count() as error_count by error_code | sort error_count desc'
@@ -345,7 +345,7 @@ aws lambda get-function-concurrency --function-name naverplace_send_inform
 **Option B: Increase Allocation (temporary)**
 ```bash
 aws lambda update-function-configuration \
-  --function-name naverplace_send_inform_v2 \
+  --function-name naverplace_send_inform \
   --memory-size 1024  # Increase from current (typically 512)
 ```
 
@@ -353,7 +353,7 @@ aws lambda update-function-configuration \
 ```bash
 # Update function code to trigger restart and clear memory
 aws lambda update-function-code \
-  --function-name naverplace_send_inform_v2 \
+  --function-name naverplace_send_inform \
   --image-uri <current-image-uri>
 ```
 
@@ -390,7 +390,7 @@ Execution Duration Stats: {
 ```bash
 # Check Lambda performance in production
 aws logs start-query \
-  --log-group-name "/aws/lambda/naverplace_send_inform_v2" \
+  --log-group-name "/aws/lambda/naverplace_send_inform" \
   --start-time $(date -d '15 minutes ago' +%s) \
   --end-time $(date +%s) \
   --query-string 'fields duration_ms | filter ispresent(duration_ms) | stats avg(duration_ms) as avg, max(duration_ms) as max, pct(duration_ms, 95) as p95'

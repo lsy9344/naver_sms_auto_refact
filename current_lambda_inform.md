@@ -27,7 +27,7 @@ Trigger : eventbridge 20minute
 
 
 
-람다 함수 이름 : naverplace_send_inform
+람다 함수 이름 : naverplace_send_inform_v2
 
   - AWS_ACCESS_KEY_ID: [REDACTED - Use environment variables]
   - AWS_SECRET_ACCESS_KEY: [REDACTED - Use environment variables]

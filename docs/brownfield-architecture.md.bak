@@ -1368,7 +1368,7 @@ class SMSService:
    docker push {account}.dkr.ecr.{region}.amazonaws.com/naver-sms-automation:latest
 
 3. Update Lambda to use image:
-   aws lambda update-function-code --function-name naverplace_send_inform_v2 \
+   aws lambda update-function-code --function-name naverplace_send_inform \
      --image-uri {account}.dkr.ecr.{region}.amazonaws.com/naver-sms-automation:latest
 ```
 
@@ -1540,7 +1540,7 @@ pytest tests/
 2. Upload via AWS Console or CLI:
    ```bash
    aws lambda update-function-code \
-     --function-name naverplace_send_inform_v2 \
+     --function-name naverplace_send_inform \
      --zip-file fileb://lambda_package.zip
    ```
 3. Test via AWS Console (Test button)
@@ -1594,7 +1594,7 @@ jobs:
       - name: Update Lambda function
         run: |
           aws lambda update-function-code \
-            --function-name naverplace_send_inform_v2 \
+            --function-name naverplace_send_inform \
             --image-uri ${{ steps.login-ecr.outputs.registry }}/naver-sms-automation:latest
 ```
 
@@ -1721,15 +1721,15 @@ def test_booking_processing_parity():
 **AWS Lambda:**
 ```bash
 # View Lambda logs
-aws logs tail /aws/lambda/naverplace_send_inform_v2 --follow
+aws logs tail /aws/lambda/naverplace_send_inform --follow
 
 # Invoke Lambda manually
-aws lambda invoke --function-name naverplace_send_inform_v2 \
+aws lambda invoke --function-name naverplace_send_inform \
   --payload '{}' response.json
 
 # Update environment variables
 aws lambda update-function-configuration \
-  --function-name naverplace_send_inform_v2 \
+  --function-name naverplace_send_inform \
   --environment "Variables={KEY=value}"
 ```
 
@@ -1775,7 +1775,7 @@ aws ecr list-images --repository-name naver-sms-automation
 **Diagnosis:**
 ```bash
 # Check CloudWatch Logs for error
-aws logs filter-log-events --log-group-name /aws/lambda/naverplace_send_inform_v2 \
+aws logs filter-log-events --log-group-name /aws/lambda/naverplace_send_inform \
   --filter-pattern "login" --max-items 10
 ```
 
@@ -1793,7 +1793,7 @@ aws dynamodb delete-item --table-name session --key '{"id": {"S": "1"}}'
 print(f"SENS Response: {res.status_code} - {res.text}")
 
 # Check logs
-aws logs tail /aws/lambda/naverplace_send_inform_v2 --follow | grep "SENS"
+aws logs tail /aws/lambda/naverplace_send_inform --follow | grep "SENS"
 ```
 
 **Common Causes:**
@@ -1808,7 +1808,7 @@ aws logs tail /aws/lambda/naverplace_send_inform_v2 --follow | grep "SENS"
 **Diagnosis:**
 ```bash
 # Check execution duration
-aws logs filter-log-events --log-group-name /aws/lambda/naverplace_send_inform_v2 \
+aws logs filter-log-events --log-group-name /aws/lambda/naverplace_send_inform \
   --filter-pattern "Duration" | grep "REPORT"
 ```
 
@@ -1838,7 +1838,7 @@ print(f"Bookings: {booking_info}")
 
 ```bash
 # Lambda execution time
-aws logs filter-log-events --log-group-name /aws/lambda/naverplace_send_inform_v2 \
+aws logs filter-log-events --log-group-name /aws/lambda/naverplace_send_inform \
   --filter-pattern "REPORT" \
   --start-time $(date -u -d '1 hour ago' +%s)000 \
   | jq '.events[].message' \

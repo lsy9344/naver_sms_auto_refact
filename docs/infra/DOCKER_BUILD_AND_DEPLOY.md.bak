@@ -39,7 +39,7 @@ docker push 654654307503.dkr.ecr.ap-northeast-2.amazonaws.com/naver-sms-automati
 
 # 4. Update Lambda
 aws lambda update-function-code \
-  --function-name naverplace_send_inform_v2 \
+  --function-name naverplace_send_inform \
   --image-uri 654654307503.dkr.ecr.ap-northeast-2.amazonaws.com/naver-sms-automation:latest
 ```
 
@@ -297,14 +297,14 @@ aws ecr list-images --repository-name $REPO --region $REGION
 ```bash
 # Update with image URI
 aws lambda update-function-code \
-  --function-name naverplace_send_inform_v2 \
+  --function-name naverplace_send_inform \
   --image-uri 654654307503.dkr.ecr.ap-northeast-2.amazonaws.com/naver-sms-automation:latest \
   --region ap-northeast-2
 
 # Output:
 # {
-#   "FunctionName": "naverplace_send_inform_v2",
-#   "FunctionArn": "arn:aws:lambda:ap-northeast-2:654654307503:function:naverplace_send_inform_v2",
+#   "FunctionName": "naverplace_send_inform",
+#   "FunctionArn": "arn:aws:lambda:ap-northeast-2:654654307503:function:naverplace_send_inform",
 #   "Runtime": "python3.11",
 #   "ImageConfigResponse": {
 #     "ImageUri": "654654307503.dkr.ecr.ap-northeast-2.amazonaws.com/naver-sms-automation:latest"
@@ -316,7 +316,7 @@ aws lambda update-function-code \
 ```bash
 # Invoke Lambda
 aws lambda invoke \
-  --function-name naverplace_send_inform_v2 \
+  --function-name naverplace_send_inform \
   --region ap-northeast-2 \
   response.json
 
@@ -324,7 +324,7 @@ aws lambda invoke \
 cat response.json | jq .
 
 # View CloudWatch logs
-aws logs tail /aws/lambda/naverplace_send_inform_v2 --follow
+aws logs tail /aws/lambda/naverplace_send_inform --follow
 ```
 
 ---
@@ -384,7 +384,7 @@ jobs:
           IMAGE_TAG: latest
         run: |
           aws lambda update-function-code \
-            --function-name naverplace_send_inform_v2 \
+            --function-name naverplace_send_inform \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Verify Lambda update
@@ -530,7 +530,7 @@ make docker-prune          # Clean Docker system
 - [ ] AWS CLI installed (`aws --version`)
 - [ ] AWS credentials configured (`aws sts get-caller-identity`)
 - [ ] ECR repository exists (`aws ecr describe-repositories --repository-names naver-sms-automation`)
-- [ ] Lambda function exists (`aws lambda get-function --function-name naverplace_send_inform_v2`)
+- [ ] Lambda function exists (`aws lambda get-function --function-name naverplace_send_inform`)
 - [ ] DynamoDB tables exist (`aws dynamodb list-tables | grep sms`)
 - [ ] All secrets/credentials ready (Naver, SENS, Telegram)
 

@@ -221,7 +221,7 @@ docker push 654654307503.dkr.ecr.ap-northeast-2.amazonaws.com/naver-sms-automati
 
 # 6. Update Lambda
 aws lambda update-function-code \
-  --function-name naverplace_send_inform \
+  --function-name naverplace_send_inform_v2 \
   --image-uri 654654307503.dkr.ecr.ap-northeast-2.amazonaws.com/naver-sms-automation:latest
 ```
 
@@ -264,7 +264,7 @@ TELEGRAM_CHAT_ID=your_telegram_chat_id
 
 # Lambda Configuration
 AWS_LAMBDA_FUNCTION_NAME=naver-sms-automation
-AWS_LAMBDA_LOG_GROUP=/aws/lambda/naverplace_send_inform
+AWS_LAMBDA_LOG_GROUP=/aws/lambda/naverplace_send_inform_v2
 
 # DynamoDB Configuration
 DYNAMODB_SMS_TABLE=sms
@@ -347,7 +347,7 @@ jobs:
           IMAGE_TAG: latest
         run: |
           aws lambda update-function-code \
-            --function-name naverplace_send_inform \
+            --function-name naverplace_send_inform_v2 \
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 ```
 
@@ -621,7 +621,7 @@ Breakdown (estimated):
 - [ ] Tag for ECR: `docker tag naver-sms-automation {account}.dkr.ecr.{region}.amazonaws.com/naver-sms-automation:latest`
 - [ ] Login to ECR: `aws ecr get-login-password | docker login --username AWS --password-stdin`
 - [ ] Push to ECR: `docker push {account}.dkr.ecr.{region}.amazonaws.com/naver-sms-automation:latest`
-- [ ] Update Lambda: `aws lambda update-function-code --function-name naverplace_send_inform --image-uri ...`
+- [ ] Update Lambda: `aws lambda update-function-code --function-name naverplace_send_inform_v2 --image-uri ...`
 - [ ] Test Lambda: EventBridge trigger or manual invoke
 - [ ] Monitor CloudWatch Logs
 
@@ -1443,7 +1443,7 @@ aws ecr describe-images \
 **Step 6: Update Lambda Function (Story 5.2)**
 ```bash
 aws lambda update-function-code \
-  --function-name naverplace_send_inform \
+  --function-name naverplace_send_inform_v2 \
   --image-uri 654654307503.dkr.ecr.ap-northeast-2.amazonaws.com/naver-sms-automation:v1.0.0
 ```
 

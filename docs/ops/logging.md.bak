@@ -423,7 +423,7 @@ Processing 100 log calls:
 1. Verify Lambda execution role has `logs:CreateLogGroup` and `logs:PutLogEvents` permissions
 2. Check Lambda environment for `LOG_LEVEL` override
 3. Verify logger is properly initialized: `logger = get_logger(__name__)`
-4. Check CloudWatch Logs for `/aws/lambda/naverplace_send_inform_v2` log group
+4. Check CloudWatch Logs for `/aws/lambda/naverplace_send_inform` log group
 
 ### Sensitive Data Leaking
 

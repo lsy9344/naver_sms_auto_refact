@@ -907,7 +907,7 @@ Option B: Using Lambda Layers (if legacy still configured)
 ```bash
 # Update function code to use legacy package
 aws lambda update-function-code \
-  --function-name naverplace_send_inform_v2 \
+  --function-name naverplace_send_inform \
   --zip-file fileb://legacy_lambda_package.zip
 ```
 

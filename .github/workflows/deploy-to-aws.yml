@@ -231,13 +231,15 @@ jobs:
           
           if [ "$LATEST_STREAM" != "None" ] && [ -n "$LATEST_STREAM" ]; then
             echo "Latest log stream: $LATEST_STREAM"
-            aws logs get-log-events \
+            if ! aws logs get-log-events \
               --log-group-name "$LOG_GROUP" \
               --log-stream-name "$LATEST_STREAM" \
               --region ${{ env.AWS_REGION }} \
               --limit 50 \
               --query 'events[*].message' \
-              --output text
+              --output text; then
+              echo "⚠️ Unable to read events from $LATEST_STREAM (stream may be new or empty)."
+            fi
           else
             echo "No log streams found yet"
           fi
