@@ -24,7 +24,7 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "[예약 확인] {{ booking.name }} 고객 예약이 시스템에 등록되었습니다."
+            "message": "[예약확정] {{ booking.name }}"
           }
         }
       ]
@@ -58,7 +58,7 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "[안내] {{ booking.name }} 고객의 예약이 2시간 이내입니다. 자세한 안내를 SMS로 발송했습니다."
+            "message": "[상세안내] {{ booking.name }}"
           }
         }
       ]
@@ -91,7 +91,7 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "[이벤트] {{ booking.name }} 고객에게 옵션 관련 이벤트 SMS를 발송했습니다."
+            "message": "[리뷰요청] {{ booking.name }}"
           }
         }
       ]
