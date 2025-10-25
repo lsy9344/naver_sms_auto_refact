@@ -156,10 +156,17 @@ jobs:
       - name: Fail if critical mismatches found
         run: |
           if [ -f tests/comparison/results/SUMMARY.md ]; then
-            if grep -q "Failed:" tests/comparison/results/SUMMARY.md; then
-              echo "❌ Parity validation failed with critical mismatches"
+            # Extract the number of failed tests from the SUMMARY.md
+            FAILED_COUNT=$(grep "Failed:" tests/comparison/results/SUMMARY.md | grep -o "[0-9]\+" | head -1)
+
+            if [ -n "$FAILED_COUNT" ] && [ "$FAILED_COUNT" -gt 0 ]; then
+              echo "❌ Parity validation failed with $FAILED_COUNT critical mismatches"
               exit 1
+            else
+              echo "✅ All parity tests passed (0 failures)"
             fi
+          else
+            echo "⚠️ SUMMARY.md not found, skipping parity validation check"
           fi
 
   security-check:

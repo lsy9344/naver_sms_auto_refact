@@ -195,3 +195,6 @@ terraform.tfstate.backup
 *.tfstate.backup
 crash.log
 crash.*.log
+
+# Comparison test results (auto-generated, stored as CI artifacts)
+tests/comparison/results/
