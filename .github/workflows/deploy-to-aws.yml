@@ -214,17 +214,57 @@ jobs:
         run: |
           echo "🧪 Testing Lambda invocation..."
           
-          aws lambda invoke \
-            --function-name $LAMBDA_FUNCTION_NAME \
-            --region ${{ env.AWS_REGION }} \
-            --payload '{}' \
-            --log-type Tail \
-            lambda-test-response.json
-          
-          # Check response
-          if [ -s lambda-test-response.json ]; then
-            echo "✅ Lambda invocation successful"
-            cat lambda-test-response.json | head -100
+          MAX_RETRIES=3
+          RETRY_DELAY=10
+          ATTEMPT=1
+          INVOCATION_OK=0
+          RESPONSE_FILE=lambda-test-response.json
+          CLI_OUTPUT_FILE=lambda-test-cli-output.json
+          ERROR_LOG=lambda-test-error.log
+
+          while [ $ATTEMPT -le $MAX_RETRIES ]; do
+            echo "Attempt $ATTEMPT/$MAX_RETRIES"
+
+            set +e
+            aws lambda invoke \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --region "${{ env.AWS_REGION }}" \
+              --payload '{}' \
+              --log-type Tail \
+              --cli-read-timeout 900 \
+              --cli-connect-timeout 60 \
+              "$RESPONSE_FILE" > "$CLI_OUTPUT_FILE" 2> "$ERROR_LOG"
+            STATUS=$?
+            set -e
+
+            if [ $STATUS -eq 0 ]; then
+              INVOCATION_OK=1
+              break
+            fi
+
+            if grep -qi "Read timeout" "$ERROR_LOG"; then
+              echo "⚠️ Lambda invocation read timeout, retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+              ATTEMPT=$((ATTEMPT + 1))
+              RETRY_DELAY=$((RETRY_DELAY * 2))
+            else
+              echo "❌ Lambda invocation failed"
+              cat "$ERROR_LOG"
+              exit $STATUS
+            fi
+          done
+
+          if [ $INVOCATION_OK -ne 1 ]; then
+            echo "❌ Lambda invocation failed after $MAX_RETRIES attempts"
+            cat "$ERROR_LOG"
+            exit 1
+          fi
+
+          echo "✅ Lambda invocation successful"
+          cat "$CLI_OUTPUT_FILE"
+
+          if [ -s "$RESPONSE_FILE" ]; then
+            cat "$RESPONSE_FILE" | head -100
           else
             echo "⚠️ Lambda returned empty response"
           fi
