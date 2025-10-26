@@ -22,7 +22,7 @@ from src.config.settings import Settings, setup_logging_redaction, SLACK_ENABLED
 from src.database.dynamodb_client import BookingRepository
 from src.domain.booking import Booking
 from src.notifications.sms_service import SensSmsClient
-from src.notifications.slack_service import SlackWebhookClient
+from src.notifications.slack_service import SlackWebhookClient, SlackServiceError
 from src.notifications.telegram_service import TelegramBotClient
 from src.rules.engine import RuleEngine, ActionResult
 from src.rules.conditions import register_conditions
@@ -244,6 +244,17 @@ def lambda_handler(event, context):
                     logger.warning(f"Failed to send Telegram summary: {e}")
             else:
                 logger.info("Skipping Telegram summary notification (disabled or unconfigured)")
+
+            # ============================================================
+            # Slack summary notification
+            # ============================================================
+            if slack_enabled and slack_service:
+                try:
+                    send_slack_summary(slack_service=slack_service, summary=summary)
+                except SlackServiceError as e:
+                    logger.warning(f"Failed to send Slack summary notification: {e}")
+            else:
+                logger.info("Skipping Slack summary notification (disabled or unconfigured)")
 
             # ============================================================
             # AC 7: Return success response
@@ -555,6 +566,31 @@ def send_telegram_summary(
     except requests.RequestException as e:
         logger.error(f"Failed to send Telegram summary: {e}")
         raise
+
+
+def send_slack_summary(
+    slack_service: Optional[SlackWebhookClient],
+    summary: Dict[str, Any],
+) -> None:
+    """
+    Send summary notification to Slack channel via webhook client.
+    """
+    if not slack_service:
+        logger.info("Slack service unavailable; skipping Slack summary notification")
+        return
+
+    message = (
+        "*Naver SMS Automation Summary*\n"
+        f"• Bookings processed: {summary['bookings_processed']}\n"
+        f"• Actions executed: {summary['actions_executed']}\n"
+        f"• Actions succeeded: {summary['actions_succeeded']}\n"
+        f"• Actions failed: {summary['actions_failed']}\n"
+        f"• SMS sent: {summary['sms_sent']}\n"
+        f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+
+    slack_service.send_text(message)
+    logger.info("Slack summary notification sent")
 
 
 def notify_telegram_error(

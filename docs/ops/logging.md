@@ -420,7 +420,13 @@ Processing 100 log calls:
 **Problem**: No structured logs visible in CloudWatch Logs
 
 **Solutions**:
-1. Verify Lambda execution role has `logs:CreateLogGroup` and `logs:PutLogEvents` permissions
+1. Verify Lambda execution role has `logs:CreateLogGroup` and `logs:PutLogEvents` permissions. If missing, attach the inline policy defined in `infrastructure/lambda-cloudwatch-logs-policy.json`:
+   ```bash
+   aws iam put-role-policy \
+     --role-name naver-sms-automation-lambda-role \
+     --policy-name LambdaCloudWatchLogs \
+     --policy-document file://infrastructure/lambda-cloudwatch-logs-policy.json
+   ```
 2. Check Lambda environment for `LOG_LEVEL` override
 3. Verify logger is properly initialized: `logger = get_logger(__name__)`
 4. Check CloudWatch Logs for `/aws/lambda/naverplace_send_inform_v2` log group

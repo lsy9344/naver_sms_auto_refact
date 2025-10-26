@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 import boto3
 import jsonschema
@@ -42,9 +42,15 @@ SLACK_ENABLED = os.getenv("SLACK_ENABLED", "false").lower() == "true"
 SLACK_WEBHOOK_URL_ENV = os.getenv("SLACK_WEBHOOK_URL", None)  # Direct override if provided
 SLACK_CONFIG_FILE = os.getenv("SLACK_CONFIG_FILE", "config/my_slack_webhook.yaml")
 
-# Telegram configuration
-# Default: False (Telegram disabled) - Requires explicit enable via environment variable
-TELEGRAM_ENABLED = os.getenv("ENABLE_TELEGRAM_NOTIFICATIONS", "false").lower() == "true"
+# Telegram configuration helper (flag evaluated at runtime per Settings instance)
+def _read_telegram_flag() -> Tuple[bool, bool]:
+    """Return (enabled_value, flag_defined) from environment variables."""
+    flag_raw = os.getenv("ENABLE_TELEGRAM_NOTIFICATIONS")
+    if flag_raw is None:
+        flag_raw = os.getenv("TELEGRAM_ENABLED")
+    if flag_raw is None:
+        return False, False
+    return flag_raw.lower() == "true", True
 
 # Manual approval gate for SENS SMS delivery (Story 5.4 - AC 10)
 # Default: False (SMS delivery disabled) - Requires explicit owner sign-off
@@ -54,6 +60,8 @@ SENS_DELIVERY_ENABLED = os.getenv("SENS_DELIVERY_ENABLED", "false").lower() == "
 # Comparison/validation mode flag
 # When True: Logs SMS payloads and metrics but does NOT send real SENS SMS
 COMPARISON_MODE_ENABLED = os.getenv("COMPARISON_MODE_ENABLED", "false") == "true"
+
+_TELEGRAM_CREDENTIALS_CACHE: Optional[Dict[str, str]] = None
 
 
 class SecretRedactionFilter(logging.Filter):
@@ -135,7 +143,11 @@ class Settings:
         # Feature flags (Story 5.4)
         self.sens_delivery_enabled = SENS_DELIVERY_ENABLED
         self.comparison_mode_enabled = COMPARISON_MODE_ENABLED
-        self.telegram_enabled = TELEGRAM_ENABLED
+        telegram_flag_value, flag_defined = _read_telegram_flag()
+        self.telegram_flag_defined = flag_defined
+        self.telegram_enabled = telegram_flag_value
+        if not self.telegram_flag_defined:
+            self.telegram_enabled = self._auto_enable_telegram_notifications()
 
     def is_sens_delivery_enabled(self) -> bool:
         """Check if SENS SMS delivery is enabled (Story 5.4 AC 10)."""
@@ -148,6 +160,45 @@ class Settings:
     def is_telegram_enabled(self) -> bool:
         """Check if Telegram notifications are permitted."""
         return self.telegram_enabled
+
+    def _auto_enable_telegram_notifications(self) -> bool:
+        """
+        Auto-enable Telegram when explicit flag not provided but credentials exist.
+        Prefers environment variables, then local secrets, then Secrets Manager.
+        """
+        env_bot = os.getenv("TELEGRAM_BOT_TOKEN")
+        env_chat = os.getenv("TELEGRAM_CHAT_ID")
+        if env_bot and env_chat:
+            logger.info("Detected Telegram bot credentials via environment; enabling notifications")
+            return True
+
+        global _TELEGRAM_CREDENTIALS_CACHE
+
+        if USE_LOCAL_SECRETS:
+            try:
+                local_creds = self._load_from_local_file(LOCAL_SECRETS_FILE).get("telegram", {})
+                if local_creds.get("bot_token") and local_creds.get("chat_id"):
+                    logger.info(
+                        "Detected Telegram credentials in local secrets file; enabling notifications"
+                    )
+                    _TELEGRAM_CREDENTIALS_CACHE = local_creds
+                    return True
+            except Exception as e:
+                logger.debug(f"Local Telegram credential detection failed: {e}")
+
+        if not USE_LOCAL_SECRETS:
+            try:
+                credentials = Settings._get_secret_value(TELEGRAM_SECRET_ID)
+                if credentials.get("bot_token") and credentials.get("chat_id"):
+                    logger.info(
+                        "Detected Telegram credentials in Secrets Manager; enabling notifications"
+                    )
+                    _TELEGRAM_CREDENTIALS_CACHE = credentials
+                    return True
+            except Exception as e:
+                logger.debug(f"Telegram secret auto-detect failed: {e}")
+
+        return False
 
     def _get_secrets_client(self):
         """Lazy initialize Secrets Manager client."""
@@ -287,8 +338,14 @@ class Settings:
         Raises:
             RuntimeError: If credentials cannot be loaded
         """
+        global _TELEGRAM_CREDENTIALS_CACHE
+        if _TELEGRAM_CREDENTIALS_CACHE:
+            return _TELEGRAM_CREDENTIALS_CACHE
+
         if USE_LOCAL_SECRETS:
-            return Settings._load_from_local_file(LOCAL_SECRETS_FILE).get("telegram", {})
+            credentials = Settings._load_from_local_file(LOCAL_SECRETS_FILE).get("telegram", {})
+            _TELEGRAM_CREDENTIALS_CACHE = credentials
+            return credentials
 
         credentials = Settings._get_secret_value(TELEGRAM_SECRET_ID)
         if "bot_token" not in credentials or "chat_id" not in credentials:
@@ -296,6 +353,7 @@ class Settings:
                 f"Telegram credentials missing required keys. "
                 f"Expected: bot_token, chat_id. Got: {list(credentials.keys())}"
             )
+        _TELEGRAM_CREDENTIALS_CACHE = credentials
         return credentials
 
     @staticmethod

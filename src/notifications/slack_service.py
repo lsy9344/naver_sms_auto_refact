@@ -207,6 +207,17 @@ class SlackWebhookClient:
         # Don't retry on rate limit - just log and return
         self._dispatch(payload, action="send_rate_limit_alert", max_retries=1)
 
+    def send_text(self, text: str, channel: Optional[str] = None) -> None:
+        """Send a simple plaintext message via Slack webhook."""
+        if not self.webhook_url:
+            return
+
+        payload: Dict[str, Any] = {"text": text}
+        if channel:
+            payload["channel"] = channel
+
+        self._dispatch(payload, action="send_text")
+
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #

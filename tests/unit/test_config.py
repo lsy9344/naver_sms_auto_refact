@@ -167,6 +167,19 @@ class TestSettingsInitialization:
         # Second call should return same client
         assert settings._get_secrets_client() is client
 
+    def test_settings_honors_telegram_enabled_alias(self):
+        """TELEGRAM_ENABLED env flag should enable Telegram notifications."""
+        os.environ["TELEGRAM_ENABLED"] = "true"
+        settings = Settings()
+        assert settings.is_telegram_enabled() is True
+
+    def test_settings_auto_enables_telegram_with_env_credentials(self):
+        """Auto-detect Telegram credentials when explicit flag missing."""
+        os.environ["TELEGRAM_BOT_TOKEN"] = "bot-token"
+        os.environ["TELEGRAM_CHAT_ID"] = "chat-id"
+        settings = Settings()
+        assert settings.is_telegram_enabled() is True
+
 
 class TestSecretsManagerIntegration:
     """Tests for Secrets Manager integration."""

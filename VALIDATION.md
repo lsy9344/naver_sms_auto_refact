@@ -7366,6 +7366,48 @@ aws iam put-role-policy \
 
 ---
 
+## CloudWatch Logs Permission Fix
+
+**Issue Date:** 2025-10-27  
+**Symptom:** Lambda test invocations succeeded but CloudWatch log group `/aws/lambda/naverplace_send_inform_v2` recorded no new streams.  
+**Root Cause:** Execution role `naver-sms-automation-lambda-role` still only had the Secrets and DynamoDB inline policies, so it lacked `logs:CreateLogStream`/`logs:PutLogEvents` permissions required for CloudWatch logging.
+
+### Resolution
+
+1. Added inline policy definition `infrastructure/lambda-cloudwatch-logs-policy.json` (least-privilege CloudWatch Logs actions scoped to the Lambda log group).
+2. Attached the policy to the execution role:
+   ```bash
+   aws iam put-role-policy \
+     --role-name naver-sms-automation-lambda-role \
+     --policy-name LambdaCloudWatchLogs \
+     --policy-document file://infrastructure/lambda-cloudwatch-logs-policy.json
+   ```
+3. Re-invoked the Lambda and confirmed `START/END/REPORT` plus structured JSON entries now appear in CloudWatch.
+
+**Status:** ✅ **COMPLETE**
+
+---
+
+## Slack/Telegram Notification Fix
+
+**Issue Date:** 2025-10-27  
+**Symptoms:** Lambda run completed but neither Slack nor Telegram received notifications despite `SLACK_ENABLED=true`, valid webhook URL, and populated Secrets Manager entries.  
+**Root Causes:**
+
+1. Telegram notifications were permanently disabled unless the exact environment variable `ENABLE_TELEGRAM_NOTIFICATIONS=true` was set. The production environment used the more intuitive `TELEGRAM_ENABLED` flag (or relied on secrets), so the rule engine short-circuited every `send_telegram` action.
+2. Slack never emitted run summaries; only optional rule actions (disabled by default) could trigger Slack. As a result, even with `SLACK_ENABLED=true`, operators received no confirmation that the Lambda completed successfully.
+
+### Resolution
+
+- Added automatic Telegram enablement when credentials exist in environment variables, local secrets, or AWS Secrets Manager. Explicit env flags (`ENABLE_TELEGRAM_NOTIFICATIONS` or the new alias `TELEGRAM_ENABLED`) still override this behaviour, so teams can force-disable notifications when needed.
+- Cached the detected Telegram credentials to avoid double-fetching Secrets Manager and to guarantee subsequent summary/alert steps reuse the same secret payload.
+- Introduced a lightweight Slack summary publisher that reuses the existing `SlackWebhookClient.send_text` API so every successful Lambda invocation posts the end-of-run metrics (bookings processed, actions executed, SMS sent, failures, timestamp) to the configured channel. Failures bubble through `SlackServiceError` for observability.
+- Refactored the general-purpose Slack `send_slack` action to use the new `send_text` helper, ensuring consistent webhook dispatch behaviour and retry logic.
+
+**Status:** ✅ **COMPLETE** — Both Telegram and Slack now emit notifications immediately after the Lambda run when credentials are present and/or env flags are set.
+
+---
+
 ## Validation Checklist
 
 - ✅ DynamoDB policy file created (`infrastructure/lambda-dynamodb-policy.json`)

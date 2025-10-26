@@ -1054,13 +1054,8 @@ def send_slack(
             context={**log_context, "message_length": len(final_message or "")},
         )
 
-        # Build Slack payload (webhook format)
-        payload = {"text": final_message}
-        if channel:
-            payload["channel"] = channel
-
         # Dispatch via webhook with retry handling
-        context.slack_service._dispatch(payload, action="send_slack_from_rule_engine")
+        context.slack_service.send_text(final_message or "", channel=channel)
 
         logger.info(
             "Slack notification sent",
