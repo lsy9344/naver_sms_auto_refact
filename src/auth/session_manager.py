@@ -13,7 +13,7 @@ class SessionManager:
     Manages session cookies in DynamoDB.
 
     Handles persistence and retrieval of Naver authentication cookies
-    to enable cookie reuse across Lambda invocations..
+    to enable cookie reuse across Lambda invocations...
     """
 
     def __init__(self, dynamodb_resource):
