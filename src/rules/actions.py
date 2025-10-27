@@ -19,7 +19,7 @@ Acceptance Criteria Coverage:
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, List, Optional, cast
 
 from src.database.dynamodb_client import BookingRepository
 from src.domain.booking import Booking
@@ -620,6 +620,56 @@ def create_db_record(
 
                 if isinstance(record["reserve_at"], datetime):
                     record["reserve_at"] = record["reserve_at"].isoformat()
+
+            # Normalise option keyword data for DynamoDB readability
+            option_keywords = record.get("option_keywords")
+            if option_keywords:
+                normalised_options: List[Dict[str, Any]] = []
+                option_keyword_names: List[str] = []
+                option_keyword_counts: Dict[str, int] = {}
+
+                for option in option_keywords:
+                    name: Optional[str] = None
+                    booking_count: Optional[int] = None
+                    price_value: Optional[Any] = None
+
+                    if isinstance(option, dict):
+                        raw_name = option.get("name")
+                        if raw_name:
+                            name = str(raw_name).strip()
+
+                        if "bookingCount" in option:
+                            try:
+                                booking_count = int(option.get("bookingCount") or 0)
+                            except (TypeError, ValueError):
+                                booking_count = None
+
+                        if "price" in option and option["price"] not in (None, "", 0):
+                            price_value = option["price"]
+                    elif option is not None:
+                        name = str(option).strip()
+
+                    if not name:
+                        continue
+
+                    detail: Dict[str, Any] = {"name": name}
+
+                    if booking_count is not None and booking_count >= 0:
+                        detail["bookingCount"] = booking_count
+                        option_keyword_counts[name] = option_keyword_counts.get(name, 0) + booking_count
+
+                    if price_value is not None:
+                        detail["price"] = price_value
+
+                    normalised_options.append(detail)
+                    option_keyword_names.append(name)
+
+                if normalised_options:
+                    record["option_keywords"] = normalised_options
+                if option_keyword_names:
+                    record["option_keyword_names"] = option_keyword_names
+                if option_keyword_counts:
+                    record["option_keyword_counts"] = option_keyword_counts
         else:
             record = booking_data
 
@@ -1312,6 +1362,22 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                     resolved_params["template_params"], rule_context
                 )
 
+            # Resolve message parameter for variable substitution
+            # This handles cases like message: "[예약확정] {{ booking.name }}"
+            if "message" in resolved_params and isinstance(resolved_params["message"], str):
+                message = resolved_params["message"]
+
+                # Extract all template variables from message and resolve them
+                def resolve_message_variables(msg: str, ctx: Dict[str, Any]) -> str:
+                    for match in _TEMPLATE_PARAM_PATTERN.finditer(msg):
+                        var_path = match.group(1)
+                        resolved_value = _lookup_context_value(var_path, ctx)
+                        if resolved_value is not None:
+                            msg = msg.replace(match.group(0), str(resolved_value))
+                    return msg
+
+                resolved_params["message"] = resolve_message_variables(message, rule_context)
+
             send_telegram(action_context, **resolved_params)
 
         def send_slack_wrapper(rule_context: Dict[str, Any], **params: Any) -> None:
@@ -1336,6 +1402,21 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 resolved_params["template_params"] = _resolve_template_params(
                     resolved_params["template_params"], rule_context
                 )
+
+            # Resolve message parameter for variable substitution
+            if "message" in resolved_params and isinstance(resolved_params["message"], str):
+                message = resolved_params["message"]
+
+                # Extract all template variables from message and resolve them
+                def resolve_message_variables(msg: str, ctx: Dict[str, Any]) -> str:
+                    for match in _TEMPLATE_PARAM_PATTERN.finditer(msg):
+                        var_path = match.group(1)
+                        resolved_value = _lookup_context_value(var_path, ctx)
+                        if resolved_value is not None:
+                            msg = msg.replace(match.group(0), str(resolved_value))
+                    return msg
+
+                resolved_params["message"] = resolve_message_variables(message, rule_context)
 
             if resolved_params.get("channel"):
                 services.logger.debug(

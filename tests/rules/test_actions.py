@@ -5,6 +5,8 @@ Tests cover success cases, failure cases, error wrapping, idempotency,
 and immutability of ActionContext. Uses mocks/stubs for all services.
 """
 
+from datetime import datetime
+
 import pytest
 from unittest.mock import Mock
 from src.rules.actions import (
@@ -274,6 +276,61 @@ class TestCreateDbRecord:
         assert error.executor_name == "create_db_record"
         assert error.booking_id == "1051707_12345"
         assert isinstance(error.original_error, Exception)
+
+    def test_create_db_record_option_keyword_details(
+        self,
+        mock_db_repo,
+        mock_sms_service,
+        mock_logger,
+        mock_slack_service,
+        mock_slack_template_loader,
+        mock_telegram_service,
+        mock_telegram_template_loader,
+    ):
+        """Persist option keyword names and counts for Dynamo inspection."""
+        booking = Booking(
+            booking_num="1051707_99999",
+            phone="010-1111-2222",
+            name="Option Test",
+            booking_time="2025-10-20 18:00:00",
+            reserve_at=datetime(2025, 10, 20, 18, 0),
+            option_keywords=[
+                {"name": "전문가 보정 2컷", "bookingCount": 2, "price": 10000},
+                {"name": "네이버 예약", "bookingCount": "1"},
+                "커스텀 옵션",
+            ],
+        )
+
+        context = ActionContext(
+            booking=booking,
+            settings_dict={},
+            db_repo=mock_db_repo,
+            sms_service=mock_sms_service,
+            slack_service=mock_slack_service,
+            slack_template_loader=mock_slack_template_loader,
+            telegram_template_loader=mock_telegram_template_loader,
+            telegram_service=mock_telegram_service,
+            logger=mock_logger,
+        )
+
+        create_db_record(context)
+
+        saved_record = mock_db_repo.create_booking.call_args[0][0]
+
+        assert saved_record["option_keywords"] == [
+            {"name": "전문가 보정 2컷", "bookingCount": 2, "price": 10000},
+            {"name": "네이버 예약", "bookingCount": 1},
+            {"name": "커스텀 옵션"},
+        ]
+        assert saved_record["option_keyword_names"] == [
+            "전문가 보정 2컷",
+            "네이버 예약",
+            "커스텀 옵션",
+        ]
+        assert saved_record["option_keyword_counts"] == {
+            "전문가 보정 2컷": 2,
+            "네이버 예약": 1,
+        }
 
 
 # ============================================================================
