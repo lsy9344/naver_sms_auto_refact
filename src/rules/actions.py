@@ -469,7 +469,7 @@ def send_sms(
     operation = f"send_sms_{template}"
     log_context = {
         "booking_id": booking.booking_num,
-        "phone_masked": context.logger.logger.name,  # Uses masked phone
+        "phone_masked": booking.phone_masked,  # Fixed: use booking's masked phone
         "template": template,
         "store_specific": store_specific,
     }
@@ -565,12 +565,14 @@ def create_db_record(
     """
     Create a new booking record in DynamoDB.
 
-    Uses context.db_repo (BookingRepository) to insert with exact legacy schema:
-    - booking_num, phone, name, booking_time
-    - confirm_sms, remind_sms, option_sms flags (all default False)
-    - option_time (default "")
-
-    This matches legacy insert at lambda_function.py:150.
+    Persists all booking fields from the domain model to support rule conditions.
+    This includes:
+    - Core fields: booking_num, phone, name, booking_time
+    - SMS flags: confirm_sms, remind_sms, option_sms (default False)
+    - Booking metadata: book_id, biz_id, status, reserve_at
+    - Option fields: option, option_keywords, has_pro_edit_option, pro_edit_count
+    - Additional fields: coupon_name, has_edit_add_person_option, edit_add_person_count
+    - Extra fields: For future expansion
 
     Args:
         context: ActionContext with booking and db_repo
@@ -582,7 +584,7 @@ def create_db_record(
     Example:
         context = ActionContext(...)
         create_db_record(context)
-        # Creates record with all SMS flags = False
+        # Creates record with all booking fields persisted
     """
     booking = context.booking
     logger = context.logger
@@ -591,7 +593,7 @@ def create_db_record(
     operation = "create_db_record"
     log_context = {
         "booking_id": booking.booking_num,
-        "phone_masked": context.logger.logger.name,
+        "phone_masked": booking.phone_masked,  # Fixed: use booking's masked phone
     }
 
     try:
@@ -603,16 +605,21 @@ def create_db_record(
 
         # Use provided data or build from booking
         if booking_data is None:
-            record = {
-                "booking_num": booking.booking_num,
-                "phone": booking.phone,
-                "name": booking.name,
-                "booking_time": booking.booking_time,
-                "confirm_sms": False,
-                "remind_sms": False,
-                "option_sms": False,
-                "option_time": "",
-            }
+            # Convert booking to dict, including all fields
+            record = booking.to_dict(include_extra=True)
+
+            # Ensure SMS flags are initialized to False for new bookings
+            record.setdefault("confirm_sms", False)
+            record.setdefault("remind_sms", False)
+            record.setdefault("option_sms", False)
+            record.setdefault("option_time", "")
+
+            # Convert datetime objects to ISO8601 strings for DynamoDB storage
+            if "reserve_at" in record and record["reserve_at"] is not None:
+                from datetime import datetime
+
+                if isinstance(record["reserve_at"], datetime):
+                    record["reserve_at"] = record["reserve_at"].isoformat()
         else:
             record = booking_data
 
@@ -684,7 +691,7 @@ def update_flag(
     operation = "update_flag"
     log_context = {
         "booking_id": booking.booking_num,
-        "phone_masked": context.logger.logger.name,
+        "phone_masked": booking.phone_masked,  # Fixed: use booking's masked phone
         "flag": effective_flag,
         "value": desired_value,
     }
@@ -719,10 +726,10 @@ def update_flag(
 
         # Idempotency check: if already set to desired value, skip update
         if current_value == desired_value:
-            logger.debug(
+            logger.info(
                 f"Flag {effective_flag} already set to {desired_value}, skipping update",
                 operation=operation,
-                context=log_context,
+                context={**log_context, "status": "skipped", "reason": "idempotent"},
             )
             return
 
@@ -737,7 +744,7 @@ def update_flag(
         logger.info(
             f"Flag {effective_flag} updated to {desired_value}",
             operation=operation,
-            context=log_context,
+            context={**log_context, "status": "updated", "previous_value": current_value},
         )
 
     except ValueError as e:

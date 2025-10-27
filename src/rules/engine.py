@@ -23,9 +23,10 @@ Acceptance Criteria Coverage:
 from dataclasses import dataclass, field
 from typing import List, Dict, Callable, Any, Optional
 import yaml
-import logging
 
-logger = logging.getLogger(__name__)
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -250,9 +251,30 @@ class RuleEngine:
         Returns:
             True if rule is enabled and all conditions met, False otherwise
         """
+        # Extract booking info for logging context
+        booking = context.get("booking")
+        booking_num = str(getattr(booking, "booking_num", "unknown")) if booking else "unknown"
+        phone_masked = str(getattr(booking, "phone_masked", "unknown")) if booking else "unknown"
+        log_context = {
+            "rule_name": rule.name,
+            "booking_num": booking_num,
+            "phone_masked": phone_masked,
+        }
+
+        # Log rule evaluation start
+        logger.debug(
+            f"Evaluating rule '{rule.name}'",
+            operation="evaluate_rule_start",
+            context=log_context,
+        )
+
         # Disabled rules never match
         if not rule.enabled:
-            logger.debug(f"Rule '{rule.name}' is disabled")
+            logger.debug(
+                f"Rule '{rule.name}' is disabled, skipping",
+                operation="evaluate_rule",
+                context={**log_context, "result": "skipped", "reason": "disabled"},
+            )
             return False
 
         # Evaluate each condition (AND logic)
@@ -261,7 +283,12 @@ class RuleEngine:
 
             # Unknown condition type fails the rule
             if not evaluator:
-                logger.error(f"Unknown condition type in rule '{rule.name}': {condition.type}")
+                logger.error(
+                    f"Unknown condition type '{condition.type}' in rule '{rule.name}'",
+                    operation="evaluate_rule",
+                    context={**log_context, "condition_type": condition.type, "result": False},
+                    error=f"No evaluator registered for '{condition.type}'",
+                )
                 return False
 
             try:
@@ -270,20 +297,33 @@ class RuleEngine:
 
                 # Short-circuit on first failing condition
                 if not result:
-                    logger.debug(
-                        f"Rule '{rule.name}' condition '{condition.type}' evaluated to False"
+                    logger.info(
+                        f"Rule '{rule.name}' condition '{condition.type}' not met",
+                        operation="evaluate_rule",
+                        context={
+                            **log_context,
+                            "condition_type": condition.type,
+                            "result": False,
+                            "params": params,
+                        },
                     )
                     return False
 
             except Exception as e:
                 logger.error(
-                    f"Error evaluating condition '{condition.type}' in rule '{rule.name}': {e}",
-                    exc_info=True,
+                    f"Error evaluating condition '{condition.type}' in rule '{rule.name}'",
+                    operation="evaluate_rule",
+                    context={**log_context, "condition_type": condition.type},
+                    error=str(e),
                 )
                 return False
 
         # All conditions passed
-        logger.info(f"Rule '{rule.name}' conditions all met")
+        logger.info(
+            f"Rule '{rule.name}' matched - all conditions met",
+            operation="evaluate_rule",
+            context={**log_context, "result": True, "conditions_count": len(rule.conditions)},
+        )
         return True
 
     def execute_rule(self, rule: RuleConfig, context: Dict[str, Any]) -> List[ActionResult]:
@@ -301,12 +341,40 @@ class RuleEngine:
         """
         results: List[ActionResult] = []
 
-        for action in rule.actions:
+        # Extract booking info for logging context
+        booking = context.get("booking")
+        booking_num = str(getattr(booking, "booking_num", "unknown")) if booking else "unknown"
+        phone_masked = str(getattr(booking, "phone_masked", "unknown")) if booking else "unknown"
+        log_context = {
+            "rule_name": rule.name,
+            "booking_num": booking_num,
+            "phone_masked": phone_masked,
+            "actions_count": len(rule.actions),
+        }
+
+        logger.info(
+            f"Executing {len(rule.actions)} action(s) for rule '{rule.name}'",
+            operation="execute_rule_start",
+            context=log_context,
+        )
+
+        for action_idx, action in enumerate(rule.actions, 1):
             executor = self.action_executors.get(action.type)
+
+            action_log_context = {
+                **log_context,
+                "action_type": action.type,
+                "action_index": action_idx,
+            }
 
             # Unknown action type is recorded as failure
             if not executor:
-                logger.error(f"Unknown action type in rule '{rule.name}': {action.type}")
+                logger.error(
+                    f"Unknown action type '{action.type}' in rule '{rule.name}'",
+                    operation="execute_action",
+                    context=action_log_context,
+                    error=f"No executor registered for '{action.type}'",
+                )
                 results.append(
                     ActionResult(
                         rule_name=rule.name,
@@ -320,6 +388,13 @@ class RuleEngine:
 
             try:
                 params = action.params or {}
+
+                logger.debug(
+                    f"Executing action '{action.type}' [{action_idx}/{len(rule.actions)}]",
+                    operation="execute_action_start",
+                    context={**action_log_context, "params": params},
+                )
+
                 executor(context, **params)
 
                 results.append(
@@ -332,12 +407,18 @@ class RuleEngine:
                     )
                 )
 
-                logger.debug(f"Action '{action.type}' in rule '{rule.name}' executed successfully")
+                logger.info(
+                    f"Action '{action.type}' completed successfully",
+                    operation="execute_action",
+                    context={**action_log_context, "status": "success", "params": params},
+                )
 
             except Exception as e:
                 logger.error(
-                    f"Error executing action '{action.type}' in rule '{rule.name}': {e}",
-                    exc_info=True,
+                    f"Action '{action.type}' failed in rule '{rule.name}'",
+                    operation="execute_action",
+                    context=action_log_context,
+                    error=str(e),
                 )
 
                 results.append(
@@ -350,6 +431,20 @@ class RuleEngine:
                         params=params,
                     )
                 )
+
+        # Log execution summary
+        success_count = sum(1 for r in results if r.success)
+        logger.info(
+            f"Completed {len(results)} action(s) for rule '{rule.name}': "
+            f"{success_count} succeeded, {len(results) - success_count} failed",
+            operation="execute_rule_complete",
+            context={
+                **log_context,
+                "actions_executed": len(results),
+                "actions_succeeded": success_count,
+                "actions_failed": len(results) - success_count,
+            },
+        )
 
         return results
 
@@ -368,22 +463,54 @@ class RuleEngine:
         """
         all_results: List[ActionResult] = []
 
+        # Extract booking info for logging
+        booking = context.get("booking")
+        booking_num = str(getattr(booking, "booking_num", "unknown")) if booking else "unknown"
+        phone_masked = str(getattr(booking, "phone_masked", "unknown")) if booking else "unknown"
+        log_context = {
+            "booking_num": booking_num,
+            "phone_masked": phone_masked,
+            "total_rules": len(self.rules),
+        }
+
+        logger.info(
+            f"Processing booking through {len(self.rules)} rule(s)",
+            operation="process_booking_start",
+            context=log_context,
+        )
+
+        matched_rules_count = 0
+
         for rule in self.rules:
             try:
                 # Evaluate rule conditions
                 if self.evaluate_rule(rule, context):
+                    matched_rules_count += 1
                     # Execute rule actions
                     results = self.execute_rule(rule, context)
                     all_results.extend(results)
 
             except Exception as e:
                 logger.error(
-                    f"Unexpected error processing rule '{rule.name}': {e}",
-                    exc_info=True,
+                    f"Unexpected error processing rule '{rule.name}'",
+                    operation="process_booking",
+                    context={**log_context, "rule_name": rule.name},
+                    error=str(e),
                 )
 
+        # Summary log
+        success_count = sum(1 for r in all_results if r.success)
         logger.info(
-            f"Processed booking through {len(self.rules)} rules, "
-            f"matched actions: {len(all_results)}"
+            f"Booking processing complete: {matched_rules_count} rules matched, "
+            f"{len(all_results)} actions executed ({success_count} succeeded, "
+            f"{len(all_results) - success_count} failed)",
+            operation="process_booking_complete",
+            context={
+                **log_context,
+                "rules_matched": matched_rules_count,
+                "actions_executed": len(all_results),
+                "actions_succeeded": success_count,
+                "actions_failed": len(all_results) - success_count,
+            },
         )
         return all_results

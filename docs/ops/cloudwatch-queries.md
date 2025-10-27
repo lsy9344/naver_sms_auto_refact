@@ -17,7 +17,7 @@ This document provides ready-to-use CloudWatch Logs Insights queries for monitor
 ### 1. View All Logs in Last Hour
 
 ```sql
-fields @timestamp, level, message, status, action_type
+fields @timestamp, level, message, operation
 | sort @timestamp desc
 | limit 100
 ```
@@ -29,8 +29,8 @@ fields @timestamp, level, message, status, action_type
 ### 2. Show Only Errors
 
 ```sql
-fields @timestamp, message, status, request_id, error_code
-| filter status = "failure" or level = "ERROR"
+fields @timestamp, message, operation, context.booking_num, error
+| filter level = "ERROR"
 | sort @timestamp desc
 | limit 50
 ```
@@ -592,8 +592,170 @@ fields @timestamp, duration_ms
 
 ---
 
+## Process Flow Queries (NEW - Enhanced Logging)
+
+These queries leverage the enhanced logging structure to track processing flow.
+
+### 26. Rule Evaluation Results
+
+```sql
+fields @timestamp, operation, context.rule_name, context.result, context.booking_num
+| filter operation = "evaluate_rule"
+| sort @timestamp desc
+| limit 100
+```
+
+**Use:** Track which rules matched/didn't match for each booking
+
+---
+
+### 27. Action Execution Summary
+
+```sql
+fields @timestamp, operation, context.action_type, context.status, context.booking_num
+| filter operation = "execute_action"
+| stats count() as total by context.action_type, context.status
+```
+
+**Use:** See which actions are executing and their success rates
+
+**Output Example:**
+```
+action_type  | status  | total
+-------------|---------|------
+send_sms     | success | 45
+send_sms     | skipped | 3
+update_flag  | success | 42
+update_flag  | skipped | 6
+```
+
+---
+
+### 28. SMS Template Distribution
+
+```sql
+fields @timestamp, context.template, context.status
+| filter operation like /send_sms/
+| stats count() as sms_count by context.template, context.status
+```
+
+**Use:** Track which SMS templates are being used
+
+---
+
+### 29. Database Flag Updates
+
+```sql
+fields @timestamp, context.flag, context.value, context.status, context.booking_num
+| filter operation = "update_flag"
+| stats count() by context.flag, context.status
+```
+
+**Use:** Monitor database flag update patterns
+
+**Output Example:**
+```
+flag         | status  | count
+-------------|---------|------
+confirm_sms  | updated | 25
+confirm_sms  | skipped | 5
+remind_sms   | updated | 18
+option_sms   | updated | 10
+```
+
+---
+
+### 30. Lambda Execution Performance
+
+```sql
+fields @timestamp, operation, duration_ms, context.bookings_processed
+| filter operation = "lambda_complete"
+| stats avg(duration_ms) as avg_duration, max(duration_ms) as max_duration, avg(context.bookings_processed) as avg_bookings
+```
+
+**Use:** Monitor Lambda performance over time
+
+---
+
+### 31. Processing Complete Summary (Last 24h)
+
+```sql
+fields @timestamp, operation, context.bookings_processed, context.actions_executed, context.actions_succeeded, context.sms_sent
+| filter operation = "process_bookings_complete"
+| stats sum(context.bookings_processed) as total_bookings, sum(context.sms_sent) as total_sms, avg(context.actions_executed) as avg_actions
+```
+
+**Use:** Generate daily statistics
+
+---
+
+### 32. Failed Actions Detail
+
+```sql
+fields @timestamp, context.rule_name, context.action_type, context.booking_num, error
+| filter operation = "execute_action" and level = "ERROR"
+| sort @timestamp desc
+| limit 50
+```
+
+**Use:** Debug why specific actions failed
+
+---
+
+### 33. Rule Match Rate
+
+```sql
+fields context.rule_name, context.result
+| filter operation = "evaluate_rule"
+| stats count() as evaluations, sum(case when context.result = true then 1 else 0 end) as matches by context.rule_name
+| fields context.rule_name, matches, evaluations, (matches * 100.0 / evaluations) as match_rate_pct
+| sort match_rate_pct desc
+```
+
+**Use:** Identify which rules are triggering most/least frequently
+
+---
+
+### 34. Booking Processing Timeline
+
+```sql
+fields @timestamp, operation, message, context.booking_num
+| filter context.booking_num = "REPLACE_WITH_BOOKING_NUM"
+| sort @timestamp asc
+```
+
+**Use:** Follow complete processing timeline for a specific booking
+
+**Steps:**
+1. Find booking_num from another query
+2. Replace `REPLACE_WITH_BOOKING_NUM` with actual value
+3. See all operations for that booking in chronological order
+
+---
+
+### 35. Lambda Execution Status
+
+```sql
+fields @timestamp, operation, context.status, duration_ms
+| filter operation = "lambda_complete"
+| stats count() as executions by context.status
+```
+
+**Use:** Track Lambda success vs failure rate
+
+**Output Example:**
+```
+status   | executions
+---------|----------
+success  | 287
+failure  | 3
+```
+
+---
+
 ## Related Documentation
 
 - [Operations Runbook](runbook.md) - How to respond to issues
 - [CloudWatch Dashboard](../../infrastructure/cloudwatch.tf) - Dashboard configuration
 - [Logging Implementation](../../src/utils/logger.py) - How logs are generated
+- [Logging Guide](logging.md) - How to add new logging statements

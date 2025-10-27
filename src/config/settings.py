@@ -42,6 +42,7 @@ SLACK_ENABLED = os.getenv("SLACK_ENABLED", "false").lower() == "true"
 SLACK_WEBHOOK_URL_ENV = os.getenv("SLACK_WEBHOOK_URL", None)  # Direct override if provided
 SLACK_CONFIG_FILE = os.getenv("SLACK_CONFIG_FILE", "config/my_slack_webhook.yaml")
 
+
 # Telegram configuration helper (flag evaluated at runtime per Settings instance)
 def _read_telegram_flag() -> Tuple[bool, bool]:
     """Return (enabled_value, flag_defined) from environment variables."""
@@ -51,6 +52,7 @@ def _read_telegram_flag() -> Tuple[bool, bool]:
     if flag_raw is None:
         return False, False
     return flag_raw.lower() == "true", True
+
 
 # Manual approval gate for SENS SMS delivery (Story 5.4 - AC 10)
 # Default: False (SMS delivery disabled) - Requires explicit owner sign-off

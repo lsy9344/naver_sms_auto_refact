@@ -326,21 +326,54 @@ Include these fields in context when available:
 ```python
 context = {
     # Identification
-    "booking_id": "1051707_12345",      # Composite key: store_id_book_id
+    "booking_num": "1051707_12345",     # Composite key: store_id_book_id (preferred over booking_id)
     "store_id": "1051707",              # Store identifier
     "rule_name": "new_booking_handler", # Processing rule
 
     # Customer Info (redacted/masked)
-    "phone_masked": "010-****-5678",    # Never use raw phone
+    "phone_masked": "010-****-5678",    # Never use raw phone (use booking.phone_masked)
 
     # Operation Tracking
-    "attempt": 1,                        # For retry scenarios
-    "status": "pending",                # Operation status
+    "operation": "evaluate_rule",       # Operation name for grouping
+    "status": "success",                # Operation status (success/failure/skipped)
+    "action_type": "send_sms",          # For action executors
+    "template": "confirmation",         # For SMS actions
+    "flag": "confirm_sms",              # For database flag updates
+    "result": True,                     # For rule evaluation results
 
     # Performance
-    "retry_count": 0,
+    "duration_ms": 123.45,              # Operation duration
+    "retry_count": 0,                   # For retry scenarios
 }
 ```
+
+### Standard Operation Names
+
+Use these consistent operation names for CloudWatch querying:
+
+**Lambda Lifecycle:**
+- `lambda_start` - Lambda handler started
+- `lambda_complete` - Lambda execution finished (success or failure)
+
+**Rule Engine:**
+- `evaluate_rule_start` - Rule evaluation beginning
+- `evaluate_rule` - Rule evaluation result (match/no match)
+- `execute_rule_start` - Rule actions execution beginning
+- `execute_rule_complete` - Rule actions execution finished
+- `execute_action_start` - Individual action starting
+- `execute_action` - Individual action completed
+- `process_booking_start` - Booking processing started
+- `process_booking_complete` - Booking processing finished
+
+**Actions:**
+- `send_sms_confirm` / `send_sms_guide` / `send_sms_event` - SMS sending
+- `create_db_record` - Database record creation
+- `update_flag` - Database flag update
+
+**Notifications:**
+- `send_telegram` - Telegram notification
+- `send_slack` - Slack notification
+- `notify_error` - Error notification sending
 
 ### Message Guidelines
 
@@ -559,13 +592,23 @@ logger.debug(
 ## Best Practices Summary
 
 1. **Always use the factory**: `logger = get_logger(__name__)`
-2. **Include operation names**: Helps with querying and debugging
-3. **Add context fields**: Booking ID, store ID, etc. for correlation
+2. **Include operation names**: Use standard operation names from the guide above
+3. **Add context fields**:
+   - Always include `booking_num` and `phone_masked` (use `booking.phone_masked`)
+   - Add `operation` for grouping related logs
+   - Include `status` for filtering success/failure
+   - Add action-specific fields (`template`, `flag`, `action_type`)
 4. **Mask sensitive data**: Phone numbers, credentials, personal info
-5. **Use appropriate levels**: DEBUG for details, INFO for flow, ERROR for problems
-6. **Track duration**: Important for performance analysis
+5. **Use appropriate levels**:
+   - **INFO**: Process flow, rule matches, action results, completion summaries
+   - **DEBUG**: Detailed internal logic, condition evaluation details
+   - **ERROR**: Failures that need investigation
+   - **WARNING**: Unexpected but handled situations
+6. **Track duration**: Add `duration_ms` for performance-critical operations
 7. **Never log credentials**: Use `get_settings()` instead
 8. **Test logging**: Verify schema in unit tests
+9. **Process flow visibility**: Log start AND completion of major operations
+10. **Include previous state**: When updating values, log both old and new values
 
 ---
 

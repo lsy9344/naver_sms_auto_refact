@@ -61,15 +61,18 @@ class StructuredLogger:
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)
 
-        # Create console handler with JSON formatting
-        if not self.logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setLevel(logging.DEBUG)
+        # Prevent duplicate logs: clear existing handlers and disable propagation
+        self.logger.handlers.clear()
+        self.logger.propagate = False
 
-            # JSON formatter
-            formatter = logging.Formatter("%(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
+        # Create console handler with JSON formatting
+        handler = logging.StreamHandler()
+        handler.setLevel(logging.DEBUG)
+
+        # JSON formatter
+        formatter = logging.Formatter("%(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
 
     def _format_log(
         self,

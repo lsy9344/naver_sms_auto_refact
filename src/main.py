@@ -61,12 +61,25 @@ def lambda_handler(event, context):
     Returns:
         dict: Status 200 with summary on success, 500 with error on failure
     """
+    import time
+
+    lambda_start_time = time.time()
+
     # ============================================================
     # AC 1: Bootstrap - Logging redaction and configuration
     # ============================================================
     try:
         setup_logging_redaction()
-        logger.info("Starting Naver SMS automation Lambda handler")
+        logger.info(
+            "Lambda handler started",
+            operation="lambda_start",
+            context={
+                "aws_request_id": (
+                    getattr(context, "aws_request_id", "local") if context else "local"
+                ),
+                "function_name": getattr(context, "function_name", "local") if context else "local",
+            },
+        )
 
         # Load settings and credentials
         settings = Settings()
@@ -225,9 +238,20 @@ def lambda_handler(event, context):
             )
 
             logger.info(
-                f"Processing complete: {summary['bookings_processed']} bookings processed, "
-                f"{summary['actions_executed']} actions executed, "
-                f"{summary['actions_succeeded']} succeeded, {summary['actions_failed']} failed"
+                f"Booking processing complete: {summary['bookings_processed']} bookings processed, "
+                f"{summary['actions_executed']} actions executed "
+                f"({summary['actions_succeeded']} succeeded, {summary['actions_failed']} failed)",
+                operation="process_bookings_complete",
+                context={
+                    "bookings_processed": summary["bookings_processed"],
+                    "actions_executed": summary["actions_executed"],
+                    "actions_succeeded": summary["actions_succeeded"],
+                    "actions_failed": summary["actions_failed"],
+                    "sms_sent": summary["sms_sent"],
+                    "rules_matched_total": sum(
+                        1 for r in all_results if r.success
+                    ),  # Count successful actions as proxy for matched rules
+                },
             )
 
             # ============================================================
@@ -259,6 +283,22 @@ def lambda_handler(event, context):
             # ============================================================
             # AC 7: Return success response
             # ============================================================
+            lambda_duration_ms = (time.time() - lambda_start_time) * 1000
+
+            logger.info(
+                "Lambda execution completed successfully",
+                operation="lambda_complete",
+                context={
+                    "status": "success",
+                    "bookings_processed": summary["bookings_processed"],
+                    "actions_executed": summary["actions_executed"],
+                    "actions_succeeded": summary["actions_succeeded"],
+                    "actions_failed": summary["actions_failed"],
+                    "sms_sent": summary["sms_sent"],
+                },
+                duration_ms=lambda_duration_ms,
+            )
+
             return {
                 "statusCode": 200,
                 "body": json.dumps(
@@ -269,6 +309,7 @@ def lambda_handler(event, context):
                         "actions_succeeded": summary["actions_succeeded"],
                         "actions_failed": summary["actions_failed"],
                         "sms_sent": summary["sms_sent"],
+                        "duration_ms": round(lambda_duration_ms, 2),
                         "timestamp": datetime.now().isoformat(),
                     }
                 ),
@@ -282,7 +323,18 @@ def lambda_handler(event, context):
         # ============================================================
         # AC 8: Error handling with logging and notification
         # ============================================================
-        logger.error(f"Lambda handler failed: {e}", error=str(e))
+        lambda_duration_ms = (time.time() - lambda_start_time) * 1000
+
+        logger.error(
+            "Lambda execution failed",
+            operation="lambda_complete",
+            context={
+                "status": "failure",
+                "error_type": type(e).__name__,
+            },
+            error=str(e),
+            duration_ms=lambda_duration_ms,
+        )
 
         # Send error notification
         try:
@@ -293,7 +345,11 @@ def lambda_handler(event, context):
             else:
                 logger.info("Skipping Telegram error notification (disabled)")
         except Exception as notify_err:
-            logger.error(f"Failed to send error notification: {notify_err}")
+            logger.error(
+                "Failed to send error notification",
+                operation="notify_error",
+                error=str(notify_err),
+            )
 
         return {
             "statusCode": 500,
@@ -301,6 +357,8 @@ def lambda_handler(event, context):
                 {
                     "error": "Lambda execution failed",
                     "message": str(e),
+                    "error_type": type(e).__name__,
+                    "duration_ms": round(lambda_duration_ms, 2),
                     "timestamp": datetime.now().isoformat(),
                 }
             ),
@@ -593,9 +651,7 @@ def send_slack_summary(
     logger.info("Slack summary notification sent")
 
 
-def notify_telegram_error(
-    telegram_creds: Optional[Dict[str, str]], error_message: str
-) -> None:
+def notify_telegram_error(telegram_creds: Optional[Dict[str, str]], error_message: str) -> None:
     """
     Send error notification to Telegram.
 
