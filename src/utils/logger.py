@@ -61,9 +61,15 @@ class StructuredLogger:
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)
 
-        # Prevent duplicate logs: clear existing handlers and disable propagation
-        self.logger.handlers.clear()
-        self.logger.propagate = False
+        # Allow propagation so pytest's caplog can capture logs in tests
+        # In production, logs will also output through our JSON handler below
+        self.logger.propagate = True
+
+        # Only remove our own StreamHandlers; preserve other handlers like caplog's
+        # This prevents clearing pytest's caplog handler
+        self.logger.handlers = [
+            h for h in self.logger.handlers if not isinstance(h, logging.StreamHandler)
+        ]
 
         # Create console handler with JSON formatting
         handler = logging.StreamHandler()
