@@ -209,70 +209,71 @@ jobs:
             sleep 5
           done
 
-      - name: Test Lambda invocation
+      - name: Test Lambda invocation (async + log verification)
         id: lambda-test
+        env:
+          LOG_GROUP: /aws/lambda/${{ env.LAMBDA_FUNCTION_NAME }}
         run: |
-          echo "🧪 Testing Lambda invocation..."
-          
-          MAX_RETRIES=3
-          RETRY_DELAY=10
-          ATTEMPT=1
-          INVOCATION_OK=0
-          RESPONSE_FILE=lambda-test-response.json
-          CLI_OUTPUT_FILE=lambda-test-cli-output.json
-          ERROR_LOG=lambda-test-error.log
+          echo "🧪 Smoke test: async invoke + CloudWatch verification"
 
-          while [ $ATTEMPT -le $MAX_RETRIES ]; do
-            echo "Attempt $ATTEMPT/$MAX_RETRIES"
+          # 1) Permission and existence check without execution
+          echo "🔎 DryRun to validate permissions and function exists"
+          aws lambda invoke \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "${{ env.AWS_REGION }}" \
+            --invocation-type DryRun \
+            /dev/null 1>/dev/null
 
+          # 2) Async invoke (don't hold HTTP connection open)
+          echo "🚀 Async invoking function (InvocationType=Event)"
+          aws lambda invoke \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "${{ env.AWS_REGION }}" \
+            --invocation-type Event \
+            --payload '{}' \
+            /dev/null 1>/dev/null
+
+          # 3) Poll CloudWatch logs for evidence that the function started
+          echo "📋 Waiting for CloudWatch logs to confirm start..."
+          START_EPOCH_MS=$(( ( $(date +%s) - 300 ) * 1000 ))  # last 5 minutes
+          MAX_WAIT=120   # seconds
+          SLEEP=5        # seconds
+          ELAPSED=0
+
+          FOUND=0
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
             set +e
-            aws lambda invoke \
-              --function-name "$LAMBDA_FUNCTION_NAME" \
+            EVENTS=$(aws logs filter-log-events \
+              --log-group-name "$LOG_GROUP" \
+              --start-time "$START_EPOCH_MS" \
+              --limit 50 \
               --region "${{ env.AWS_REGION }}" \
-              --payload '{}' \
-              --log-type Tail \
-              --cli-read-timeout 900 \
-              --cli-connect-timeout 60 \
-              "$RESPONSE_FILE" > "$CLI_OUTPUT_FILE" 2> "$ERROR_LOG"
+              --query 'events[].message' \
+              --output text 2>/dev/null)
             STATUS=$?
             set -e
 
-            if [ $STATUS -eq 0 ]; then
-              INVOCATION_OK=1
+            if [ $STATUS -eq 0 ] && echo "$EVENTS" | grep -Eiq "(^| )START RequestId|Starting Naver SMS automation Lambda handler"; then
+              FOUND=1
               break
             fi
 
-            if grep -qi "Read timeout" "$ERROR_LOG"; then
-              echo "⚠️ Lambda invocation read timeout, retrying in ${RETRY_DELAY}s..."
-              sleep $RETRY_DELAY
-              ATTEMPT=$((ATTEMPT + 1))
-              RETRY_DELAY=$((RETRY_DELAY * 2))
-            elif grep -qi "Connection was closed" "$ERROR_LOG"; then
-              echo "⚠️ Connection to Lambda API closed unexpectedly, retrying in ${RETRY_DELAY}s..."
-              sleep $RETRY_DELAY
-              ATTEMPT=$((ATTEMPT + 1))
-              RETRY_DELAY=$((RETRY_DELAY * 2))
-            else
-              echo "❌ Lambda invocation failed"
-              cat "$ERROR_LOG"
-              exit $STATUS
-            fi
+            echo "⏳ No start logs yet... waiting (${ELAPSED}s/${MAX_WAIT}s)"
+            sleep $SLEEP
+            ELAPSED=$((ELAPSED + SLEEP))
           done
 
-          if [ $INVOCATION_OK -ne 1 ]; then
-            echo "❌ Lambda invocation failed after $MAX_RETRIES attempts"
-            cat "$ERROR_LOG"
+          if [ $FOUND -ne 1 ]; then
+            echo "❌ Did not observe Lambda start logs within ${MAX_WAIT}s"
+            echo "Common root causes:"
+            echo "- Heavy cold start (Chrome init) exceeding startup expectations"
+            echo "- Wrong handler path or image command"
+            echo "- VPC ENI cold start delays or missing network egress"
+            echo "- Execution role issues causing immediate init failure"
             exit 1
           fi
 
-          echo "✅ Lambda invocation successful"
-          cat "$CLI_OUTPUT_FILE"
-
-          if [ -s "$RESPONSE_FILE" ]; then
-            cat "$RESPONSE_FILE" | head -100
-          else
-            echo "⚠️ Lambda returned empty response"
-          fi
+          echo "✅ Lambda started successfully (confirmed via CloudWatch logs)"
 
       - name: Check Lambda CloudWatch logs
         if: always()

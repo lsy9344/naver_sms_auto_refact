@@ -1,5 +1,7 @@
 import json
-from unittest.mock import Mock, MagicMock, call, patch
+from unittest.mock import Mock, MagicMock, call, patch, ANY
+
+from selenium.common.exceptions import InvalidCookieDomainException
 
 from src.auth.naver_login import NaverAuthenticator
 
@@ -156,3 +158,27 @@ def test_get_session_without_driver_returns_empty_session():
     auth = NaverAuthenticator("testuser", "testpass", session_mgr)
     session = auth.get_session()
     assert session.cookies.get_dict() == {}
+
+
+@patch("src.auth.naver_login.Service")
+@patch("src.auth.naver_login.webdriver.Chrome")
+def test_cookie_domain_mismatch_falls_back_to_cdp(mock_chrome, mock_service):
+    driver = _build_driver_mock()
+    driver.add_cookie.side_effect = InvalidCookieDomainException("domain mismatch")
+    mock_chrome.return_value = driver
+    mock_service.return_value = MagicMock()
+
+    cached_cookies = [
+        {"name": "NID_SES", "value": "cached", "domain": "partner.booking.naver.com", "path": "/"}
+    ]
+
+    session_mgr = Mock()
+    auth = NaverAuthenticator("testuser", "testpass", session_mgr)
+
+    with patch("src.auth.naver_login.time.sleep"):
+        auth.login(cached_cookies=cached_cookies)
+
+    driver.execute_cdp_cmd.assert_any_call("Network.enable", {})
+    driver.execute_cdp_cmd.assert_any_call("Network.setCookie", ANY)
+    cookie_payload = driver.execute_cdp_cmd.call_args_list[-1][0][1]
+    assert cookie_payload["domain"] == "partner.booking.naver.com"

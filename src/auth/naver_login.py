@@ -24,6 +24,7 @@ class NaverAuthenticator:
         self.password = password
         self.session_manager = session_manager
         self.driver = None
+        self._cdp_network_enabled = False
 
     def setup_driver(self):
         chrome_options = Options()
@@ -151,11 +152,9 @@ class NaverAuthenticator:
                 except WebDriverException as exc:
                     logger.warning(
                         "Skipping cached cookies for domain due to navigation failure",
-                        extra={
-                            "operation": "naver_login_cached",
-                            "error": str(exc),
-                            "domain": sanitized_domain,
-                        },
+                        operation="naver_login_cached",
+                        error=str(exc),
+                        context={"domain": sanitized_domain},
                     )
                     continue
 
@@ -170,9 +169,75 @@ class NaverAuthenticator:
                 except InvalidCookieDomainException as exc:
                     logger.warning(
                         "Cached cookie rejected due to domain mismatch",
-                        extra={
-                            "operation": "naver_login_cached",
-                            "error": str(exc),
-                            "domain": sanitized_domain,
-                        },
+                        operation="naver_login_cached",
+                        error=str(exc),
+                        context={"domain": sanitized_domain},
                     )
+                    self._set_cookie_via_devtools(cookie_payload)
+
+    def _ensure_cdp_network(self) -> bool:
+        """Enable Chrome DevTools Protocol network domain once per session."""
+        if not self.driver or self._cdp_network_enabled:
+            return bool(self.driver)
+
+        try:
+            self.driver.execute_cdp_cmd("Network.enable", {})
+            self._cdp_network_enabled = True
+            return True
+        except WebDriverException as exc:
+            logger.error(
+                "Failed to enable CDP network domain",
+                operation="naver_login_cdp",
+                error=str(exc),
+            )
+            return False
+
+    def _set_cookie_via_devtools(self, cookie: Dict[str, Any]) -> bool:
+        """
+        Fallback cookie injection for domains that cannot be navigated to without authentication.
+        Uses Chrome DevTools Protocol to bypass Selenium's domain restrictions.
+        """
+        if not self.driver or not self._ensure_cdp_network():
+            return False
+
+        cookie_args: Dict[str, Any] = {
+            "name": cookie["name"],
+            "value": cookie["value"],
+            "path": cookie.get("path", "/"),
+            "secure": cookie.get("secure", False),
+            "httpOnly": cookie.get("httpOnly", False),
+        }
+
+        domain = cookie.get("domain")
+        if domain:
+            cookie_args["domain"] = domain
+        else:
+            cookie_args["url"] = "https://naver.com/"
+
+        expiry = cookie.get("expiry")
+        if isinstance(expiry, (int, float)):
+            cookie_args["expires"] = int(expiry)
+
+        same_site = cookie.get("sameSite")
+        if same_site:
+            cookie_args["sameSite"] = same_site
+
+        try:
+            self.driver.execute_cdp_cmd("Network.setCookie", cookie_args)
+            logger.debug(
+                "Injected cookie via CDP after Selenium rejection",
+                operation="naver_login_cdp",
+                context={
+                    "domain": domain or "naver.com",
+                    "cookie": cookie["name"],
+                },
+            )
+            return True
+        except WebDriverException as exc:
+            logger.error(
+                "Failed to inject cookie via CDP",
+                operation="naver_login_cdp",
+                error=str(exc),
+                context={"cookie": cookie["name"], "domain": domain or "naver.com"},
+            )
+            return False
