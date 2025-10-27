@@ -575,3 +575,154 @@ class TestRegisterActionsIntegration:
         }
 
         assert registered_names == expected
+
+
+class TestMessageTemplateVariableResolution:
+    """Test that template variables in message parameters are resolved correctly.
+
+    This tests the fix for the issue where messages like "[예약확정] {{ booking.name }}"
+    were being sent with template variables unresolved.
+    """
+
+    def test_telegram_message_variable_resolution_from_rule_context(self, booking, services_bundle):
+        """Test that Telegram message variables are resolved from booking in rule context."""
+        # Create action context
+        context = ActionContext(
+            booking=booking,
+            settings_dict=services_bundle.settings_dict,
+            db_repo=services_bundle.db_repo,
+            sms_service=services_bundle.sms_service,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
+            telegram_template_loader=services_bundle.telegram_template_loader,
+            telegram_service=services_bundle.telegram_service,
+            logger=services_bundle.logger,
+        )
+
+        # Call send_telegram with a message containing template variables
+        # (simulating what happens when rules.yaml has: message: "[예약확정] {{ booking.name }}")
+        send_telegram(context, message="[예약확정] {{ booking.name }}", parse_mode="Markdown")
+
+        # Verify telegram service was called with resolved message
+        services_bundle.telegram_service.send_message.assert_called_once()
+        call_args = services_bundle.telegram_service.send_message.call_args
+        sent_text = call_args[1]["text"]
+
+        # Message should have template variable resolved
+        assert sent_text == "[예약확정] Test Customer"
+        assert "{{ booking.name }}" not in sent_text
+
+    def test_slack_message_variable_resolution_from_rule_context(self, booking, services_bundle):
+        """Test that Slack message variables are resolved from booking in rule context."""
+        # Enable Slack for this test
+        services_bundle.settings_dict["slack_enabled"] = True
+
+        # Create action context
+        context = ActionContext(
+            booking=booking,
+            settings_dict=services_bundle.settings_dict,
+            db_repo=services_bundle.db_repo,
+            sms_service=services_bundle.sms_service,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
+            telegram_template_loader=services_bundle.telegram_template_loader,
+            telegram_service=services_bundle.telegram_service,
+            logger=services_bundle.logger,
+        )
+
+        # Call send_slack with a message containing template variables
+        send_slack(context, message="[상세안내] {{ booking.name }}")
+
+        # Verify slack service was called with resolved message
+        services_bundle.slack_service.send_text.assert_called_once()
+        call_args = services_bundle.slack_service.send_text.call_args
+        sent_text = call_args[0][0]
+
+        # Message should have template variable resolved
+        assert sent_text == "[상세안내] Test Customer"
+        assert "{{ booking.name }}" not in sent_text
+
+    def test_message_variable_resolution_through_rule_engine_wrapper(
+        self, booking, services_bundle
+    ):
+        """Test template variable resolution when called through register_actions wrappers.
+
+        This simulates the actual flow: rules.yaml -> rule engine -> action wrapper -> send_telegram.
+        """
+        # Create a mock rule engine
+        mock_engine = Mock()
+        action_wrappers = {}
+
+        def capture_action_wrapper(action_name):
+            def capture(executor_func):
+                action_wrappers[action_name] = executor_func
+                return executor_func
+
+            return capture
+
+        mock_engine.register_action.side_effect = lambda name, func: action_wrappers.update(
+            {name: func}
+        )
+
+        # Register actions
+        register_actions(mock_engine, services_bundle)
+
+        # Get the send_telegram_wrapper that was registered
+        assert "send_telegram" in action_wrappers
+        send_telegram_wrapper = action_wrappers["send_telegram"]
+
+        # Simulate rule engine calling the wrapper with rule context
+        # (This is what happens in engine.py execute_rule when a send_telegram action runs)
+        rule_context = {"booking": booking}
+        params = {"message": "[예약확정] {{ booking.name }}"}
+
+        send_telegram_wrapper(rule_context, **params)
+
+        # Verify telegram service was called with resolved message
+        services_bundle.telegram_service.send_message.assert_called_once()
+        call_args = services_bundle.telegram_service.send_message.call_args
+        sent_text = call_args[1]["text"]
+
+        # Message should have template variable resolved
+        assert sent_text == "[예약확정] Test Customer"
+        assert "{{ booking.name }}" not in sent_text
+
+    def test_multiple_template_variables_in_message(self, services_bundle):
+        """Test that multiple template variables in a single message are all resolved."""
+        # Create a booking with Korean name
+        booking = Booking(
+            booking_num="1051707_99999",
+            phone="010-9999-9999",
+            name="홍길동",
+            booking_time="2025-10-20 14:00:00",
+        )
+
+        # Create action context
+        context = ActionContext(
+            booking=booking,
+            settings_dict=services_bundle.settings_dict,
+            db_repo=services_bundle.db_repo,
+            sms_service=services_bundle.sms_service,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
+            telegram_template_loader=services_bundle.telegram_template_loader,
+            telegram_service=services_bundle.telegram_service,
+            logger=services_bundle.logger,
+        )
+
+        # Send message with multiple template variables
+        send_telegram(
+            context,
+            message="예약자: {{ booking.name }}, 예약번호: {{ booking.booking_num }}",
+            parse_mode="Markdown",
+        )
+
+        # Verify both variables were resolved
+        services_bundle.telegram_service.send_message.assert_called_once()
+        call_args = services_bundle.telegram_service.send_message.call_args
+        sent_text = call_args[1]["text"]
+
+        # Both variables should be resolved
+        assert sent_text == "예약자: 홍길동, 예약번호: 1051707_99999"
+        assert "{{" not in sent_text
+        assert "}}" not in sent_text

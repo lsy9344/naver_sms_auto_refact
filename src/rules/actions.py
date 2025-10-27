@@ -656,7 +656,9 @@ def create_db_record(
 
                     if booking_count is not None and booking_count >= 0:
                         detail["bookingCount"] = booking_count
-                        option_keyword_counts[name] = option_keyword_counts.get(name, 0) + booking_count
+                        option_keyword_counts[name] = (
+                            option_keyword_counts.get(name, 0) + booking_count
+                        )
 
                     if price_value is not None:
                         detail["price"] = price_value
@@ -882,10 +884,26 @@ def send_telegram(
                 raise ValueError("Either 'message' or 'template_name' must be provided")
 
             final_message = message
+
+            # Resolve template params if explicitly provided
             if template_params:
                 for key, value in template_params.items():
                     pattern = re.compile(r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}")
                     final_message = pattern.sub(str(value), final_message)
+
+            # Also resolve variables from booking object (e.g., {{ booking.name }})
+            # This handles cases where template variables reference booking attributes
+            for match in _TEMPLATE_PARAM_PATTERN.finditer(final_message):
+                var_path = match.group(1)
+                # Only resolve if it starts with "booking."
+                if var_path.startswith("booking."):
+                    attr_name = var_path.split(".", 1)[1]
+                    if hasattr(booking, attr_name):
+                        resolved_value = getattr(booking, attr_name)
+                        if resolved_value is not None:
+                            final_message = final_message.replace(
+                                match.group(0), str(resolved_value)
+                            )
 
         if not isinstance(final_message, str) or final_message == "":
             raise ValueError("Telegram message must be a non-empty string")
@@ -1100,6 +1118,21 @@ def send_slack(
                     error=str(e),
                 )
                 raise
+        else:
+            # Resolve variables from booking object if message is provided directly
+            # This handles cases where message contains {{ booking.name }} etc.
+            if final_message:
+                for match in _TEMPLATE_PARAM_PATTERN.finditer(final_message):
+                    var_path = match.group(1)
+                    # Only resolve if it starts with "booking."
+                    if var_path.startswith("booking."):
+                        attr_name = var_path.split(".", 1)[1]
+                        if hasattr(booking, attr_name):
+                            resolved_value = getattr(booking, attr_name)
+                            if resolved_value is not None:
+                                final_message = final_message.replace(
+                                    match.group(0), str(resolved_value)
+                                )
 
         # Send via webhook client (AC 1)
         if not context.slack_service:

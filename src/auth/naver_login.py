@@ -1,8 +1,11 @@
 import json
+import os
+import shutil
 import time
 from collections import defaultdict
+from pathlib import Path
 from random import uniform
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from selenium import webdriver
 from selenium.common.exceptions import InvalidCookieDomainException, WebDriverException
 from selenium.webdriver.chrome.options import Options
@@ -28,7 +31,13 @@ class NaverAuthenticator:
 
     def setup_driver(self):
         chrome_options = Options()
-        chrome_options.binary_location = "/opt/chrome/chrome"
+        chrome_binary = self._resolve_chrome_binary_location()
+        if chrome_binary:
+            chrome_options.binary_location = chrome_binary
+            logger.info("Using Chrome binary", context={"path": chrome_binary})
+        else:
+            logger.warning("Chrome binary not found via known paths; relying on Selenium defaults")
+
         chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
@@ -46,10 +55,71 @@ class NaverAuthenticator:
         )
         chrome_options.add_argument(user_agent)
 
-        service = Service(executable_path="/opt/chromedriver")
+        chromedriver_path = self._resolve_chromedriver_path()
+        if chromedriver_path:
+            logger.info("Using ChromeDriver binary", context={"path": chromedriver_path})
+            service = Service(executable_path=chromedriver_path)
+        else:
+            logger.warning(
+                "ChromeDriver binary not found via known paths; falling back to Selenium Manager"
+            )
+            service = Service()
 
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
         self.driver.get("https://new.smartplace.naver.com/")
+
+    def _resolve_chrome_binary_location(self) -> Optional[str]:
+        """
+        Locate the Chrome binary using environment overrides and common fallback paths.
+
+        Returns:
+            Path to Chrome binary if found, otherwise None.
+        """
+        candidates = [
+            os.getenv("CHROME_BINARY_PATH"),
+            os.getenv("GOOGLE_CHROME_BIN"),
+            os.getenv("GOOGLE_CHROME_SHIM"),
+            "/opt/chrome/chrome",
+            "/usr/bin/google-chrome",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium",
+        ]
+
+        for candidate in candidates:
+            if candidate and Path(candidate).is_file():
+                return candidate
+
+        for binary_name in ("google-chrome", "chrome", "chromium-browser", "chromium"):
+            resolved = shutil.which(binary_name)
+            if resolved:
+                return resolved
+
+        return None
+
+    def _resolve_chromedriver_path(self) -> Optional[str]:
+        """
+        Locate the ChromeDriver binary via environment hints or PATH.
+
+        Returns:
+            Path to ChromeDriver binary if found, otherwise None.
+        """
+        candidates = [
+            os.getenv("CHROMEDRIVER_BIN"),
+            os.getenv("CHROMEDRIVER_PATH"),
+            "/opt/chromedriver",
+            "/usr/local/bin/chromedriver",
+            "/usr/bin/chromedriver",
+        ]
+
+        for candidate in candidates:
+            if candidate and Path(candidate).is_file():
+                return candidate
+
+        resolved = shutil.which("chromedriver")
+        if resolved:
+            return resolved
+
+        return None
 
     def login(self, cached_cookies=None):
         if not self.driver:

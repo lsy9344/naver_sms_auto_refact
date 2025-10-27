@@ -436,13 +436,13 @@ def lambda_handler(event, context):
     
         arrays = reservation_results + option_results
     
-        requests.post(f'https://api.telegram.org/bot6657330606:AAFX9uYEwkcuuSpQORGpShFTSpG7e8GO1sg/sendMessage', {
-            'chat_id': '6968094848',
+        requests.post(f' ', {
+            'chat_id': '6 ',
             'text': '\n'.join(arrays) if len(arrays) > 0 else '문자 발송 대상 없음'
         })
     except Exception as err:
-        requests.post(f'https://api.telegram.org/bot6657330606:AAFX9uYEwkcuuSpQORGpShFTSpG7e8GO1sg/sendMessage', {
-            'chat_id': '6968094848',
+        requests.post(f' ', {
+            'chat_id': ' ',
             'text': '요청중 오류 발생'
         })
         

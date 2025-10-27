@@ -7,6 +7,7 @@ context injection, and operation timing for CloudWatch integration.
 
 import json
 import logging
+import os
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -61,24 +62,30 @@ class StructuredLogger:
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)
 
-        # Allow propagation so pytest's caplog can capture logs in tests
-        # In production, logs will also output through our JSON handler below
-        self.logger.propagate = True
+        propagate_flag = os.getenv("STRUCTURED_LOGGER_PROPAGATE", "").lower()
+        propagate_enabled = propagate_flag in {"1", "true", "yes", "on"}
 
-        # Only remove our own StreamHandlers; preserve other handlers like caplog's
-        # This prevents clearing pytest's caplog handler
-        self.logger.handlers = [
-            h for h in self.logger.handlers if not isinstance(h, logging.StreamHandler)
-        ]
+        if propagate_enabled:
+            # Allow upstream handlers (e.g. pytest caplog) to manage emission.
+            self.logger.propagate = True
+            self.logger.handlers = [
+                h for h in self.logger.handlers if not isinstance(h, logging.StreamHandler)
+            ]
+            if not self.logger.handlers:
+                self.logger.addHandler(logging.NullHandler())
+        else:
+            self.logger.propagate = False
 
-        # Create console handler with JSON formatting
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.DEBUG)
+            # Only remove our own StreamHandlers; preserve other handlers like caplog's
+            self.logger.handlers = [
+                h for h in self.logger.handlers if not isinstance(h, logging.StreamHandler)
+            ]
 
-        # JSON formatter
-        formatter = logging.Formatter("%(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.DEBUG)
+            formatter = logging.Formatter("%(message)s", datefmt="%Y-%m-%dT%H:%M:%S")
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
     def _format_log(
         self,

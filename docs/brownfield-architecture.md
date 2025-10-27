@@ -701,8 +701,8 @@ self.secret_key = "YrAgDCC20hiItoFrzrolbStsIwzyEWBFi4szm1Vh"
 
 **Location**: `lambda_function.py` lines 439,444
 ```python
-bot_token = "6657330606:AAFX9uYEwkcuuSpQORGpShFTSpG7e8GO1sg"
-chat_id = "6968094848"
+bot_token = " "
+chat_id = " "
 ```
 
 **Risk**: Credentials exposed in version control
