@@ -7,7 +7,7 @@ Implements exact transformation logic from legacy lambda_function.py:303-388.
 Reference: docs/brownfield-architecture.md - Naver Booking API Details
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 import time
 
@@ -64,16 +64,17 @@ class NaverBookingAPIClient:
 
         Returns:
             Tuple of (start_date, end_date) in ISO 8601 format
-            Example: ("2025-09-29T00:00:00Z", "2025-10-29T18:27:22Z")
+            Example: ("2025-09-29T00:00:00+09:00", "2025-10-29T18:27:22+09:00")
         """
-        now = datetime.now()
+        kst = timezone(timedelta(hours=9))
+        now = datetime.now(tz=kst)
         # Start: 30 days ago at midnight (ensures total range ≤ 31 days)
-        start = now - timedelta(days=30)
-        start_date = start.replace(hour=0, minute=0, second=0, microsecond=0).strftime(
-            "%Y-%m-%dT%H:%M:%S"
+        start = (now - timedelta(days=30)).replace(
+            hour=0, minute=0, second=0, microsecond=0
         )
         # End: current time
-        end_date = now.strftime("%Y-%m-%dT%H:%M:%S")
+        start_date = start.isoformat(timespec="seconds")
+        end_date = now.isoformat(timespec="seconds")
         return (
             self._normalize_datetime_param(start_date),
             self._normalize_datetime_param(end_date),
@@ -119,9 +120,9 @@ class NaverBookingAPIClient:
 
         The Naver Partner Booking API rejects values without a timezone component,
         returning HTTP 422 (Unprocessable Entity). Existing legacy flows passed
-        values suffixed with either `Z` or an explicit offset (`+09:00`). To
-        maintain backwards compatibility while preventing 422 responses, append
-        `Z` when no timezone information is present.
+        values suffixed with explicit offsets in KST (`+09:00`). To maintain
+        backwards compatibility while preventing 422 responses, append `+09:00`
+        when no timezone information is present.
 
         Args:
             date_str: ISO-like date-time string (e.g. '2025-10-29T18:40:28')
@@ -141,7 +142,7 @@ class NaverBookingAPIClient:
             if any(sign in time_part for sign in ("+", "-")):
                 return normalized
 
-        return f"{normalized}Z"
+        return f"{normalized}+09:00"
 
     def _count_bookings(
         self,

@@ -97,10 +97,13 @@ def test_get_bookings_includes_date_range():
     count_params = session.get.call_args_list[0].kwargs["params"]
     bookings_params = session.get.call_args_list[1].kwargs["params"]
 
-    assert count_params["startDateTime"] == f"{start}Z"
-    assert count_params["endDateTime"] == f"{end}Z"
-    assert bookings_params["startDateTime"] == f"{start}Z"
-    assert bookings_params["endDateTime"] == f"{end}Z"
+    expected_start = f"{start}+09:00"
+    expected_end = f"{end}+09:00"
+
+    assert count_params["startDateTime"] == expected_start
+    assert count_params["endDateTime"] == expected_end
+    assert bookings_params["startDateTime"] == expected_start
+    assert bookings_params["endDateTime"] == expected_end
 
 
 def test_build_query_params_preserves_timezone_offsets():
@@ -124,5 +127,14 @@ def test_default_date_range_includes_timezone_suffix():
 
     start, end = client._get_default_date_range()
 
-    assert start.endswith("Z")
-    assert end.endswith("Z")
+    assert start.endswith("+09:00")
+    assert end.endswith("+09:00")
+
+
+def test_normalize_naive_datetime_appends_kst_offset():
+    """Naive ISO strings should gain KST offset to satisfy API expectations."""
+    session = Mock(spec=requests.Session)
+    client = NaverBookingAPIClient(session=session)
+
+    normalized = client._normalize_datetime_param("2024-02-15T10:20:30")
+    assert normalized == "2024-02-15T10:20:30+09:00"
