@@ -59,16 +59,16 @@ class NaverBookingAPIClient:
         """
         Calculate default date range for booking queries.
 
-        Returns last 31 days from current time to prevent fetching excessive historical data.
-        This ensures tests and normal operations only fetch recent bookings.
+        Returns last 30 days to ensure the range stays within Naver API's 31-day limit.
+        This prevents 422 Unprocessable Entity errors when the date range exceeds maxDays=31.
 
         Returns:
             Tuple of (start_date, end_date) in ISO 8601 format
-            Example: ("2025-09-29T00:00:00", "2025-10-30T23:59:59")
+            Example: ("2025-09-29T00:00:00", "2025-10-29T18:27:22")
         """
         now = datetime.now()
-        # Start: 31 days ago at midnight
-        start = now - timedelta(days=31)
+        # Start: 30 days ago at midnight (ensures total range ≤ 31 days)
+        start = now - timedelta(days=30)
         start_date = start.replace(hour=0, minute=0, second=0, microsecond=0).strftime(
             "%Y-%m-%dT%H:%M:%S"
         )
