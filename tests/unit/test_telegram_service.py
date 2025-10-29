@@ -288,3 +288,37 @@ class TestTelegramBotClient:
 
         payload = json.loads(mock_session.post.call_args[1]["data"])
         assert payload["chat_id"] == "custom_chat"
+
+    def test_markdown_parse_error_falls_back_to_plain_text(self):
+        """Telegram markdown parse errors should retry without parse mode."""
+        mock_session = Mock()
+
+        parse_error_response = Mock()
+        parse_error_response.status_code = 400
+        parse_error_response.text = (
+            '{"ok":false,"error_code":400,'
+            '"description":"Bad Request: can\\\'t parse entities: '
+            "Can\\'t find end of the entity starting at byte offset 18\"}"
+        )
+
+        success_response = Mock()
+        success_response.status_code = 200
+        success_response.json.return_value = {"ok": True}
+
+        mock_session.post.side_effect = [parse_error_response, success_response]
+
+        client = TelegramBotClient(
+            bot_token="test_token",
+            chat_id="test_chat",
+            http_client=mock_session,
+        )
+
+        client.send_message("Message with underscore_value")
+
+        assert mock_session.post.call_count == 2
+
+        first_payload = json.loads(mock_session.post.call_args_list[0][1]["data"])
+        second_payload = json.loads(mock_session.post.call_args_list[1][1]["data"])
+
+        assert first_payload["parse_mode"] == "Markdown"
+        assert "parse_mode" not in second_payload

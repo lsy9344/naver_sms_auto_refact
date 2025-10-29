@@ -8,15 +8,18 @@ Reference: docs/brownfield-architecture.md - Naver Booking API Details
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
-import logging
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 import time
 
 import requests
 
 from src.domain.booking import Booking
+from src.utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from src.database.dynamodb_client import BookingRepository
+
+logger = get_logger(__name__)
 
 
 class NaverBookingAPIClient:
@@ -34,16 +37,23 @@ class NaverBookingAPIClient:
     STATUS_COMPLETED = "RC08"  # Reservation Completed
     PAGE_SIZE = 50  # Matches legacy lambda pagination size
 
-    def __init__(self, session: requests.Session, option_keywords: Optional[List[str]] = None):
+    def __init__(
+        self,
+        session: requests.Session,
+        option_keywords: Optional[List[str]] = None,
+        booking_repo: Optional["BookingRepository"] = None,
+    ):
         """
         Initialize Naver Booking API client.
 
         Args:
             session: Authenticated requests.Session with Naver cookies
             option_keywords: List of keywords for option detection (default: ['네이버', '인스타', '원본'])
+            booking_repo: Optional BookingRepository for fetching unnotified options (RC08 filtering)
         """
         self.session = session
         self.option_keywords = option_keywords or ["네이버", "인스타", "원본"]
+        self.booking_repo = booking_repo
 
     def _build_query_params(
         self,
@@ -257,23 +267,78 @@ class NaverBookingAPIClient:
         """
         Fetch completed (RC08) bookings for all stores.
 
+        Implements legacy behavior from lambda_function.py:102, 391:
+        1. Scans DynamoDB for bookings with option_sms=False (via scan_unnotified_options)
+        2. Extracts date ranges from first and last booking times per store
+        3. Fetches RC08 bookings within those date ranges
+
+        This ensures RC08 data matches original Lambda behavior exactly.
+
         Args:
             store_ids: List of store IDs to query
 
         Returns:
-            Combined list of all completed bookings
+            Combined list of completed bookings filtered by unnotified options date ranges
         """
         all_bookings = []
 
-        for store_id in store_ids:
+        # AC-6: Fetch unnotified options with date ranges (lambda_function.py:102)
+        if self.booking_repo:
             try:
-                bookings = self.get_bookings(store_id, status=self.STATUS_COMPLETED)
-                all_bookings.extend(bookings)
+                unnotified_options = self.booking_repo.scan_unnotified_options()
+                logger.info(
+                    f"Found unnotified options for {len(unnotified_options)} stores",
+                    context={"stores_with_unnotified_options": len(unnotified_options)},
+                )
+
+                # Fetch RC08 bookings within each store's date range (lambda_function.py:391)
+                for store_id, date_range in unnotified_options.items():
+                    try:
+                        start_date = date_range.get("start_time")
+                        end_date = date_range.get("end_time")
+                        logger.debug(
+                            f"Fetching RC08 for store {store_id} with date range",
+                            context={"store_id": store_id, "start": start_date, "end": end_date},
+                        )
+                        bookings = self.get_bookings(
+                            store_id,
+                            status=self.STATUS_COMPLETED,
+                            start_date=start_date,
+                            end_date=end_date,
+                        )
+                        all_bookings.extend(bookings)
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to fetch completed bookings for store {store_id}: {e}"
+                        )
             except Exception as e:
-                logger.error(f"Failed to fetch completed bookings for store {store_id}: {e}")
+                logger.warning(
+                    f"Failed to scan unnotified options, falling back to no date filtering: {e}"
+                )
+                # Fallback: fetch all RC08 bookings without date filtering
+                for store_id in store_ids:
+                    try:
+                        bookings = self.get_bookings(store_id, status=self.STATUS_COMPLETED)
+                        all_bookings.extend(bookings)
+                    except Exception as store_err:
+                        logger.error(
+                            f"Failed to fetch completed bookings for store {store_id}: {store_err}"
+                        )
+        else:
+            # No repository provided: fetch all RC08 bookings without date filtering
+            logger.warning(
+                "BookingRepository not provided, fetching all RC08 bookings without date filtering"
+            )
+            for store_id in store_ids:
+                try:
+                    bookings = self.get_bookings(store_id, status=self.STATUS_COMPLETED)
+                    all_bookings.extend(bookings)
+                except Exception as e:
+                    logger.error(f"Failed to fetch completed bookings for store {store_id}: {e}")
 
         logger.info(
-            f"Retrieved {len(all_bookings)} total completed bookings across {len(store_ids)} stores"
+            f"Retrieved {len(all_bookings)} total completed bookings across {len(store_ids)} stores",
+            context={"total_bookings": len(all_bookings), "store_count": len(store_ids)},
         )
         return all_bookings
 

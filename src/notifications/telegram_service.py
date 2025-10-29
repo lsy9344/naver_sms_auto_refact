@@ -152,6 +152,7 @@ class TelegramBotClient:
         payload: Dict[str, Any],
         action: str,
         max_retries: Optional[int] = None,
+        allow_parse_mode_fallback: bool = True,
     ) -> None:
         """Send payload to Telegram Bot API with retry handling."""
         if not self.api_url:
@@ -161,10 +162,11 @@ class TelegramBotClient:
             )
             return
 
-        max_retries = max_retries or self.max_retries
-        body = json.dumps(payload)
+        max_attempts = max_retries or self.max_retries
+        attempt = 1
 
-        for attempt in range(1, max_retries + 1):
+        while attempt <= max_attempts:
+            body = json.dumps(payload)
             try:
                 self.logger.debug(
                     "Sending Telegram notification",
@@ -194,8 +196,9 @@ class TelegramBotClient:
                             "retry_after": retry_after,
                         },
                     )
-                    if attempt < max_retries:
+                    if attempt < max_attempts:
                         time.sleep(min(retry_after, self.retry_delay_seconds * attempt))
+                        attempt += 1
                         continue
                     raise TelegramServiceError(f"Rate limited; retry after {retry_after}s")
 
@@ -225,7 +228,27 @@ class TelegramBotClient:
                 return
 
             except Exception as exc:  # noqa: BLE001
-                if attempt >= max_retries:
+                error_message = str(exc)
+
+                if (
+                    allow_parse_mode_fallback
+                    and payload.get("parse_mode")
+                    and self._is_markdown_parse_error(error_message)
+                ):
+                    self.logger.warning(
+                        "Telegram parse error detected; retrying without parse mode",
+                        operation=action,
+                        context={
+                            "status": "parse_mode_fallback",
+                            "attempt": attempt,
+                        },
+                        error=error_message,
+                    )
+                    payload = {k: v for k, v in payload.items() if k != "parse_mode"}
+                    allow_parse_mode_fallback = False
+                    continue
+
+                if attempt >= max_attempts:
                     self.logger.error(
                         "Telegram delivery failed",
                         operation=action,
@@ -233,7 +256,7 @@ class TelegramBotClient:
                             "status": "failed",
                             "attempt": attempt,
                         },
-                        error=str(exc),
+                        error=error_message,
                     )
                     # Note: Telegram delivery failures are NOT critical path blockers
                     # Log but don't raise - allow processing to continue
@@ -246,9 +269,19 @@ class TelegramBotClient:
                         "status": "retry",
                         "attempt": attempt,
                     },
-                    error=str(exc),
+                    error=error_message,
                 )
                 time.sleep(self.retry_delay_seconds * attempt)
+                attempt += 1
+
+    @staticmethod
+    def _is_markdown_parse_error(error_message: str) -> bool:
+        """Detect Markdown parse errors returned by Telegram."""
+        normalized = error_message.lower().replace("\\'", "'")
+        return (
+            "can't parse entities" in normalized
+            or "can't find end of the entity" in normalized
+        )
 
     def get_client_status(self) -> Dict[str, Any]:
         """Return client configuration status."""

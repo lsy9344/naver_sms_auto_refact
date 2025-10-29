@@ -608,18 +608,16 @@ def create_db_record(
             # Convert booking to dict, including all fields
             record = booking.to_dict(include_extra=True)
 
+            # Exclude fields that should not be persisted to DynamoDB
+            excluded_fields = {"book_id", "booking_time", "option_keyword_names", "reserve_at"}
+            for field in excluded_fields:
+                record.pop(field, None)
+
             # Ensure SMS flags are initialized to False for new bookings
             record.setdefault("confirm_sms", False)
             record.setdefault("remind_sms", False)
             record.setdefault("option_sms", False)
             record.setdefault("option_time", "")
-
-            # Convert datetime objects to ISO8601 strings for DynamoDB storage
-            if "reserve_at" in record and record["reserve_at"] is not None:
-                from datetime import datetime
-
-                if isinstance(record["reserve_at"], datetime):
-                    record["reserve_at"] = record["reserve_at"].isoformat()
 
             # Normalise option keyword data for DynamoDB readability
             option_keywords = record.get("option_keywords")
@@ -668,8 +666,6 @@ def create_db_record(
 
                 if normalised_options:
                     record["option_keywords"] = normalised_options
-                if option_keyword_names:
-                    record["option_keyword_names"] = option_keyword_names
                 if option_keyword_counts:
                     record["option_keyword_counts"] = option_keyword_counts
         else:

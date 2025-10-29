@@ -119,8 +119,13 @@ def lambda_handler(event, context):
             # ============================================================
             # AC 3: Booking retrieval orchestration
             # ============================================================
+            # Initialize repository first for RC08 date filtering
+            booking_repo = BookingRepository(table_name="sms", dynamodb_resource=dynamodb)
+
             booking_api = NaverBookingAPIClient(
-                session=api_session, option_keywords=["네이버", "인스타", "원본"]
+                session=api_session,
+                option_keywords=["네이버", "인스타", "원본"],
+                booking_repo=booking_repo,
             )
 
             # Fetch confirmed (RC03) bookings
@@ -146,7 +151,6 @@ def lambda_handler(event, context):
             register_conditions(engine, settings)
 
             # Register action executors with services bundle
-            booking_repo = BookingRepository(table_name="sms", dynamodb_resource=dynamodb)
             sms_service = SensSmsClient(settings=settings, credentials=sens_creds)
 
             # Initialize Slack services if enabled (Story 6.2, 6.1)
