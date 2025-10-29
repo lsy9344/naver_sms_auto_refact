@@ -62,23 +62,30 @@ class NaverBookingAPIClient:
         Returns last 30 days to ensure the range stays within Naver API's 31-day limit.
         This prevents 422 Unprocessable Entity errors when the date range exceeds maxDays=31.
 
+        IMPORTANT: Naver API expects UTC format with .000Z suffix (not KST with +09:00).
+        This matches the original lambda_function.py behavior.
+
         Returns:
-            Tuple of (start_date, end_date) in ISO 8601 format
-            Example: ("2025-09-29T00:00:00+09:00", "2025-10-29T18:27:22+09:00")
+            Tuple of (start_date, end_date) in UTC format with .000Z suffix
+            Example: ("2025-09-29T15:00:00.000Z", "2025-10-29T19:27:22.000Z")
         """
         kst = timezone(timedelta(hours=9))
-        now = datetime.now(tz=kst)
-        # Start: 30 days ago at midnight (ensures total range ≤ 31 days)
-        start = (now - timedelta(days=30)).replace(
+        now_kst = datetime.now(timezone.utc).astimezone(kst)
+
+        # Start: 30 days ago at midnight KST (ensures total range ≤ 31 days)
+        start_kst = (now_kst - timedelta(days=30)).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
-        # End: current time
-        start_date = start.isoformat(timespec="seconds")
-        end_date = now.isoformat(timespec="seconds")
-        return (
-            self._normalize_datetime_param(start_date),
-            self._normalize_datetime_param(end_date),
-        )
+
+        # Convert to UTC for Naver API (matches original lambda_function.py format)
+        start_utc = start_kst.astimezone(timezone.utc)
+        now_utc = now_kst.astimezone(timezone.utc)
+
+        # Format as UTC with .000Z suffix (original lambda_function.py line 117-120)
+        start_date = start_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        end_date = now_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        return (start_date, end_date)
 
     def _build_query_params(
         self,
@@ -92,6 +99,13 @@ class NaverBookingAPIClient:
         Build query parameters exactly like legacy implementation.
 
         Preserves optional fields with default values so behaviour stays identical.
+
+        Args:
+            status: Booking status code (RC03 or RC08)
+            start_date: Start date in UTC format (e.g., "2025-09-29T15:00:00.000Z")
+            end_date: End date in UTC format (e.g., "2025-10-29T19:27:22.000Z")
+            page: Page number (0-indexed)
+            size: Page size (default: 50)
         """
         params: Dict[str, Any] = {
             "bizItemTypes": "STANDARD",
@@ -109,8 +123,10 @@ class NaverBookingAPIClient:
         }
 
         if start_date and end_date:
-            params["startDateTime"] = self._normalize_datetime_param(start_date)
-            params["endDateTime"] = self._normalize_datetime_param(end_date)
+            # Dates are already in correct UTC format from _get_default_date_range()
+            # or from scan_unnotified_options() which uses strftime('%Y-%m-%dT%H:%M:%S.000Z')
+            params["startDateTime"] = start_date
+            params["endDateTime"] = end_date
 
         return params
 

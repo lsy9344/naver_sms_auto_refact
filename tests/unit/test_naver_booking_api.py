@@ -80,7 +80,12 @@ def test_get_bookings_uses_legacy_params():
 
 
 def test_get_bookings_includes_date_range():
-    """Date range filters should be forwarded to both count and list APIs."""
+    """
+    Date range filters should be forwarded to both count and list APIs.
+
+    After refactoring to match original lambda_function.py, dates are now
+    passed through unchanged (no timezone normalization applied).
+    """
     session = Mock(spec=requests.Session)
     session.get.side_effect = [
         _mock_response({"count": 1}),
@@ -88,8 +93,9 @@ def test_get_bookings_includes_date_range():
     ]
 
     client = NaverBookingAPIClient(session=session)
-    start = "2024-01-01T00:00:00"
-    end = "2024-01-31T23:59:59"
+    # Use UTC format matching original lambda_function.py
+    start = "2024-01-01T00:00:00.000Z"
+    end = "2024-01-31T23:59:59.000Z"
 
     with patch("src.api.naver_booking.time.sleep"):
         client.get_bookings("1051707", status="RC08", start_date=start, end_date=end)
@@ -97,13 +103,11 @@ def test_get_bookings_includes_date_range():
     count_params = session.get.call_args_list[0].kwargs["params"]
     bookings_params = session.get.call_args_list[1].kwargs["params"]
 
-    expected_start = f"{start}+09:00"
-    expected_end = f"{end}+09:00"
-
-    assert count_params["startDateTime"] == expected_start
-    assert count_params["endDateTime"] == expected_end
-    assert bookings_params["startDateTime"] == expected_start
-    assert bookings_params["endDateTime"] == expected_end
+    # Dates are passed through unchanged
+    assert count_params["startDateTime"] == start
+    assert count_params["endDateTime"] == end
+    assert bookings_params["startDateTime"] == start
+    assert bookings_params["endDateTime"] == end
 
 
 def test_build_query_params_preserves_timezone_offsets():
@@ -121,14 +125,21 @@ def test_build_query_params_preserves_timezone_offsets():
 
 
 def test_default_date_range_includes_timezone_suffix():
-    """Default 31-day lookback should provide timezone-qualified values."""
+    """
+    Default 30-day lookback should provide UTC format (.000Z) matching original lambda.
+
+    After refactoring to match original lambda_function.py:117-120, dates are now
+    formatted as UTC with .000Z suffix instead of KST with +09:00 offset.
+    """
     session = Mock(spec=requests.Session)
     client = NaverBookingAPIClient(session=session)
 
     start, end = client._get_default_date_range()
 
-    assert start.endswith("+09:00")
-    assert end.endswith("+09:00")
+    # Verify UTC format with .000Z suffix (original lambda_function.py format)
+    assert start.endswith(".000Z"), f"Expected UTC format, got: {start}"
+    assert end.endswith(".000Z"), f"Expected UTC format, got: {end}"
+    assert "T" in start and "T" in end, "Expected ISO 8601 format with 'T' separator"
 
 
 def test_normalize_naive_datetime_appends_kst_offset():
