@@ -59,7 +59,7 @@ class NaverBookingAPIClient:
         """
         Calculate default date range for booking queries.
 
-        Returns last 30 days to ensure the range stays within Naver API's 31-day limit.
+        Returns next 31 days to ensure the range stays within Naver API's 31-day limit.
         This prevents 422 Unprocessable Entity errors when the date range exceeds maxDays=31.
 
         IMPORTANT: Naver API expects UTC format with .000Z suffix (not KST with +09:00).
@@ -67,23 +67,26 @@ class NaverBookingAPIClient:
 
         Returns:
             Tuple of (start_date, end_date) in UTC format with .000Z suffix
-            Example: ("2025-09-29T15:00:00.000Z", "2025-10-29T19:27:22.000Z")
+            Example: ("2025-10-29T15:00:00.000Z", "2025-11-29T14:59:59.000Z")
         """
         kst = timezone(timedelta(hours=9))
         now_kst = datetime.now(timezone.utc).astimezone(kst)
 
-        # Start: 30 days ago at midnight KST (ensures total range ≤ 31 days)
-        start_kst = (now_kst - timedelta(days=30)).replace(
-            hour=0, minute=0, second=0, microsecond=0
+        # Start: today at midnight KST
+        start_kst = now_kst.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # End: 31 days from today at 23:59:59 KST (ensures total range ≤ 31 days)
+        end_kst = (now_kst + timedelta(days=31)).replace(
+            hour=23, minute=59, second=59, microsecond=0
         )
 
         # Convert to UTC for Naver API (matches original lambda_function.py format)
         start_utc = start_kst.astimezone(timezone.utc)
-        now_utc = now_kst.astimezone(timezone.utc)
+        end_utc = end_kst.astimezone(timezone.utc)
 
         # Format as UTC with .000Z suffix (original lambda_function.py line 117-120)
         start_date = start_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        end_date = now_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        end_date = end_utc.strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
         return (start_date, end_date)
 

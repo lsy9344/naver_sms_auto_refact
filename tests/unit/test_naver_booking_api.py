@@ -126,7 +126,7 @@ def test_build_query_params_preserves_timezone_offsets():
 
 def test_default_date_range_includes_timezone_suffix():
     """
-    Default 30-day lookback should provide UTC format (.000Z) matching original lambda.
+    Default 31-day forward window should provide UTC format (.000Z) matching original lambda.
 
     After refactoring to match original lambda_function.py:117-120, dates are now
     formatted as UTC with .000Z suffix instead of KST with +09:00 offset.
