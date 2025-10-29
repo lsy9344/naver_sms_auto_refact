@@ -278,10 +278,7 @@ class TelegramBotClient:
     def _is_markdown_parse_error(error_message: str) -> bool:
         """Detect Markdown parse errors returned by Telegram."""
         normalized = error_message.lower().replace("\\'", "'")
-        return (
-            "can't parse entities" in normalized
-            or "can't find end of the entity" in normalized
-        )
+        return "can't parse entities" in normalized or "can't find end of the entity" in normalized
 
     def get_client_status(self) -> Dict[str, Any]:
         """Return client configuration status."""

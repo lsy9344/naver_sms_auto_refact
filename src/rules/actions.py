@@ -609,7 +609,7 @@ def create_db_record(
             record = booking.to_dict(include_extra=True)
 
             # Exclude fields that should not be persisted to DynamoDB
-            excluded_fields = {"book_id", "booking_time", "option_keyword_names", "reserve_at"}
+            excluded_fields = {"reserve_at"}
             for field in excluded_fields:
                 record.pop(field, None)
 
@@ -666,10 +666,15 @@ def create_db_record(
 
                 if normalised_options:
                     record["option_keywords"] = normalised_options
+                if option_keyword_names:
+                    record["option_keyword_names"] = option_keyword_names
                 if option_keyword_counts:
                     record["option_keyword_counts"] = option_keyword_counts
         else:
             record = booking_data
+
+        # DynamoDB does not allow attributes with null (None) values - drop them
+        record = {key: value for key, value in record.items() if value is not None}
 
         # Create the record
         db_repo.create_booking(record)

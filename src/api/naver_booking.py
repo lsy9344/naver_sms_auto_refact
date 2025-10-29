@@ -55,6 +55,27 @@ class NaverBookingAPIClient:
         self.option_keywords = option_keywords or ["네이버", "인스타", "원본"]
         self.booking_repo = booking_repo
 
+    def _get_default_date_range(self) -> tuple[str, str]:
+        """
+        Calculate default date range for booking queries.
+
+        Returns last 31 days from current time to prevent fetching excessive historical data.
+        This ensures tests and normal operations only fetch recent bookings.
+
+        Returns:
+            Tuple of (start_date, end_date) in ISO 8601 format
+            Example: ("2025-09-29T00:00:00", "2025-10-30T23:59:59")
+        """
+        now = datetime.now()
+        # Start: 31 days ago at midnight
+        start = now - timedelta(days=31)
+        start_date = start.replace(hour=0, minute=0, second=0, microsecond=0).strftime(
+            "%Y-%m-%dT%H:%M:%S"
+        )
+        # End: current time
+        end_date = now.strftime("%Y-%m-%dT%H:%M:%S")
+        return start_date, end_date
+
     def _build_query_params(
         self,
         status: str,
@@ -243,17 +264,30 @@ class NaverBookingAPIClient:
         """
         Fetch confirmed (RC03) bookings for all stores.
 
+        Fetches only the last 31 days of bookings to prevent excessive data accumulation.
+        This ensures tests and normal operations complete quickly without processing
+        years of historical data.
+
         Args:
             store_ids: List of store IDs to query
 
         Returns:
-            Combined list of all confirmed bookings
+            Combined list of confirmed bookings from the last 31 days
         """
         all_bookings = []
 
+        # Use default 31-day lookback window to prevent fetching years of old data
+        start_date, end_date = self._get_default_date_range()
+        logger.info(f"Fetching confirmed bookings with date range: {start_date} to {end_date}")
+
         for store_id in store_ids:
             try:
-                bookings = self.get_bookings(store_id, status=self.STATUS_CONFIRMED)
+                bookings = self.get_bookings(
+                    store_id,
+                    status=self.STATUS_CONFIRMED,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
                 all_bookings.extend(bookings)
             except Exception as e:
                 logger.error(f"Failed to fetch confirmed bookings for store {store_id}: {e}")
@@ -313,25 +347,39 @@ class NaverBookingAPIClient:
                         )
             except Exception as e:
                 logger.warning(
-                    f"Failed to scan unnotified options, falling back to no date filtering: {e}"
+                    f"Failed to scan unnotified options, falling back to 31-day date range: {e}"
                 )
-                # Fallback: fetch all RC08 bookings without date filtering
+                # Fallback: fetch RC08 bookings with default 31-day range
+                start_date, end_date = self._get_default_date_range()
+                logger.info(f"Using fallback date range for RC08: {start_date} to {end_date}")
                 for store_id in store_ids:
                     try:
-                        bookings = self.get_bookings(store_id, status=self.STATUS_COMPLETED)
+                        bookings = self.get_bookings(
+                            store_id,
+                            status=self.STATUS_COMPLETED,
+                            start_date=start_date,
+                            end_date=end_date,
+                        )
                         all_bookings.extend(bookings)
                     except Exception as store_err:
                         logger.error(
                             f"Failed to fetch completed bookings for store {store_id}: {store_err}"
                         )
         else:
-            # No repository provided: fetch all RC08 bookings without date filtering
+            # No repository provided: fetch RC08 bookings with default 31-day range
+            start_date, end_date = self._get_default_date_range()
             logger.warning(
-                "BookingRepository not provided, fetching all RC08 bookings without date filtering"
+                f"BookingRepository not provided, fetching RC08 bookings with 31-day range: "
+                f"{start_date} to {end_date}"
             )
             for store_id in store_ids:
                 try:
-                    bookings = self.get_bookings(store_id, status=self.STATUS_COMPLETED)
+                    bookings = self.get_bookings(
+                        store_id,
+                        status=self.STATUS_COMPLETED,
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
                     all_bookings.extend(bookings)
                 except Exception as e:
                     logger.error(f"Failed to fetch completed bookings for store {store_id}: {e}")
