@@ -7794,3 +7794,123 @@ aws iam put-role-policy \
 - Missing artifact type: alarm_log
 - Missing artifact type: slack_history
 - Few test reports collected
+
+
+---
+
+# Validation Campaign: orch-e2e-test
+
+**Generated**: 2025-10-29T18:36:06.089709
+**Completeness**: WARNINGS
+
+## Evidence Artifacts
+
+### Readiness Report (readiness_report)
+
+| Artifact | Description | Timestamp |
+|----------|-------------|-----------|
+| [readiness_report.json](/var/folders/l5/92xs8lfs4zv943pdjs0bfhxm0000gn/T/tmphpfbbnuu/orch-e2e-test/readiness_report.json) | Automated readiness gate validation report | 2025-10-30T03:36:06.088416 |
+
+## Evidence Manifest
+
+- **Total Artifacts**: 1
+- **Total Size**: 3,683 bytes
+- **Campaign ID**: orch-e2e-test
+
+## Completeness Notes
+
+- Missing artifact type: test_report
+- Missing artifact type: metric_export
+- Missing artifact type: alarm_log
+- Missing artifact type: slack_history
+- Few test reports collected
+
+
+---
+
+# Validation Campaign: orch-e2e-test
+
+**Generated**: 2025-10-29T18:36:06.092543
+**Completeness**: WARNINGS
+
+## Evidence Artifacts
+
+### Readiness Report (readiness_report)
+
+| Artifact | Description | Timestamp |
+|----------|-------------|-----------|
+| [readiness_report.json](/var/folders/l5/92xs8lfs4zv943pdjs0bfhxm0000gn/T/tmphpfbbnuu/orch-e2e-test/readiness_report.json) | Automated readiness gate validation report | 2025-10-30T03:36:06.088416 |
+
+## Evidence Manifest
+
+- **Total Artifacts**: 1
+- **Total Size**: 3,683 bytes
+- **Campaign ID**: orch-e2e-test
+
+## Completeness Notes
+
+- Missing artifact type: test_report
+- Missing artifact type: metric_export
+- Missing artifact type: alarm_log
+- Missing artifact type: slack_history
+- Few test reports collected
+
+
+---
+
+# Validation Campaign: validation-md-test
+
+**Generated**: 2025-10-29T18:36:06.103346
+**Completeness**: WARNINGS
+
+## Evidence Artifacts
+
+### Readiness Report (readiness_report)
+
+| Artifact | Description | Timestamp |
+|----------|-------------|-----------|
+| [readiness_report.json](/var/folders/l5/92xs8lfs4zv943pdjs0bfhxm0000gn/T/tmpp4yli0yr/validation-md-test/readiness_report.json) | Automated readiness gate validation report | 2025-10-30T03:36:06.101677 |
+
+## Evidence Manifest
+
+- **Total Artifacts**: 1
+- **Total Size**: 3,993 bytes
+- **Campaign ID**: validation-md-test
+
+## Completeness Notes
+
+- Missing artifact type: test_report
+- Missing artifact type: metric_export
+- Missing artifact type: alarm_log
+- Missing artifact type: slack_history
+- Few test reports collected
+
+
+---
+
+# Validation Campaign: validation-md-test
+
+**Generated**: 2025-10-29T18:36:06.105566
+**Completeness**: WARNINGS
+
+## Evidence Artifacts
+
+### Readiness Report (readiness_report)
+
+| Artifact | Description | Timestamp |
+|----------|-------------|-----------|
+| [readiness_report.json](/var/folders/l5/92xs8lfs4zv943pdjs0bfhxm0000gn/T/tmpp4yli0yr/validation-md-test/readiness_report.json) | Automated readiness gate validation report | 2025-10-30T03:36:06.101677 |
+
+## Evidence Manifest
+
+- **Total Artifacts**: 1
+- **Total Size**: 3,993 bytes
+- **Campaign ID**: validation-md-test
+
+## Completeness Notes
+
+- Missing artifact type: test_report
+- Missing artifact type: metric_export
+- Missing artifact type: alarm_log
+- Missing artifact type: slack_history
+- Few test reports collected

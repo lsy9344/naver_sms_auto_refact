@@ -64,7 +64,7 @@ class NaverBookingAPIClient:
 
         Returns:
             Tuple of (start_date, end_date) in ISO 8601 format
-            Example: ("2025-09-29T00:00:00", "2025-10-29T18:27:22")
+            Example: ("2025-09-29T00:00:00Z", "2025-10-29T18:27:22Z")
         """
         now = datetime.now()
         # Start: 30 days ago at midnight (ensures total range ≤ 31 days)
@@ -74,7 +74,10 @@ class NaverBookingAPIClient:
         )
         # End: current time
         end_date = now.strftime("%Y-%m-%dT%H:%M:%S")
-        return start_date, end_date
+        return (
+            self._normalize_datetime_param(start_date),
+            self._normalize_datetime_param(end_date),
+        )
 
     def _build_query_params(
         self,
@@ -105,10 +108,40 @@ class NaverBookingAPIClient:
         }
 
         if start_date and end_date:
-            params["startDateTime"] = start_date
-            params["endDateTime"] = end_date
+            params["startDateTime"] = self._normalize_datetime_param(start_date)
+            params["endDateTime"] = self._normalize_datetime_param(end_date)
 
         return params
+
+    def _normalize_datetime_param(self, date_str: str) -> str:
+        """
+        Ensure date-time strings include an explicit timezone suffix.
+
+        The Naver Partner Booking API rejects values without a timezone component,
+        returning HTTP 422 (Unprocessable Entity). Existing legacy flows passed
+        values suffixed with either `Z` or an explicit offset (`+09:00`). To
+        maintain backwards compatibility while preventing 422 responses, append
+        `Z` when no timezone information is present.
+
+        Args:
+            date_str: ISO-like date-time string (e.g. '2025-10-29T18:40:28')
+
+        Returns:
+            Date-time string guaranteed to include timezone information.
+        """
+        if not date_str:
+            return date_str
+
+        normalized = date_str.strip()
+        if normalized.endswith(("Z", "z")):
+            return normalized
+
+        if "T" in normalized:
+            _, time_part = normalized.split("T", 1)
+            if any(sign in time_part for sign in ("+", "-")):
+                return normalized
+
+        return f"{normalized}Z"
 
     def _count_bookings(
         self,

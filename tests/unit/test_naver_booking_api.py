@@ -97,7 +97,32 @@ def test_get_bookings_includes_date_range():
     count_params = session.get.call_args_list[0].kwargs["params"]
     bookings_params = session.get.call_args_list[1].kwargs["params"]
 
-    assert count_params["startDateTime"] == start
-    assert count_params["endDateTime"] == end
-    assert bookings_params["startDateTime"] == start
-    assert bookings_params["endDateTime"] == end
+    assert count_params["startDateTime"] == f"{start}Z"
+    assert count_params["endDateTime"] == f"{end}Z"
+    assert bookings_params["startDateTime"] == f"{start}Z"
+    assert bookings_params["endDateTime"] == f"{end}Z"
+
+
+def test_build_query_params_preserves_timezone_offsets():
+    """Datetime parameters already containing timezone offsets must remain unchanged."""
+    session = Mock(spec=requests.Session)
+    client = NaverBookingAPIClient(session=session)
+
+    start = "2024-01-01T00:00:00+09:00"
+    end = "2024-01-31T23:59:59+09:00"
+
+    params = client._build_query_params("RC03", start, end, page=0, size=50)
+
+    assert params["startDateTime"] == start
+    assert params["endDateTime"] == end
+
+
+def test_default_date_range_includes_timezone_suffix():
+    """Default 31-day lookback should provide timezone-qualified values."""
+    session = Mock(spec=requests.Session)
+    client = NaverBookingAPIClient(session=session)
+
+    start, end = client._get_default_date_range()
+
+    assert start.endswith("Z")
+    assert end.endswith("Z")
