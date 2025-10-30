@@ -200,6 +200,58 @@ class TestTelegramBotClient:
         assert mock_session.post.call_count == 1
         assert result is False
 
+    def test_throttling_delay_after_success(self):
+        """Test that throttling delay is applied after successful message delivery."""
+        import time
+
+        mock_session = Mock()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"ok": True}
+        mock_session.post.return_value = mock_response
+
+        client = TelegramBotClient(
+            bot_token="test_token",
+            chat_id="test_chat",
+            http_client=mock_session,
+            throttle_seconds=0.05,  # 50ms delay for testing
+        )
+
+        start_time = time.time()
+        result = client.send_message("Test message")
+        elapsed = time.time() - start_time
+
+        # Should succeed and include throttle delay
+        assert result is True
+        assert elapsed >= 0.05  # At least 50ms elapsed due to throttle
+        assert mock_session.post.call_count == 1
+
+    def test_no_throttling_when_disabled(self):
+        """Test that no throttling occurs when throttle_seconds is 0."""
+        import time
+
+        mock_session = Mock()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"ok": True}
+        mock_session.post.return_value = mock_response
+
+        client = TelegramBotClient(
+            bot_token="test_token",
+            chat_id="test_chat",
+            http_client=mock_session,
+            throttle_seconds=0.0,  # Throttling disabled
+        )
+
+        start_time = time.time()
+        result = client.send_message("Test message")
+        elapsed = time.time() - start_time
+
+        # Should succeed without delay
+        assert result is True
+        assert elapsed < 0.05  # Should complete quickly without throttle delay
+        assert mock_session.post.call_count == 1
+
     def test_api_error_response(self):
         """Test handling of Telegram API error responses."""
         mock_session = Mock()
@@ -247,6 +299,7 @@ class TestTelegramBotClient:
             chat_id="test_chat",
             max_retries=5,
             retry_delay_seconds=1.5,
+            throttle_seconds=0.2,
         )
 
         status = client.get_client_status()
@@ -256,6 +309,7 @@ class TestTelegramBotClient:
         assert status["api_url"] == "https://api.telegram.org/bottest_token/sendMessage"
         assert status["max_retries"] == 5
         assert status["retry_delay_seconds"] == 1.5
+        assert status["throttle_seconds"] == 0.2
 
     def test_get_client_status_not_configured(self):
         """Test client status when not configured."""

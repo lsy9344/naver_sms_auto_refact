@@ -63,6 +63,11 @@ SENS_DELIVERY_ENABLED = os.getenv("SENS_DELIVERY_ENABLED", "false").lower() == "
 # When True: Logs SMS payloads and metrics but does NOT send real SENS SMS
 COMPARISON_MODE_ENABLED = os.getenv("COMPARISON_MODE_ENABLED", "false") == "true"
 
+# Telegram throttling configuration (Rate limit prevention)
+# Default: 0.15 seconds between messages to avoid Telegram API rate limits
+# Adjustable via TELEGRAM_THROTTLE_SECONDS environment variable
+TELEGRAM_THROTTLE_SECONDS = float(os.getenv("TELEGRAM_THROTTLE_SECONDS", "0.15"))
+
 _TELEGRAM_CREDENTIALS_CACHE: Optional[Dict[str, str]] = None
 
 
@@ -145,6 +150,7 @@ class Settings:
         # Feature flags (Story 5.4)
         self.sens_delivery_enabled = SENS_DELIVERY_ENABLED
         self.comparison_mode_enabled = COMPARISON_MODE_ENABLED
+        self.telegram_throttle_seconds = TELEGRAM_THROTTLE_SECONDS
         telegram_flag_value, flag_defined = _read_telegram_flag()
         self.telegram_flag_defined = flag_defined
         self.telegram_enabled = telegram_flag_value
@@ -162,6 +168,10 @@ class Settings:
     def is_telegram_enabled(self) -> bool:
         """Check if Telegram notifications are permitted."""
         return self.telegram_enabled
+
+    def get_telegram_throttle_seconds(self) -> float:
+        """Get Telegram message throttle delay in seconds."""
+        return self.telegram_throttle_seconds
 
     def _auto_enable_telegram_notifications(self) -> bool:
         """

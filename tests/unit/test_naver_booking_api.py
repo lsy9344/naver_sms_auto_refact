@@ -149,3 +149,24 @@ def test_normalize_naive_datetime_appends_kst_offset():
 
     normalized = client._normalize_datetime_param("2024-02-15T10:20:30")
     assert normalized == "2024-02-15T10:20:30+09:00"
+
+
+def test_completed_bookings_clamps_date_range_to_31_days():
+    """RC08 fetches must clamp date window to 31 days to prevent huge data pulls."""
+    session = Mock(spec=requests.Session)
+    booking_repo = Mock()
+    booking_repo.scan_unnotified_options.return_value = {
+        "1051707": {
+            "start_time": "2024-01-01T00:00:00.000Z",
+            "end_time": "2024-04-01T23:59:59.000Z",
+        }
+    }
+
+    client = NaverBookingAPIClient(session=session, booking_repo=booking_repo)
+
+    with patch.object(client, "get_bookings", return_value=[]) as mocked_get_bookings:
+        client.get_all_completed_bookings(["1051707"])
+
+    _, kwargs = mocked_get_bookings.call_args
+    assert kwargs["start_date"] == "2024-01-01T00:00:00.000Z"
+    assert kwargs["end_date"] == "2024-01-31T23:59:59.000Z"

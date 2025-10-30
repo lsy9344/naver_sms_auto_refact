@@ -213,3 +213,23 @@ class Booking:
 
         # Format: 010-****-XXXX (last 4 digits visible)
         return f"{clean_phone[:3]}-****-{clean_phone[-4:]}"
+
+    @property
+    def phone_last4(self) -> str:
+        """
+        Get last 4 digits of phone number for compact display in notifications.
+
+        Returns:
+            Last 4 digits of phone number (e.g., "4452")
+        """
+        if not self.phone:
+            return "****"
+
+        # Normalize: remove hyphens
+        clean_phone = self.phone.replace("-", "")
+
+        if len(clean_phone) < 4:
+            return "****"
+
+        # Return last 4 digits only
+        return clean_phone[-4:]

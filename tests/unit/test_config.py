@@ -180,6 +180,27 @@ class TestSettingsInitialization:
         settings = Settings()
         assert settings.is_telegram_enabled() is True
 
+    def test_settings_telegram_throttle_default(self):
+        """Test default Telegram throttle configuration."""
+        settings = Settings()
+        assert settings.get_telegram_throttle_seconds() == 0.15
+
+    def test_settings_telegram_throttle_custom(self, monkeypatch):
+        """Test custom Telegram throttle configuration via environment variable."""
+        # Need to reload the module to pick up the new env var
+        import importlib
+        import src.config.settings as settings_module
+
+        monkeypatch.setenv("TELEGRAM_THROTTLE_SECONDS", "0.25")
+        importlib.reload(settings_module)
+
+        settings = settings_module.Settings()
+        assert settings.get_telegram_throttle_seconds() == 0.25
+
+        # Restore original value
+        monkeypatch.delenv("TELEGRAM_THROTTLE_SECONDS", raising=False)
+        importlib.reload(settings_module)
+
 
 class TestSecretsManagerIntegration:
     """Tests for Secrets Manager integration."""

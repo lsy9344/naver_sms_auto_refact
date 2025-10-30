@@ -90,6 +90,76 @@ class NaverBookingAPIClient:
 
         return (start_date, end_date)
 
+    def _enforce_max_date_range(
+        self,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        store_id: Optional[str] = None,
+    ) -> tuple[str, str, bool]:
+        """
+        Clamp arbitrary date ranges to 31 days to prevent runaway data pulls.
+
+        Args:
+            start_date: Proposed start date in ISO8601 format
+            end_date: Proposed end date in ISO8601 format
+            store_id: Optional store identifier for logging context
+
+        Returns:
+            Tuple of (start_date, end_date, adjusted) where adjusted indicates
+            whether the requested window was modified or defaulted.
+        """
+        default_start, default_end = self._get_default_date_range()
+
+        if not start_date or not end_date:
+            logger.warning(
+                "Missing RC08 date range; falling back to default 31-day window",
+                context={"store_id": store_id},
+            )
+            return default_start, default_end, True
+
+        try:
+            start_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+        except ValueError:
+            logger.warning(
+                "Invalid RC08 date range; falling back to default 31-day window",
+                context={"store_id": store_id, "start_date": start_date, "end_date": end_date},
+            )
+            return default_start, default_end, True
+
+        start_dt = start_dt.astimezone(timezone.utc).replace(microsecond=0)
+        end_dt = end_dt.astimezone(timezone.utc).replace(microsecond=0)
+        adjusted = False
+
+        if end_dt < start_dt:
+            logger.warning(
+                "RC08 end date precedes start date; normalizing range",
+                context={"store_id": store_id, "start": start_date, "end": end_date},
+            )
+            end_dt = start_dt
+            adjusted = True
+
+        max_span = timedelta(days=31) - timedelta(seconds=1)
+        allowed_end = start_dt + max_span
+
+        if end_dt > allowed_end:
+            logger.info(
+                "Clamping RC08 date range to 31 days to avoid excessive data pull",
+                context={
+                    "store_id": store_id,
+                    "requested_start": start_date,
+                    "requested_end": end_date,
+                    "clamped_end": allowed_end.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+                },
+            )
+            end_dt = allowed_end
+            adjusted = True
+
+        normalized_start = start_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        normalized_end = end_dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+        return normalized_start, normalized_end, adjusted
+
     def _build_query_params(
         self,
         status: str,
@@ -383,15 +453,25 @@ class NaverBookingAPIClient:
                     try:
                         start_date = date_range.get("start_time")
                         end_date = date_range.get("end_time")
+                        clamped_start, clamped_end, adjusted = self._enforce_max_date_range(
+                            start_date, end_date, store_id
+                        )
                         logger.debug(
                             f"Fetching RC08 for store {store_id} with date range",
-                            context={"store_id": store_id, "start": start_date, "end": end_date},
+                            context={
+                                "store_id": store_id,
+                                "start": start_date,
+                                "end": end_date,
+                                "effective_start": clamped_start,
+                                "effective_end": clamped_end,
+                                "was_clamped": adjusted,
+                            },
                         )
                         bookings = self.get_bookings(
                             store_id,
                             status=self.STATUS_COMPLETED,
-                            start_date=start_date,
-                            end_date=end_date,
+                            start_date=clamped_start,
+                            end_date=clamped_end,
                         )
                         all_bookings.extend(bookings)
                     except Exception as e:
@@ -462,6 +542,14 @@ class NaverBookingAPIClient:
         booking_id = booking_data["bookingId"]
         name = booking_data.get("name", "")
         phone_raw = booking_data.get("phone", "")
+
+        # Debug logging for name truncation investigation
+        logger.debug(
+            f"Customer name extracted from Naver API for booking {booking_id}: "
+            f"name={name!r}, length={len(name)}"
+        )
+        if name and len(name) < 3:
+            logger.warning(f"Suspiciously short customer name for booking {booking_id}: {name!r}")
 
         # Format phone number: 01012345678 -> 010-1234-5678 (line 375)
         phone = self._format_phone(phone_raw)

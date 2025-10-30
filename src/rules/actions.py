@@ -1422,9 +1422,18 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
             # Resolve message parameter for variable substitution
             # This handles cases like message: "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
             if "message" in resolved_params and isinstance(resolved_params["message"], str):
+                original_message = resolved_params["message"]
+                store_context = rule_context.get("store", {})
+                services.logger.debug(
+                    f"Resolving Telegram message template for booking {booking.booking_num}: "
+                    f"original_message={original_message!r}, "
+                    f"has_store_context={'store' in rule_context}, "
+                    f"store_alias={store_context.get('alias', 'N/A')}"
+                )
                 resolved_params["message"] = _resolve_message_variables(
                     resolved_params["message"], rule_context
                 )
+                services.logger.debug(f"Resolved message: {resolved_params['message']!r}")
 
             resolved_params["context_variables"] = rule_context
 

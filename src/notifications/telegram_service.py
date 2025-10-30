@@ -39,6 +39,7 @@ class TelegramBotClient:
         logger: Optional[StructuredLogger] = None,
         max_retries: int = 3,
         retry_delay_seconds: float = 0.5,
+        throttle_seconds: float = 0.15,
     ) -> None:
         """
         Initialize the Telegram bot client.
@@ -50,11 +51,13 @@ class TelegramBotClient:
             logger: Optional structured logger instance
             max_retries: Number of attempts when sending messages
             retry_delay_seconds: Base delay between retries (exponential backoff)
+            throttle_seconds: Delay after successful message to prevent rate limiting
         """
         self.logger = logger or get_logger(__name__)
         self.http_client = http_client or requests.Session()
         self.max_retries = max_retries
         self.retry_delay_seconds = retry_delay_seconds  # Used for exponential backoff
+        self.throttle_seconds = throttle_seconds  # Delay after successful send
 
         import os
 
@@ -230,8 +233,12 @@ class TelegramBotClient:
                     context={
                         "status": "success",
                         "attempt": attempt,
+                        "throttle_seconds": self.throttle_seconds,
                     },
                 )
+                # Add throttling delay after successful delivery to prevent rate limiting
+                if self.throttle_seconds > 0:
+                    time.sleep(self.throttle_seconds)
                 return True
 
             except Exception as exc:  # noqa: BLE001
@@ -299,4 +306,5 @@ class TelegramBotClient:
             "api_url": self.api_url if self.api_url else None,
             "max_retries": self.max_retries,
             "retry_delay_seconds": self.retry_delay_seconds,
+            "throttle_seconds": self.throttle_seconds,
         }

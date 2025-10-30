@@ -202,8 +202,12 @@ def lambda_handler(event, context):
                             bot_token=telegram_creds.get("bot_token"),
                             chat_id=telegram_creds.get("chat_id"),
                             logger=logger,
+                            throttle_seconds=settings.get_telegram_throttle_seconds(),
                         )
-                        logger.info("Telegram service initialized")
+                        logger.info(
+                            "Telegram service initialized",
+                            context={"throttle_seconds": settings.get_telegram_throttle_seconds()},
+                        )
                     else:
                         logger.warning("Telegram credentials not configured")
                 except Exception as e:
@@ -264,6 +268,12 @@ def lambda_handler(event, context):
             # ============================================================
             if telegram_enabled and telegram_creds:
                 try:
+                    # Add small delay before summary to ensure previous messages finished
+                    import time
+
+                    throttle_delay = settings.get_telegram_throttle_seconds()
+                    if throttle_delay > 0:
+                        time.sleep(throttle_delay)
                     send_telegram_summary(
                         telegram_creds=telegram_creds,
                         summary=summary,
@@ -513,11 +523,19 @@ def _build_store_context(
     }
 
     if not stores_config or not store_id:
+        logger.debug(
+            f"Store context fallback for booking {booking.booking_num}: "
+            f"stores_config={'present' if stores_config else 'missing'}, "
+            f"store_id={store_id}"
+        )
         return context
 
     stores_map = stores_config.get("stores") or {}
     store_entry = stores_map.get(str(store_id))
     if not store_entry:
+        logger.warning(
+            f"Store ID {store_id} not found in stores.yaml for booking {booking.booking_num}"
+        )
         return context
 
     raw_name = store_entry.get("name") or fallback_alias
@@ -530,6 +548,12 @@ def _build_store_context(
 
     context["name"] = raw_name
     context["alias"] = alias
+
+    logger.debug(
+        f"Store context built for booking {booking.booking_num}: "
+        f"store_id={store_id}, name={raw_name}, alias={alias}"
+    )
+
     return context
 
 
