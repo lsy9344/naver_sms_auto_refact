@@ -740,3 +740,29 @@ class TestMessageTemplateVariableResolution:
         assert sent_text == "예약자: 홍길동, 예약번호: 1051707_99999"
         assert "{{" not in sent_text
         assert "}}" not in sent_text
+
+    def test_direct_send_telegram_resolves_store_alias_when_context_provided(
+        self, booking, services_bundle
+    ):
+        """Ensure direct send_telegram calls resolve store variables when context provided."""
+        context = ActionContext(
+            booking=booking,
+            settings_dict=services_bundle.settings_dict,
+            db_repo=services_bundle.db_repo,
+            sms_service=services_bundle.sms_service,
+            slack_service=services_bundle.slack_service,
+            slack_template_loader=services_bundle.slack_template_loader,
+            telegram_template_loader=services_bundle.telegram_template_loader,
+            telegram_service=services_bundle.telegram_service,
+            logger=services_bundle.logger,
+        )
+
+        send_telegram(
+            context,
+            message="예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}",
+            context_variables={"store": {"alias": "테스트점"}},
+        )
+
+        services_bundle.telegram_service.send_message.assert_called_once()
+        sent_text = services_bundle.telegram_service.send_message.call_args[1]["text"]
+        assert sent_text == "예약확정 테스트점 Test Customer 010-****-5678"

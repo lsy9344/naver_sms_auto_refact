@@ -99,6 +99,34 @@ def _resolve_template_params(raw_params: Any, context: Dict[str, Any]) -> Any:
     return raw_params
 
 
+# Reusable helper for resolving {{ variables }} in free-form messages
+def _resolve_message_variables(message: str, context: Dict[str, Any]) -> str:
+    """
+    Replace template variables in a message string using the provided context.
+
+    Supports dot-delimited lookups (e.g., {{ booking.name }}, {{ store.alias }}).
+
+    Args:
+        message: Raw message text that may contain template variables
+        context: Context dictionary/dataclasses to resolve against
+
+    Returns:
+        Message with any resolvable variables substituted
+    """
+    if not message or "{{" not in message:
+        return message
+
+    resolved_message = message
+
+    for match in _TEMPLATE_PARAM_PATTERN.finditer(message):
+        var_path = match.group(1)
+        resolved_value = _lookup_context_value(var_path, context)
+        if resolved_value is not None:
+            resolved_message = resolved_message.replace(match.group(0), str(resolved_value))
+
+    return resolved_message
+
+
 # ============================================================================
 # Template Loader (AC 3)
 # ============================================================================
@@ -840,6 +868,7 @@ def send_telegram(
     template_name: Optional[str] = None,
     template_params: Optional[Dict[str, Any]] = None,
     parse_mode: Optional[str] | object = _PARSE_MODE_UNSET,
+    context_variables: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Send message via Telegram Bot API.
@@ -892,19 +921,12 @@ def send_telegram(
                     pattern = re.compile(r"\{\{\s*" + re.escape(str(key)) + r"\s*\}\}")
                     final_message = pattern.sub(str(value), final_message)
 
-            # Also resolve variables from booking object (e.g., {{ booking.name }})
-            # This handles cases where template variables reference booking attributes
-            for match in _TEMPLATE_PARAM_PATTERN.finditer(final_message):
-                var_path = match.group(1)
-                # Only resolve if it starts with "booking."
-                if var_path.startswith("booking."):
-                    attr_name = var_path.split(".", 1)[1]
-                    if hasattr(booking, attr_name):
-                        resolved_value = getattr(booking, attr_name)
-                        if resolved_value is not None:
-                            final_message = final_message.replace(
-                                match.group(0), str(resolved_value)
-                            )
+        # Resolve any remaining template variables (e.g., {{ store.alias }}) using context
+        resolution_context: Dict[str, Any] = {}
+        if context_variables:
+            resolution_context.update(context_variables)
+        resolution_context.setdefault("booking", booking)
+        final_message = _resolve_message_variables(final_message, resolution_context)
 
         if not isinstance(final_message, str) or final_message == "":
             raise ValueError("Telegram message must be a non-empty string")
@@ -1134,17 +1156,7 @@ def send_slack(
             # Resolve variables from booking object if message is provided directly
             # This handles cases where message contains {{ booking.name }} etc.
             if final_message:
-                for match in _TEMPLATE_PARAM_PATTERN.finditer(final_message):
-                    var_path = match.group(1)
-                    # Only resolve if it starts with "booking."
-                    if var_path.startswith("booking."):
-                        attr_name = var_path.split(".", 1)[1]
-                        if hasattr(booking, attr_name):
-                            resolved_value = getattr(booking, attr_name)
-                            if resolved_value is not None:
-                                final_message = final_message.replace(
-                                    match.group(0), str(resolved_value)
-                                )
+                final_message = _resolve_message_variables(final_message, {"booking": booking})
 
         # Send via webhook client (AC 1)
         if not context.slack_service:
@@ -1410,18 +1422,11 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
             # Resolve message parameter for variable substitution
             # This handles cases like message: "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
             if "message" in resolved_params and isinstance(resolved_params["message"], str):
-                message = resolved_params["message"]
+                resolved_params["message"] = _resolve_message_variables(
+                    resolved_params["message"], rule_context
+                )
 
-                # Extract all template variables from message and resolve them
-                def resolve_message_variables(msg: str, ctx: Dict[str, Any]) -> str:
-                    for match in _TEMPLATE_PARAM_PATTERN.finditer(msg):
-                        var_path = match.group(1)
-                        resolved_value = _lookup_context_value(var_path, ctx)
-                        if resolved_value is not None:
-                            msg = msg.replace(match.group(0), str(resolved_value))
-                    return msg
-
-                resolved_params["message"] = resolve_message_variables(message, rule_context)
+            resolved_params["context_variables"] = rule_context
 
             send_telegram(action_context, **resolved_params)
 
@@ -1450,18 +1455,9 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
 
             # Resolve message parameter for variable substitution
             if "message" in resolved_params and isinstance(resolved_params["message"], str):
-                message = resolved_params["message"]
-
-                # Extract all template variables from message and resolve them
-                def resolve_message_variables(msg: str, ctx: Dict[str, Any]) -> str:
-                    for match in _TEMPLATE_PARAM_PATTERN.finditer(msg):
-                        var_path = match.group(1)
-                        resolved_value = _lookup_context_value(var_path, ctx)
-                        if resolved_value is not None:
-                            msg = msg.replace(match.group(0), str(resolved_value))
-                    return msg
-
-                resolved_params["message"] = resolve_message_variables(message, rule_context)
+                resolved_params["message"] = _resolve_message_variables(
+                    resolved_params["message"], rule_context
+                )
 
             if resolved_params.get("channel"):
                 services.logger.debug(
