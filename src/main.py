@@ -239,6 +239,7 @@ def lambda_handler(event, context):
                 engine=engine,
                 booking_repo=booking_repo,
                 settings=settings,
+                stores_config=stores_config,
             )
 
             logger.info(
@@ -493,11 +494,51 @@ def _build_holiday_event_roster(
     return roster
 
 
+def _build_store_context(
+    booking: Booking, stores_config: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Build store context information for a booking.
+
+    Returns a dict with id/name/alias keys so rule actions can reference
+    store metadata (e.g., Telegram notifications that include store name).
+    """
+    store_id = getattr(booking, "biz_id", None)
+    fallback_alias = str(store_id) if store_id else "UNKNOWN"
+
+    context = {
+        "id": store_id,
+        "name": fallback_alias,
+        "alias": fallback_alias,
+    }
+
+    if not stores_config or not store_id:
+        return context
+
+    stores_map = stores_config.get("stores") or {}
+    store_entry = stores_map.get(str(store_id))
+    if not store_entry:
+        return context
+
+    raw_name = store_entry.get("name") or fallback_alias
+    alias = raw_name
+    if alias.startswith("다비스튜디오"):
+        alias = alias.replace("다비스튜디오", "", 1).strip()
+    alias = alias.replace(" ", "")
+    if not alias:
+        alias = fallback_alias
+
+    context["name"] = raw_name
+    context["alias"] = alias
+    return context
+
+
 def process_all_bookings(
     bookings: List[Booking],
     engine: RuleEngine,
     booking_repo: BookingRepository,
     settings: Settings,
+    stores_config: Optional[Dict[str, Any]] = None,
 ) -> Tuple[List[ActionResult], Dict[str, Any]]:
     """
     Process all bookings through rule engine.
@@ -540,6 +581,8 @@ def process_all_bookings(
             db_record = booking_repo.get_booking(booking.booking_num, booking.phone)
 
             # Build context dict
+            store_context = _build_store_context(booking, stores_config)
+
             context = {
                 "booking": booking,
                 "db_record": db_record,
@@ -548,6 +591,7 @@ def process_all_bookings(
                 "db_repo": booking_repo,
                 "bookings_with_expert_correction": expert_correction_roster,
                 "bookings_in_date_range": holiday_event_roster,
+                "store": store_context,
             }
 
             logger.debug(

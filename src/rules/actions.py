@@ -1397,7 +1397,7 @@ def register_actions(engine: Any, services: ActionServicesBundle) -> None:
                 )
 
             # Resolve message parameter for variable substitution
-            # This handles cases like message: "[예약확정] {{ booking.name }}"
+            # This handles cases like message: "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
             if "message" in resolved_params and isinstance(resolved_params["message"], str):
                 message = resolved_params["message"]
 

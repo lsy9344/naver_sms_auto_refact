@@ -24,7 +24,7 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "[예약확정] {{ booking.name }}"
+            "message": "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
           }
         }
       ]
@@ -58,7 +58,7 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "[상세안내] {{ booking.name }}"
+            "message": "상세안내 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
           }
         }
       ]
@@ -91,7 +91,7 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "[리뷰요청] {{ booking.name }}"
+            "message": "리뷰요청 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
           }
         }
       ]

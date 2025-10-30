@@ -304,12 +304,21 @@ def test_process_all_bookings_success():
     # Mock settings
     mock_settings_obj = MagicMock()
 
+    stores_config = {
+        "stores": {
+            "1051707": {
+                "name": "다비스튜디오 화성점",
+            }
+        }
+    }
+
     # Call function
     results, summary = process_all_bookings(
         bookings=[booking],
         engine=mock_engine,
         booking_repo=mock_repo,
         settings=mock_settings_obj,
+        stores_config=stores_config,
     )
 
     # Verify results
@@ -327,6 +336,8 @@ def test_process_all_bookings_success():
     assert call_args["db_record"] is None
     assert "current_time" in call_args
     assert call_args["settings"] == mock_settings_obj
+    assert call_args["store"]["alias"] == "화성점"
+    assert call_args["store"]["id"] == "1051707"
 
 
 def test_process_all_bookings_with_failures():
@@ -373,11 +384,20 @@ def test_process_all_bookings_with_failures():
     mock_repo.get_booking.return_value = None
     mock_settings_obj = MagicMock()
 
+    stores_config = {
+        "stores": {
+            "1051707": {
+                "name": "다비스튜디오 화성점",
+            }
+        }
+    }
+
     results, summary = process_all_bookings(
         bookings=[booking],
         engine=mock_engine,
         booking_repo=mock_repo,
         settings=mock_settings_obj,
+        stores_config=stores_config,
     )
 
     # Verify mixed results
@@ -435,11 +455,20 @@ def test_process_all_bookings_handles_exceptions():
     mock_repo.get_booking.return_value = None
     mock_settings_obj = MagicMock()
 
+    stores_config = {
+        "stores": {
+            "1051707": {
+                "name": "다비스튜디오 화성점",
+            }
+        }
+    }
+
     results, summary = process_all_bookings(
         bookings=[booking1, booking2],
         engine=mock_engine,
         booking_repo=mock_repo,
         settings=mock_settings_obj,
+        stores_config=stores_config,
     )
 
     # Verify only second booking processed

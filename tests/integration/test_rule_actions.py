@@ -36,6 +36,7 @@ def booking():
         phone="010-1234-5678",
         name="Test Customer",
         booking_time="2025-10-20 14:00:00",
+        biz_id="1051707",
         confirm_sms=False,
         remind_sms=False,
         option_sms=False,
@@ -580,7 +581,8 @@ class TestRegisterActionsIntegration:
 class TestMessageTemplateVariableResolution:
     """Test that template variables in message parameters are resolved correctly.
 
-    This tests the fix for the issue where messages like "[예약확정] {{ booking.name }}"
+    This tests the fix for the issue where messages like
+    "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
     were being sent with template variables unresolved.
     """
 
@@ -600,8 +602,11 @@ class TestMessageTemplateVariableResolution:
         )
 
         # Call send_telegram with a message containing template variables
-        # (simulating what happens when rules.yaml has: message: "[예약확정] {{ booking.name }}")
-        send_telegram(context, message="[예약확정] {{ booking.name }}", parse_mode="Markdown")
+        send_telegram(
+            context,
+            message="예약확정 {{ booking.name }} {{ booking.phone_masked }}",
+            parse_mode="Markdown",
+        )
 
         # Verify telegram service was called with resolved message
         services_bundle.telegram_service.send_message.assert_called_once()
@@ -609,8 +614,9 @@ class TestMessageTemplateVariableResolution:
         sent_text = call_args[1]["text"]
 
         # Message should have template variable resolved
-        assert sent_text == "[예약확정] Test Customer"
+        assert sent_text == "예약확정 Test Customer 010-****-5678"
         assert "{{ booking.name }}" not in sent_text
+        assert "{{ booking.phone_masked }}" not in sent_text
 
     def test_slack_message_variable_resolution_from_rule_context(self, booking, services_bundle):
         """Test that Slack message variables are resolved from booking in rule context."""
@@ -673,8 +679,14 @@ class TestMessageTemplateVariableResolution:
 
         # Simulate rule engine calling the wrapper with rule context
         # (This is what happens in engine.py execute_rule when a send_telegram action runs)
-        rule_context = {"booking": booking}
-        params = {"message": "[예약확정] {{ booking.name }}"}
+        rule_context = {
+            "booking": booking,
+            "store": {
+                "alias": "테스트점",
+                "id": "1051707",
+            },
+        }
+        params = {"message": "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"}
 
         send_telegram_wrapper(rule_context, **params)
 
@@ -684,8 +696,8 @@ class TestMessageTemplateVariableResolution:
         sent_text = call_args[1]["text"]
 
         # Message should have template variable resolved
-        assert sent_text == "[예약확정] Test Customer"
-        assert "{{ booking.name }}" not in sent_text
+        assert sent_text == "예약확정 테스트점 Test Customer 010-****-5678"
+        assert "{{" not in sent_text
 
     def test_multiple_template_variables_in_message(self, services_bundle):
         """Test that multiple template variables in a single message are all resolved."""
