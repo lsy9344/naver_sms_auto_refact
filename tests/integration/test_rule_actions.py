@@ -686,7 +686,9 @@ class TestMessageTemplateVariableResolution:
                 "id": "1051707",
             },
         }
-        params = {"message": "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"}
+        params = {
+            "message": "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
+        }
 
         send_telegram_wrapper(rule_context, **params)
 

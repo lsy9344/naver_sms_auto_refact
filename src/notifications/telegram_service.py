@@ -54,7 +54,7 @@ class TelegramBotClient:
         self.logger = logger or get_logger(__name__)
         self.http_client = http_client or requests.Session()
         self.max_retries = max_retries
-        self.retry_delay_seconds = retry_delay_seconds
+        self.retry_delay_seconds = retry_delay_seconds  # Used for exponential backoff
 
         import os
 
@@ -87,7 +87,7 @@ class TelegramBotClient:
         text: str,
         parse_mode: str = "Markdown",
         chat_id: Optional[str] = None,
-    ) -> None:
+    ) -> bool:
         """
         Send a text message to Telegram.
 
@@ -96,12 +96,15 @@ class TelegramBotClient:
             parse_mode: Telegram parse mode ("Markdown", "HTML", or None)
             chat_id: Optional override for target chat ID
 
-        Raises:
-            TelegramServiceError: If message delivery fails
+        Returns:
+            True if message was delivered successfully, False otherwise
+
+        Note:
+            Does not raise exceptions - failures are logged and returned as False
         """
         if not self.api_url:
             self.logger.debug("Telegram not configured; skipping message")
-            return
+            return False
 
         target_chat_id = chat_id or self.chat_id
 
@@ -113,7 +116,7 @@ class TelegramBotClient:
         if parse_mode:
             payload["parse_mode"] = parse_mode
 
-        self._dispatch(payload, action="send_message")
+        return self._dispatch(payload, action="send_message")
 
     def send_notification(
         self,
@@ -153,14 +156,19 @@ class TelegramBotClient:
         action: str,
         max_retries: Optional[int] = None,
         allow_parse_mode_fallback: bool = True,
-    ) -> None:
-        """Send payload to Telegram Bot API with retry handling."""
+    ) -> bool:
+        """
+        Send payload to Telegram Bot API with retry handling.
+
+        Returns:
+            True if message was delivered successfully, False otherwise
+        """
         if not self.api_url:
             self.logger.debug(
                 "Telegram API not configured; skipping notification",
                 operation=action,
             )
-            return
+            return False
 
         max_attempts = max_retries or self.max_retries
         attempt = 1
@@ -187,20 +195,19 @@ class TelegramBotClient:
                 # Telegram Bot API returns 200 with JSON response
                 if response.status_code == 429:  # Rate limited
                     retry_after = int(response.headers.get("Retry-After", 60))
-                    self.logger.warning(
-                        "Telegram rate limited",
+                    self.logger.error(
+                        "Telegram rate limited by API - cannot retry within Lambda timeout",
                         operation=action,
                         context={
                             "status": "rate_limited",
                             "attempt": attempt,
-                            "retry_after": retry_after,
+                            "retry_after_seconds": retry_after,
+                            "note": "Rate limit failures are not retried to avoid Lambda timeout",
                         },
                     )
-                    if attempt < max_attempts:
-                        time.sleep(min(retry_after, self.retry_delay_seconds * attempt))
-                        attempt += 1
-                        continue
-                    raise TelegramServiceError(f"Rate limited; retry after {retry_after}s")
+                    # Rate limit failures should not be retried - the Retry-After
+                    # period is typically 60+ seconds, which exceeds Lambda timeout
+                    return False
 
                 if response.status_code >= 400:
                     raise TelegramServiceError(
@@ -225,7 +232,7 @@ class TelegramBotClient:
                         "attempt": attempt,
                     },
                 )
-                return
+                return True
 
             except Exception as exc:  # noqa: BLE001
                 error_message = str(exc)
@@ -250,17 +257,18 @@ class TelegramBotClient:
 
                 if attempt >= max_attempts:
                     self.logger.error(
-                        "Telegram delivery failed",
+                        "Telegram delivery failed after all retries",
                         operation=action,
                         context={
                             "status": "failed",
                             "attempt": attempt,
+                            "max_attempts": max_attempts,
                         },
                         error=error_message,
                     )
                     # Note: Telegram delivery failures are NOT critical path blockers
-                    # Log but don't raise - allow processing to continue
-                    return
+                    # Return False to indicate failure - caller can decide how to handle
+                    return False
 
                 self.logger.warning(
                     "Retrying Telegram delivery",
@@ -273,6 +281,9 @@ class TelegramBotClient:
                 )
                 time.sleep(self.retry_delay_seconds * attempt)
                 attempt += 1
+
+        # Should never reach here (all paths return), but satisfy mypy
+        return False
 
     @staticmethod
     def _is_markdown_parse_error(error_message: str) -> bool:

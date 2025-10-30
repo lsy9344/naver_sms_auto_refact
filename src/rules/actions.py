@@ -944,16 +944,27 @@ def send_telegram(
             context=log_context,
         )
 
-        context.telegram_service.send_message(
+        delivered = context.telegram_service.send_message(
             text=final_message,
             parse_mode=final_parse_mode,
         )
 
-        logger.info(
-            "Telegram notification sent",
-            operation=operation,
-            context=log_context,
-        )
+        if delivered:
+            logger.info(
+                "Telegram notification sent successfully",
+                operation=operation,
+                context=log_context,
+            )
+        else:
+            logger.warning(
+                "Telegram notification failed to deliver (check previous logs for details)",
+                operation=operation,
+                context={
+                    **log_context,
+                    "status": "failed",
+                    "note": "Delivery failure logged by telegram_service",
+                },
+            )
 
     except ValueError as e:
         logger.error(

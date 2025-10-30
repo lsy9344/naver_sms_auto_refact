@@ -441,7 +441,9 @@ class TestSendTelegram:
 
     def test_send_telegram_success(self, action_context):
         """Test successful Telegram notification."""
-        # Should not raise any exception
+        # Mock successful delivery
+        action_context.telegram_service.send_message.return_value = True
+
         send_telegram(action_context, message="Test message")
 
         action_context.telegram_service.send_message.assert_called_once_with(
@@ -452,6 +454,9 @@ class TestSendTelegram:
 
     def test_send_telegram_with_params(self, action_context):
         """Test Telegram notification with template parameters."""
+        # Mock successful delivery
+        action_context.telegram_service.send_message.return_value = True
+
         params = {"booking_id": "123", "status": "confirmed"}
         send_telegram(action_context, message="Booking {{booking_id}}", template_params=params)
 
@@ -462,14 +467,15 @@ class TestSendTelegram:
         action_context.logger.info.assert_called_once()
 
     def test_send_telegram_error_handling(self, action_context):
-        """Test error handling in send_telegram."""
-        action_context.logger.info.side_effect = Exception("Telegram API error")
+        """Test handling when telegram delivery fails."""
+        # Mock failed delivery
+        action_context.telegram_service.send_message.return_value = False
 
-        with pytest.raises(ActionExecutionError) as exc_info:
-            send_telegram(action_context, message="Test")
+        # Should log warning but not raise exception (graceful failure)
+        send_telegram(action_context, message="Test")
 
-        error = exc_info.value
-        assert error.executor_name == "send_telegram"
+        action_context.logger.warning.assert_called_once()
+        action_context.logger.info.assert_not_called()
 
 
 # ============================================================================
@@ -517,6 +523,9 @@ class TestSendTelegramDetailed:
 
     def test_send_telegram_success(self, action_context, mock_telegram_service):
         """Test successful Telegram message sending."""
+        # Mock successful delivery
+        mock_telegram_service.send_message.return_value = True
+
         send_telegram(action_context, message="Test notification")
 
         mock_telegram_service.send_message.assert_called_once_with(

@@ -180,16 +180,12 @@ class TestTelegramBotClient:
         """Test rate limit response handling (429)."""
         mock_session = Mock()
 
-        # First call rate limited, second succeeds
+        # Rate limited response
         mock_rate_limit = Mock()
         mock_rate_limit.status_code = 429
-        mock_rate_limit.headers = {"Retry-After": "1"}
+        mock_rate_limit.headers = {"Retry-After": "60"}
 
-        mock_success = Mock()
-        mock_success.status_code = 200
-        mock_success.json.return_value = {"ok": True}
-
-        mock_session.post.side_effect = [mock_rate_limit, mock_success]
+        mock_session.post.return_value = mock_rate_limit
 
         client = TelegramBotClient(
             bot_token="test_token",
@@ -198,10 +194,11 @@ class TestTelegramBotClient:
             retry_delay_seconds=0.01,
         )
 
-        client.send_message("Test message")
+        result = client.send_message("Test message")
 
-        # Should have retried after rate limit
-        assert mock_session.post.call_count == 2
+        # Rate limit should cause immediate failure (no retry to avoid Lambda timeout)
+        assert mock_session.post.call_count == 1
+        assert result is False
 
     def test_api_error_response(self):
         """Test handling of Telegram API error responses."""
