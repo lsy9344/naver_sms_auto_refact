@@ -97,7 +97,6 @@ booking_num: Partition key "{biz_id}_{book_id}"
 phone: Sort key "010-XXXX-XXXX"
 name, booking_time: Customer info
 confirm_sms, remind_sms, option_sms: Flags (all False initially)
-option_time: Reserved field
 ```
 
 **Used In Rules:**

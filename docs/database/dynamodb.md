@@ -21,8 +21,10 @@ This document describes the DynamoDB tables used by the SMS automation system, t
 | `confirm_sms` | Boolean | Required | SMS sent flag | `true` \| `false` |
 | `remind_sms` | Boolean | Required | 2-hour reminder sent | `true` \| `false` |
 | `option_sms` | Boolean | Required | Event/option notification sent | `true` \| `false` |
-| `option_time` | String | Optional | Reserved for future use | `""` (empty) or ISO8601 |
+| `option_time` | String | Deprecated | No longer persisted (legacy data only) | Not applicable |
 | `*` (extra fields) | Various | Optional | Dynamic fields for future expansion | `customer_id`, `visit_count`, etc. |
+
+> **Note:** Legacy attributes (`book_id`, `option_keyword`, `option_keyword_names`, `option_time`) are stripped before new records are written. Existing historical items may still contain them but new writes will not.
 
 ### Billing Mode
 
@@ -394,4 +396,3 @@ Before deploying to production, verify:
 - **Logging Utility:** `src/utils/logger.py`
 - **Unit Tests:** `tests/unit/test_database_booking.py`, `tests/unit/test_database_session.py`
 - **Architecture:** `docs/brownfield-architecture.md` (section on DynamoDB, line 1350–1450)
-

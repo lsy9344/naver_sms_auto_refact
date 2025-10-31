@@ -597,7 +597,7 @@ def create_db_record(
     This includes:
     - Core fields: booking_num, phone, name, booking_time
     - SMS flags: confirm_sms, remind_sms, option_sms (default False)
-    - Booking metadata: book_id, biz_id, status, reserve_at
+    - Booking metadata: biz_id, status, reserve_at
     - Option fields: option, option_keywords, has_pro_edit_option, pro_edit_count
     - Additional fields: coupon_name, has_edit_add_person_option, edit_add_person_count
     - Extra fields: For future expansion
@@ -637,7 +637,14 @@ def create_db_record(
             record = booking.to_dict(include_extra=True)
 
             # Exclude fields that should not be persisted to DynamoDB
-            excluded_fields = {"reserve_at"}
+            excluded_fields = {
+                "reserve_at",
+                "book_id",
+                "option_time",
+                "option_keyword",
+                "option_keyword_names",
+                "option_keyword_counts",
+            }
             for field in excluded_fields:
                 record.pop(field, None)
 
@@ -645,14 +652,11 @@ def create_db_record(
             record.setdefault("confirm_sms", False)
             record.setdefault("remind_sms", False)
             record.setdefault("option_sms", False)
-            record.setdefault("option_time", "")
 
             # Normalise option keyword data for DynamoDB readability
             option_keywords = record.get("option_keywords")
             if option_keywords:
                 normalised_options: List[Dict[str, Any]] = []
-                option_keyword_names: List[str] = []
-                option_keyword_counts: Dict[str, int] = {}
 
                 for option in option_keywords:
                     name: Optional[str] = None
@@ -682,27 +686,35 @@ def create_db_record(
 
                     if booking_count is not None and booking_count >= 0:
                         detail["bookingCount"] = booking_count
-                        option_keyword_counts[name] = (
-                            option_keyword_counts.get(name, 0) + booking_count
-                        )
 
                     if price_value is not None:
                         detail["price"] = price_value
 
                     normalised_options.append(detail)
-                    option_keyword_names.append(name)
 
                 if normalised_options:
                     record["option_keywords"] = normalised_options
-                if option_keyword_names:
-                    record["option_keyword_names"] = option_keyword_names
-                if option_keyword_counts:
-                    record["option_keyword_counts"] = option_keyword_counts
         else:
-            record = booking_data
+            record = dict(booking_data)
+
+        # Remove disallowed columns regardless of data source
+        for disallowed in (
+            "book_id",
+            "option_keyword",
+            "option_keyword_names",
+            "option_keyword_counts",
+            "option_time",
+        ):
+            record.pop(disallowed, None)
 
         # DynamoDB does not allow attributes with null (None) values - drop them
         record = {key: value for key, value in record.items() if value is not None}
+
+        # Ensure booking_num is the last attribute for readability
+        if "booking_num" in record:
+            booking_num_value = record["booking_num"]
+            record = {key: value for key, value in record.items() if key != "booking_num"}
+            record["booking_num"] = booking_num_value
 
         # Create the record
         db_repo.create_booking(record)

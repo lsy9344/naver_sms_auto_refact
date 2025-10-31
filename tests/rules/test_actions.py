@@ -246,7 +246,10 @@ class TestCreateDbRecord:
         assert call_args["confirm_sms"] is False
         assert call_args["remind_sms"] is False
         assert call_args["option_sms"] is False
-        assert call_args["option_time"] == ""
+        assert "option_time" not in call_args
+        assert "book_id" not in call_args
+        assert "option_keyword_names" not in call_args
+        assert list(call_args.keys())[-1] == "booking_num"
 
     def test_create_db_record_with_custom_data(self, action_context, mock_db_repo):
         """Test booking creation with custom data override."""
@@ -263,7 +266,13 @@ class TestCreateDbRecord:
 
         create_db_record(action_context, booking_data=custom_data)
 
-        mock_db_repo.create_booking.assert_called_once_with(custom_data)
+        mock_db_repo.create_booking.assert_called_once()
+        saved_record = mock_db_repo.create_booking.call_args[0][0]
+        assert "option_time" not in saved_record
+        assert "book_id" not in saved_record
+        assert saved_record["booking_num"] == "999_99999"
+        assert saved_record["phone"] == "010-9999-9999"
+        assert list(saved_record.keys())[-1] == "booking_num"
 
     def test_create_db_record_db_error(self, action_context, mock_db_repo):
         """Test that DynamoDB errors are wrapped in ActionExecutionError."""
@@ -287,7 +296,7 @@ class TestCreateDbRecord:
         mock_telegram_service,
         mock_telegram_template_loader,
     ):
-        """Persist option keyword names and counts for Dynamo inspection."""
+        """Persist normalized option keyword data without derived columns."""
         booking = Booking(
             booking_num="1051707_99999",
             phone="010-1111-2222",
@@ -322,15 +331,8 @@ class TestCreateDbRecord:
             {"name": "네이버 예약", "bookingCount": 1},
             {"name": "커스텀 옵션"},
         ]
-        assert saved_record["option_keyword_names"] == [
-            "전문가 보정 2컷",
-            "네이버 예약",
-            "커스텀 옵션",
-        ]
-        assert saved_record["option_keyword_counts"] == {
-            "전문가 보정 2컷": 2,
-            "네이버 예약": 1,
-        }
+        assert "option_keyword_names" not in saved_record
+        assert "option_keyword_counts" not in saved_record
 
 
 # ============================================================================

@@ -180,7 +180,6 @@ class BookingRepository:
                 - confirm_sms: bool
                 - remind_sms: bool
                 - option_sms: bool
-                - option_time: str (optional)
 
         Returns:
             True if successful
@@ -190,11 +189,33 @@ class BookingRepository:
             ThrottlingError: If throttled
             NetworkError: If connection fails
         """
+        # Copy to avoid mutating caller data
+        record = dict(record)
+
+        # Remove disallowed columns before validation/persistence
+        for disallowed in (
+            "book_id",
+            "option_keyword",
+            "option_keyword_names",
+            "option_keyword_counts",
+            "option_time",
+        ):
+            record.pop(disallowed, None)
+
         # Validate required fields
         required = {"booking_num", "phone", "name", "booking_time"}
         if not required.issubset(record.keys()):
             missing = required - record.keys()
             raise DynamoDBException(f"Missing required fields: {missing}")
+
+        # DynamoDB does not allow attributes with null (None) values - drop them
+        record = {key: value for key, value in record.items() if value is not None}
+
+        # Ensure booking_num is positioned last for readability
+        if "booking_num" in record:
+            booking_num_value = record["booking_num"]
+            record = {key: value for key, value in record.items() if key != "booking_num"}
+            record["booking_num"] = booking_num_value
 
         context = {
             "booking_num": record["booking_num"],
