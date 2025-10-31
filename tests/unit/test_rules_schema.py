@@ -59,8 +59,8 @@ class TestRulesSchema:
         assert settings.rules is not None
         assert len(settings.rules) > 0
         assert (
-            len(settings.rules) == 9
-        )  # 3 enabled core rules + 1 disabled (SMS failure) + 3 disabled (Slack templates) + 2 disabled future rules
+            len(settings.rules) == 10
+        )  # 4 enabled core rules + 1 disabled failure alert + 3 disabled Slack templates + 2 disabled future templates
 
     def test_missing_name_field(self, schema):
         """Test Case 2: Missing required field 'name' produces ValidationError."""
