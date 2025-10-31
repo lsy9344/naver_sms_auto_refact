@@ -33,6 +33,7 @@ from src.rules.actions import (
     TelegramTemplateLoader,
 )
 from src.utils.logger import get_logger
+from src.utils.timezone import now_kst
 
 logger = get_logger(__name__)
 
@@ -602,7 +603,7 @@ def process_all_bookings(
         Tuple of (all_results, summary_dict)
     """
     all_results: List[ActionResult] = []
-    current_time = datetime.now()
+    current_time = now_kst()
 
     # Summary statistics
     summary = {

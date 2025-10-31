@@ -11,6 +11,8 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import logging
 
+from src.utils.timezone import now_kst
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,11 +45,11 @@ def build_context(
         - db_client: DynamoDB client for actions
 
     Example:
-        >>> context = build_context(booking, db_record, datetime.now(), settings, db_client)
+        >>> context = build_context(booking, db_record, now_kst(), settings, db_client)
         >>> rule_results = engine.process_booking(context)
     """
     if current_time is None:
-        current_time = datetime.now()
+        current_time = now_kst()
 
     context = {
         "booking": booking,
