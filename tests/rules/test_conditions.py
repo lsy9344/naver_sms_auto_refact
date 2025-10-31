@@ -5,6 +5,7 @@ Tests validate that condition evaluators replicate legacy SMS automation logic.
 
 Coverage Targets:
 - AC1: booking_not_in_db
+- AC1b: booking_in_db
 - AC2: time_before_booking
 - AC3: flag_not_set
 - AC4: current_hour
@@ -22,6 +23,7 @@ import pytz
 
 from src.rules.conditions import (
     booking_not_in_db,
+    booking_in_db,
     time_before_booking,
     flag_not_set,
     current_hour,
@@ -70,6 +72,42 @@ class TestBookingNotInDb:
         context = {"db_record": None, "booking": Mock()}
         original_keys = set(context.keys())
         booking_not_in_db(context)
+        assert set(context.keys()) == original_keys
+
+
+class TestBookingInDb:
+    """AC1b: booking_in_db - Check if booking exists in database"""
+
+    def test_existing_booking_returns_true(self):
+        """Test: Returns True when db_record exists"""
+        context = {"db_record": {"confirm_sms": False}, "booking": Mock()}
+        assert booking_in_db(context) is True
+
+    def test_new_booking_returns_false(self):
+        """Test: Returns False when db_record is None"""
+        context = {"db_record": None, "booking": Mock()}
+        assert booking_in_db(context) is False
+
+    def test_missing_key_returns_false(self):
+        """Test: Missing db_record key treated as new booking"""
+        context = {"booking": Mock()}
+        assert booking_in_db(context) is False
+
+    def test_handles_exceptions(self, caplog):
+        """Test: Handles unexpected errors gracefully"""
+        class BadContext(dict):
+            def get(self, *_args, **_kwargs):
+                raise RuntimeError("boom")
+
+        context = BadContext()
+        assert booking_in_db(context) is False
+        assert any("booking_in_db error" in message for message in caplog.text.splitlines())
+
+    def test_immutable_context(self):
+        """Test: Does not mutate context dictionary"""
+        context = {"db_record": {"confirm_sms": True}, "booking": Mock()}
+        original_keys = set(context.keys())
+        booking_in_db(context)
         assert set(context.keys()) == original_keys
 
 
@@ -781,16 +819,17 @@ class TestRegisterConditions:
     """Test registry helper function"""
 
     def test_register_all_conditions(self):
-        """Test: Registers all 10 condition evaluators"""
+        """Test: Registers all 11 condition evaluators"""
         engine = Mock()
         register_conditions(engine)
 
-        # Verify all 10 conditions registered (including has_multiple_options, has_pro_edit_option, sms_send_failed)
-        assert engine.register_condition.call_count == 10
+        # Verify all 11 conditions registered (including booking_in_db, has_multiple_options, has_pro_edit_option, sms_send_failed)
+        assert engine.register_condition.call_count == 11
 
         # Verify correct names registered
         calls = [call[0][0] for call in engine.register_condition.call_args_list]
         assert "booking_not_in_db" in calls
+        assert "booking_in_db" in calls
         assert "time_before_booking" in calls
         assert "flag_not_set" in calls
         assert "current_hour" in calls
@@ -811,6 +850,7 @@ class TestRegisterConditions:
 
         # Verify they're the right functions
         assert registered["booking_not_in_db"] == booking_not_in_db
+        assert registered["booking_in_db"] == booking_in_db
         assert registered["time_before_booking"] == time_before_booking
         assert registered["flag_not_set"] == flag_not_set
         assert registered["current_hour"] == current_hour
@@ -825,11 +865,11 @@ class TestRegisterConditions:
         settings = Mock()
         # Should not raise
         register_conditions(engine, settings)
-        assert engine.register_condition.call_count == 10
+        assert engine.register_condition.call_count == 11
 
     def test_register_without_settings(self):
         """Test: Works without settings parameter"""
         engine = Mock()
         # Should not raise
         register_conditions(engine)
-        assert engine.register_condition.call_count == 10
+        assert engine.register_condition.call_count == 11

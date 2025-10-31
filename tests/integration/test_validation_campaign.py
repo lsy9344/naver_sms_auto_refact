@@ -393,8 +393,9 @@ class TestValidationCampaignIntegration:
 
         test_bookings = [
             ("booking-001", "New Booking Confirmation"),
-            ("booking-002", "Two-Hour Reminder"),
-            ("booking-003", "Event SMS"),
+            ("booking-002", "Two-Hour Confirmation Sync"),
+            ("booking-003", "Two-Hour Reminder"),
+            ("booking-004", "Event SMS"),
         ]
 
         all_stats = []
@@ -424,8 +425,8 @@ class TestValidationCampaignIntegration:
 
         # 4. Validate results
         passed = sum(1 for s in all_stats if s["parity_status"] == "PASS")
-        assert passed == 3
-        assert len(all_stats) == 3
+        assert passed == 4
+        assert len(all_stats) == 4
 
         # 5. Verify artifacts
         json_files = list(output_dir.glob("*.json"))

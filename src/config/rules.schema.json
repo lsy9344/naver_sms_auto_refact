@@ -100,6 +100,7 @@
           "description": "Condition type identifier",
           "enum": [
             "booking_not_in_db",
+            "booking_in_db",
             "time_before_booking",
             "flag_not_set",
             "current_hour",
@@ -123,6 +124,24 @@
             "properties": {
               "type": {
                 "const": "booking_not_in_db"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "booking_in_db"
               }
             }
           },

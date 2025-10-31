@@ -31,11 +31,13 @@
       "db_record": {
         "booking_id": "booking_002",
         "created_at": "2025-10-19T10:00:00",
+        "confirm_sms": false,
         "remind_sms": false,
         "option_sms": false
       },
       "current_time": "2025-10-19T14:35:00",
       "expected_rule_matches": [
+        "Two-Hour Confirmation Sync",
         "Two-Hour Reminder"
       ]
     },

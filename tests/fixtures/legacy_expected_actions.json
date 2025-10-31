@@ -1,7 +1,7 @@
 {
   "expected_actions": {
     "booking_001": {
-      "description": "New Booking Confirmation - Should execute all 3 actions",
+      "description": "New Booking Confirmation - Should execute all 4 actions",
       "actions": [
         {
           "rule_name": "New Booking Confirmation",
@@ -20,18 +20,47 @@
         },
         {
           "rule_name": "New Booking Confirmation",
+          "action_type": "update_flag",
+          "success": true,
+          "message": "Flag confirm_sms updated to true in DynamoDB",
+          "params": {
+            "flag": "confirm_sms",
+            "value": true
+          }
+        },
+        {
+          "rule_name": "New Booking Confirmation",
           "action_type": "send_telegram",
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
+          "message": "예약확정 {{ store.alias }} {{ booking.name }} {{ booking.phone_last4 }}"
           }
         }
       ]
     },
     "booking_002": {
-      "description": "Two-Hour Reminder - Should send guide SMS, update flag, and send telegram",
+      "description": "Two-Hour Reminder - Should sync confirm flag then send guide SMS, update flag, and send telegram",
       "actions": [
+        {
+          "rule_name": "Two-Hour Confirmation Sync",
+          "action_type": "send_sms",
+          "success": true,
+          "message": "Confirmation SMS sent via SENS API",
+          "params": {
+            "template": "confirmation"
+          }
+        },
+        {
+          "rule_name": "Two-Hour Confirmation Sync",
+          "action_type": "update_flag",
+          "success": true,
+          "message": "Flag confirm_sms updated to true in DynamoDB",
+          "params": {
+            "flag": "confirm_sms",
+            "value": true
+          }
+        },
         {
           "rule_name": "Two-Hour Reminder",
           "action_type": "send_sms",
@@ -58,7 +87,7 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "상세안내 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
+          "message": "상세안내 {{ store.alias }} {{ booking.name }} {{ booking.phone_last4 }}"
           }
         }
       ]
@@ -91,7 +120,7 @@
           "success": true,
           "message": "Telegram notification sent",
           "params": {
-            "message": "리뷰요청 {{ store.alias }} {{ booking.name }} {{ booking.phone_masked }}"
+          "message": "리뷰요청 {{ store.alias }} {{ booking.name }} {{ booking.phone_last4 }}"
           }
         }
       ]

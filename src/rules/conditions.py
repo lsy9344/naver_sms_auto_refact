@@ -58,6 +58,35 @@ def booking_not_in_db(context: Dict[str, Any], **params) -> bool:
     return result
 
 
+def booking_in_db(context: Dict[str, Any], **params) -> bool:
+    """
+    Evaluate if a booking already exists in the database.
+
+    Returns True only when a DynamoDB record is present (context['db_record'] is not None).
+    Returns False for new bookings where no record exists yet.
+
+    Args:
+        context: Dictionary containing:
+            - db_record: Booking from DynamoDB or None for new bookings
+            - booking: Current booking object (unused, provided for parity)
+        **params: Additional parameters (unused)
+
+    Returns:
+        bool: True if booking exists (db_record is not None), False otherwise
+
+    Reference:
+        Ensures parity with legacy logic that differentiates new vs existing bookings.
+    """
+    try:
+        db_record = context.get("db_record")
+        result = db_record is not None
+        logger.debug(f"booking_in_db: has_db_record={result}")
+        return result
+    except Exception as e:
+        logger.error(f"booking_in_db error: {e}", exc_info=True)
+        return False
+
+
 def time_before_booking(context: Dict[str, Any], hours: int = 2, **params) -> bool:
     """
     Evaluate if current time is within specified hours before a booking.
@@ -651,6 +680,7 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
 
     Registered Evaluators:
         - booking_not_in_db: True if booking is new (not in DynamoDB)
+        - booking_in_db: True if booking already exists in DynamoDB
         - time_before_booking: True if within X hours of booking
         - flag_not_set: True if SMS flag not sent
         - current_hour: True if current hour matches
@@ -665,6 +695,7 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
         Integration pattern: docs/brownfield-architecture.md:1070-1145
     """
     engine.register_condition("booking_not_in_db", booking_not_in_db)
+    engine.register_condition("booking_in_db", booking_in_db)
     engine.register_condition("time_before_booking", time_before_booking)
     engine.register_condition("flag_not_set", flag_not_set)
     engine.register_condition("current_hour", current_hour)
@@ -676,8 +707,8 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     engine.register_condition("sms_send_failed", sms_send_failed)
 
     logger.info(
-        "Registered 10 condition evaluators with RuleEngine: "
-        "booking_not_in_db, time_before_booking, flag_not_set, "
+        "Registered 11 condition evaluators with RuleEngine: "
+        "booking_not_in_db, booking_in_db, time_before_booking, flag_not_set, "
         "current_hour, booking_status, has_option_keyword, "
         "has_multiple_options, date_range, has_pro_edit_option, sms_send_failed"
     )

@@ -28,6 +28,7 @@
       "description": "Booking within 2-hour window and reminder not sent yet",
       "key_assertions": [
         "Correct time window calculation (booking_time - current_time < 2h)",
+        "Confirmation SMS resent if confirm_sms flag is false",
         "Guide SMS sent with store-specific content",
         "remind_sms flag updated to true",
         "Only when remind_sms is currently false"

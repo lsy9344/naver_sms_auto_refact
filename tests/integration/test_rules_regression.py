@@ -42,6 +42,7 @@ from config.settings import Settings
 from rules.engine import RuleEngine
 from rules.conditions import (
     booking_not_in_db,
+    booking_in_db,
     time_before_booking,
     flag_not_set,
     current_hour,
@@ -540,6 +541,7 @@ def rule_engine(settings):
 
     # Register condition evaluators
     engine.register_condition("booking_not_in_db", booking_not_in_db)
+    engine.register_condition("booking_in_db", booking_in_db)
     engine.register_condition("time_before_booking", time_before_booking)
     engine.register_condition("flag_not_set", flag_not_set)
     engine.register_condition("current_hour", current_hour)
