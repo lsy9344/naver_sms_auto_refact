@@ -81,3 +81,23 @@ class SessionManager:
         except Exception as e:
             logger.error(f"Error saving cookies: {e}")
             return False
+
+    def clear_cookies(self) -> bool:
+        """
+        Remove cached cookies from DynamoDB.
+
+        Returns:
+            True if cookies were deleted successfully, False otherwise.
+        """
+        try:
+            response = self.table.delete_item(Key={"id": "1"})
+            http_status = response["ResponseMetadata"]["HTTPStatusCode"]
+            if http_status == 200:
+                logger.info("Cleared cached cookies from DynamoDB")
+                return True
+
+            logger.warning(f"DynamoDB delete_item returned unexpected status {http_status}")
+            return False
+        except Exception as e:
+            logger.error(f"Error clearing cached cookies: {e}")
+            return False

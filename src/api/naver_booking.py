@@ -317,30 +317,38 @@ class NaverBookingAPIClient:
             logger.debug(f"Count API returned {count} bookings for store {store_id}")
             return count
         except requests.HTTPError as http_err:
-            status = http_err.response.status_code if http_err.response else None
+            response_obj = getattr(http_err, "response", None)
+            status_code = getattr(response_obj, "status_code", None)
             response_snippet = None
-            if http_err.response is not None:
+            if response_obj is not None:
                 try:
-                    response_snippet = http_err.response.text[:200]
+                    response_snippet = response_obj.text[:200]
                 except Exception:  # noqa: BLE001
                     response_snippet = None
+            else:
+                # Fall back to parsing well-known status codes from the error string
+                error_text = str(http_err)
+                if "401" in error_text:
+                    status_code = 401
+                elif "403" in error_text:
+                    status_code = 403
 
-            if status in (401, 403):
+            if status_code in (401, 403):
                 logger.error(
                     "Authentication rejected by Naver during bookings count",
-                    context={"store_id": store_id, "status": status},
+                    context={"store_id": store_id, "status": status_code},
                     error=str(http_err),
                 )
                 raise NaverAuthenticationError(
                     store_id=store_id,
-                    status_code=status,
+                    status_code=status_code,
                     operation="count_bookings",
                     response_snippet=response_snippet,
                 ) from http_err
 
             logger.error(
                 "Failed to count bookings (HTTP error)",
-                context={"store_id": store_id, "status": status or "unknown"},
+                context={"store_id": store_id, "status": status_code or "unknown"},
                 error=str(http_err),
             )
             return 0

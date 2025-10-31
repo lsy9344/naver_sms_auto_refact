@@ -185,7 +185,7 @@ rules:
       - type: "send_slack"
         params:
           channel: "#naver_sms_auto_notify"
-          message: "보정 {{ booking.pro_edit_count }}장 - {{ booking.name }} ({{ booking.phone_masked }})"
+          message: "보정 {{ booking.pro_edit_count }}장 - {{ store.alias }} {{ booking.name }} ({{ booking.phone_masked }})"
 
   # 규칙 8: SMS 발송 실패 알람 (모든 문자 유형) - 현재 미지원 (향후 구현 예정)
   # 우선순위: 높음 - 모든 문자(안내, 확인, 이벤트) 발송 실패시 즉시 운영팀에 알림

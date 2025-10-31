@@ -17,7 +17,7 @@ import requests
 
 from src.auth.naver_login import NaverAuthenticator
 from src.auth.session_manager import SessionManager
-from src.api.naver_booking import NaverBookingAPIClient
+from src.api.naver_booking import NaverBookingAPIClient, NaverAuthenticationError
 from src.config.settings import Settings, setup_logging_redaction, SLACK_ENABLED
 from src.database.dynamodb_client import BookingRepository
 from src.domain.booking import Booking
@@ -123,19 +123,48 @@ def lambda_handler(event, context):
             # Initialize repository first for RC08 date filtering
             booking_repo = BookingRepository(table_name="sms", dynamodb_resource=dynamodb)
 
-            booking_api = NaverBookingAPIClient(
-                session=api_session,
-                option_keywords=["네이버", "인스타", "원본"],
-                booking_repo=booking_repo,
-            )
+            def _create_booking_client(session: requests.Session) -> NaverBookingAPIClient:
+                return NaverBookingAPIClient(
+                    session=session,
+                    option_keywords=["네이버", "인스타", "원본"],
+                    booking_repo=booking_repo,
+                )
 
-            # Fetch confirmed (RC03) bookings
-            confirmed_bookings = booking_api.get_all_confirmed_bookings(store_ids)
-            logger.info(f"Fetched {len(confirmed_bookings)} confirmed bookings")
+            booking_api = _create_booking_client(api_session)
 
-            # Fetch completed (RC08) bookings
-            completed_bookings = booking_api.get_all_completed_bookings(store_ids)
-            logger.info(f"Fetched {len(completed_bookings)} completed bookings")
+            def _fetch_all_bookings(client: NaverBookingAPIClient) -> Tuple[List[Booking], List[Booking]]:
+                confirmed = client.get_all_confirmed_bookings(store_ids)
+                logger.info(f"Fetched {len(confirmed)} confirmed bookings")
+
+                completed = client.get_all_completed_bookings(store_ids)
+                logger.info(f"Fetched {len(completed)} completed bookings")
+
+                return confirmed, completed
+
+            try:
+                confirmed_bookings, completed_bookings = _fetch_all_bookings(booking_api)
+            except NaverAuthenticationError as auth_err:
+                logger.warning(
+                    "Detected expired Naver session; refreshing authentication",
+                    operation="naver_auth_retry",
+                    context={
+                        "store_id": getattr(auth_err, "store_id", None),
+                        "status_code": getattr(auth_err, "status_code", None),
+                    },
+                    error=str(auth_err),
+                )
+
+                session_mgr.clear_cookies()
+
+                cookies = authenticator.login(cached_cookies=None)
+                logger.info(
+                    f"Re-authentication successful: {len(cookies)} cookies",
+                    operation="naver_auth_retry",
+                )
+
+                refreshed_session = authenticator.get_session()
+                booking_api = _create_booking_client(refreshed_session)
+                confirmed_bookings, completed_bookings = _fetch_all_bookings(booking_api)
 
             # Combine all bookings
             all_bookings = confirmed_bookings + completed_bookings
