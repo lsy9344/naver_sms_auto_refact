@@ -54,6 +54,15 @@ class StubSettings:
         return self._comparison_mode_enabled
 
 
+@pytest.fixture(autouse=True)
+def allow_delivery_outside_ci(monkeypatch):
+    """Default tests to non-CI mode so legacy assertions continue to pass."""
+    monkeypatch.setenv("ALLOW_SENS_IN_CI", "true")
+    monkeypatch.setenv("CI", "false")
+    monkeypatch.setenv("GITHUB_ACTIONS", "false")
+    yield
+
+
 def build_client(
     http_stub: HttpStub,
     *,
@@ -193,4 +202,19 @@ def test_comparison_mode_skips_requests(caplog):
     assert delivered is False
     assert stub.requests == []
     assert client.last_skip_reason == "COMPARISON_MODE_ENABLED is true"
+    assert any("SMS delivery skipped" in record.message for record in caplog.records)
+
+
+def test_ci_environment_blocks_delivery(monkeypatch, caplog):
+    stub = HttpStub()
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setenv("ALLOW_SENS_IN_CI", "false")
+    client = build_client(stub)
+
+    with caplog.at_level("INFO"):
+        delivered = client.send_confirm_sms("010-2222-3333")
+
+    assert delivered is False
+    assert stub.requests == []
+    assert client.last_skip_reason == "SENS delivery blocked in CI environment"
     assert any("SMS delivery skipped" in record.message for record in caplog.records)

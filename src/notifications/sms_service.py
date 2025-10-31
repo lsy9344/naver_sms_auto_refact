@@ -238,6 +238,8 @@ class SensSmsClient:
             return False, "SENS_DELIVERY_ENABLED is false"
         if getattr(self, "_comparison_mode_enabled", False):
             return False, "COMPARISON_MODE_ENABLED is true"
+        if self._is_ci_blocked():
+            return False, "SENS delivery blocked in CI environment"
         return True, ""
 
     def _build_payload(
@@ -403,3 +405,21 @@ class SensSmsClient:
                 }
             else:
                 stores[store_id]["fromNumber"] = number
+
+    @staticmethod
+    def _ci_environment_active() -> bool:
+        """Detect if running inside a continuous-integration environment."""
+        for env_var in ("CI", "GITHUB_ACTIONS"):
+            value = os.getenv(env_var)
+            if value and value.lower() == "true":
+                return True
+        return False
+
+    @staticmethod
+    def _ci_delivery_override_enabled() -> bool:
+        """Return True when CI guard is explicitly bypassed."""
+        return os.getenv("ALLOW_SENS_IN_CI", "false").lower() == "true"
+
+    def _is_ci_blocked(self) -> bool:
+        """Determine whether CI rules forbid outbound SENS delivery."""
+        return self._ci_environment_active() and not self._ci_delivery_override_enabled()

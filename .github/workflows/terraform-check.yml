@@ -9,6 +9,11 @@ on:
       - 'infrastructure/**'
       - '.github/workflows/terraform-check.yml'
 
+env:
+  SENS_DELIVERY_ENABLED: "false"
+  COMPARISON_MODE_ENABLED: "true"
+  ALLOW_SENS_IN_CI: "false"
+
 permissions:
   contents: read
   pull-requests: write

@@ -5,8 +5,9 @@ Story 4.2 Task 2: Implements AC 2 (Wrap handlers with deterministic settings inj
 """
 
 import logging
-from typing import Dict, List, Any, Tuple
 from pathlib import Path
+from typing import Dict, List, Any, Tuple
+from unittest.mock import patch
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,32 @@ class ParityValidator:
             if mock_services is None:
                 mock_services = self._create_mock_services()
 
+            sms_calls = mock_services.setdefault("sms_calls", [])
+
+            class RecordingSensSmsClient:  # pragma: no cover - simple test double
+                """Test double that records attempted SMS sends."""
+
+                def __init__(self, *args, **kwargs):
+                    self.last_skip_reason = None
+
+                def _record(self, method: str, *args, **kwargs) -> bool:
+                    sms_calls.append({
+                        "method": method,
+                        "args": args,
+                        "kwargs": kwargs,
+                    })
+                    self.last_skip_reason = None
+                    return True
+
+                def send_confirm_sms(self, *args, **kwargs) -> bool:
+                    return self._record("send_confirm_sms", *args, **kwargs)
+
+                def send_guide_sms(self, *args, **kwargs) -> bool:
+                    return self._record("send_guide_sms", *args, **kwargs)
+
+                def send_event_sms(self, *args, **kwargs) -> bool:
+                    return self._record("send_event_sms", *args, **kwargs)
+
             # Build Lambda event
             event = {
                 "scenario": scenario_context.get("scenario"),
@@ -140,8 +167,9 @@ class ParityValidator:
                 request_id = "test-request"
                 invoked_function_arn = "arn:aws:lambda:test"
 
-            # Execute handler
-            _ = lambda_handler(event, MockContext())  # noqa: F841
+            # Execute handler with patched SMS client (prevents live delivery in CI)
+            with patch("src.main.SensSmsClient", new=RecordingSensSmsClient):
+                _ = lambda_handler(event, MockContext())  # noqa: F841
 
             outputs = {
                 "sms": mock_services.get("sms_calls", []),

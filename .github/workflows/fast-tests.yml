@@ -13,6 +13,11 @@ on:
         required: false
         default: "false"
 
+env:
+  SENS_DELIVERY_ENABLED: "false"
+  COMPARISON_MODE_ENABLED: "true"
+  ALLOW_SENS_IN_CI: "false"
+
 jobs:
   fast-tests:
     name: Fast Unit Tests (3-5min)
