@@ -340,6 +340,8 @@ def lambda_handler(event, context):
         # ============================================================
         lambda_duration_ms = (time.time() - lambda_start_time) * 1000
 
+        error_message = f"{type(e).__name__}: {e}"
+
         logger.error(
             "Lambda execution failed",
             operation="lambda_complete",
@@ -352,18 +354,36 @@ def lambda_handler(event, context):
         )
 
         # Send error notification
+        settings: Optional[Settings] = None
         try:
             settings = Settings()
-            if settings.is_telegram_enabled():
-                telegram_creds = settings.load_telegram_credentials()
-                notify_telegram_error(telegram_creds, str(e))
-            else:
-                logger.info("Skipping Telegram error notification (disabled)")
         except Exception as notify_err:
             logger.error(
-                "Failed to send error notification",
+                "Failed to load settings for error notification",
                 operation="notify_error",
                 error=str(notify_err),
+            )
+        else:
+            try:
+                if settings.is_telegram_enabled():
+                    telegram_creds = settings.load_telegram_credentials()
+                    notify_telegram_error(telegram_creds, error_message)
+                else:
+                    logger.info("Skipping Telegram error notification (disabled)")
+            except Exception as notify_err:
+                logger.error(
+                    "Failed to send Telegram error notification",
+                    operation="notify_error_telegram",
+                    error=str(notify_err),
+                )
+
+        try:
+            notify_slack_error(error_message)
+        except Exception as slack_err:
+            logger.error(
+                "Failed to send Slack error notification",
+                operation="notify_error_slack",
+                error=str(slack_err),
             )
 
         return {
@@ -759,6 +779,39 @@ def notify_telegram_error(telegram_creds: Optional[Dict[str, str]], error_messag
         logger.info("Telegram error notification sent")
     except requests.RequestException as e:
         logger.error(f"Failed to send Telegram error notification: {e}")
+
+
+def notify_slack_error(error_message: str) -> None:
+    """
+    Send error notification to Slack via webhook if configured.
+    """
+    if not SLACK_ENABLED:
+        logger.info("Slack notifications disabled; skipping error alert")
+        return
+
+    try:
+        slack_webhook_url = Settings.load_slack_webhook_url()
+    except Exception as e:  # noqa: BLE001
+        logger.error(
+            "Failed to load Slack webhook URL for error notification",
+            operation="notify_error_slack",
+            error=str(e),
+        )
+        return
+
+    if not slack_webhook_url:
+        logger.warning("Slack webhook URL not configured; skipping Slack error notification")
+        return
+
+    slack_service = SlackWebhookClient(webhook_url=slack_webhook_url, logger=logger)
+    message = (
+        "*🚨 Naver SMS Automation Error*\n"
+        f"• Error: {error_message}\n"
+        f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+
+    slack_service.send_text(message)
+    logger.info("Slack error notification sent")
 
 
 if __name__ == "__main__":

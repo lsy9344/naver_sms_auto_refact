@@ -22,6 +22,32 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+class NaverAuthenticationError(RuntimeError):
+    """Raised when Naver API rejects authenticated requests (e.g., expired cookies)."""
+
+    def __init__(
+        self,
+        store_id: Optional[str],
+        status_code: Optional[int],
+        operation: str,
+        response_snippet: Optional[str] = None,
+    ) -> None:
+        store_fragment = f" for store {store_id}" if store_id else ""
+        status_fragment = f" (HTTP {status_code})" if status_code is not None else ""
+        snippet_fragment = (
+            f" - {response_snippet.strip()}" if response_snippet and response_snippet.strip() else ""
+        )
+        message = (
+            f"Naver authentication failure during {operation}{store_fragment}"
+            f"{status_fragment}{snippet_fragment}"
+        )
+        super().__init__(message)
+        self.store_id = store_id
+        self.status_code = status_code
+        self.operation = operation
+        self.response_snippet = response_snippet
+
+
 class NaverBookingAPIClient:
     """
     Client for fetching booking data from Naver Partner Booking API.
@@ -259,6 +285,16 @@ class NaverBookingAPIClient:
             "accept": "*/*",
             "accept-language": "en-US,en;q=0.9",
             "referer": f"https://partner.booking.naver.com/bizes/{store_id}/booking-list-view",
+            "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "user-agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
             "x-booking-naver-role": "OWNER",
         }
 
@@ -280,8 +316,40 @@ class NaverBookingAPIClient:
             count = response.json().get("count", 0)
             logger.debug(f"Count API returned {count} bookings for store {store_id}")
             return count
+        except requests.HTTPError as http_err:
+            status = http_err.response.status_code if http_err.response else None
+            response_snippet = None
+            if http_err.response is not None:
+                try:
+                    response_snippet = http_err.response.text[:200]
+                except Exception:  # noqa: BLE001
+                    response_snippet = None
+
+            if status in (401, 403):
+                logger.error(
+                    "Authentication rejected by Naver during bookings count",
+                    context={"store_id": store_id, "status": status},
+                    error=str(http_err),
+                )
+                raise NaverAuthenticationError(
+                    store_id=store_id,
+                    status_code=status,
+                    operation="count_bookings",
+                    response_snippet=response_snippet,
+                ) from http_err
+
+            logger.error(
+                "Failed to count bookings (HTTP error)",
+                context={"store_id": store_id, "status": status or "unknown"},
+                error=str(http_err),
+            )
+            return 0
         except Exception as e:
-            logger.error(f"Failed to count bookings for store {store_id}: {e}")
+            logger.error(
+                "Failed to count bookings",
+                context={"store_id": store_id},
+                error=str(e),
+            )
             return 0
 
     def get_bookings(
@@ -376,6 +444,32 @@ class NaverBookingAPIClient:
                 )
 
             except requests.RequestException as e:
+                response = getattr(e, "response", None)
+                status = getattr(response, "status_code", None)
+                response_snippet = None
+                if response is not None:
+                    try:
+                        response_snippet = response.text[:200]
+                    except Exception:  # noqa: BLE001
+                        response_snippet = None
+
+                if status in (401, 403):
+                    logger.error(
+                        "Authentication rejected by Naver while fetching bookings page",
+                        context={
+                            "store_id": store_id,
+                            "status": status,
+                            "page_index": page_idx,
+                        },
+                        error=str(e),
+                    )
+                    raise NaverAuthenticationError(
+                        store_id=store_id,
+                        status_code=status,
+                        operation="fetch_bookings",
+                        response_snippet=response_snippet,
+                    ) from e
+
                 logger.error(f"Failed to fetch page {page_idx} for store {store_id}: {e}")
                 # Continue to next page rather than failing entirely
                 continue
@@ -412,6 +506,8 @@ class NaverBookingAPIClient:
                     end_date=end_date,
                 )
                 all_bookings.extend(bookings)
+            except NaverAuthenticationError:
+                raise
             except Exception as e:
                 logger.error(f"Failed to fetch confirmed bookings for store {store_id}: {e}")
 
@@ -474,10 +570,14 @@ class NaverBookingAPIClient:
                             end_date=clamped_end,
                         )
                         all_bookings.extend(bookings)
+                    except NaverAuthenticationError:
+                        raise
                     except Exception as e:
                         logger.error(
                             f"Failed to fetch completed bookings for store {store_id}: {e}"
                         )
+            except NaverAuthenticationError:
+                raise
             except Exception as e:
                 logger.warning(
                     f"Failed to scan unnotified options, falling back to 31-day date range: {e}"
@@ -494,6 +594,8 @@ class NaverBookingAPIClient:
                             end_date=end_date,
                         )
                         all_bookings.extend(bookings)
+                    except NaverAuthenticationError:
+                        raise
                     except Exception as store_err:
                         logger.error(
                             f"Failed to fetch completed bookings for store {store_id}: {store_err}"
@@ -514,6 +616,8 @@ class NaverBookingAPIClient:
                         end_date=end_date,
                     )
                     all_bookings.extend(bookings)
+                except NaverAuthenticationError:
+                    raise
                 except Exception as e:
                     logger.error(f"Failed to fetch completed bookings for store {store_id}: {e}")
 

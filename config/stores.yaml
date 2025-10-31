@@ -2,42 +2,42 @@ default:
   fromNumber: "01055814318"
 stores:
   "1051707":
-    name: "다비스튜디오 화성 새솔점"
+    name: "화성 새솔점"
     fromNumber: "01055814318"
     templates:
       guide: "1051707"
   "1120125":
-    name: "다비스튜디오 수원 호매실점"
+    name: "수원 호매실점"
     fromNumber: "01055814318"
     templates:
       guide: "1120125"
   "1285716":
-    name: "다비스튜디오 화성 동탄점"
+    name: "화성 동탄점"
     fromNumber: "01055814318"
     templates:
       guide: "1285716"
   "1462519":
-    name: "다비스튜디오 인천 검단점"
+    name: "인천 검단점"
     fromNumber: "01055814318"
     templates:
       guide: "1462519"
   "1466783":
-    name: "다비스튜디오 평택 고덕점"
+    name: "평택 고덕점"
     fromNumber: "01055811814"
     templates:
       guide: "1466783"
   "1473826":
-    name: "다비스튜디오 부천점"
+    name: "부천점"
     fromNumber: "01055814318"
     templates:
       guide: "1473826"
   "867589":
-    name: "다비스튜디오 안산 초지점"
+    name: "안산 초지점"
     fromNumber: "01022392673"
     templates:
       guide: "867589"
   "951291":
-    name: "다비스튜디오 안산 중앙점"
+    name: "안산 중앙점"
     fromNumber: "01055814318"
     templates:
       guide: "951291"

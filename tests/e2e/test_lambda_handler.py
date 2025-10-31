@@ -43,6 +43,10 @@ def mock_settings():
             "bot_token": "test_token",
             "chat_id": "test_chat",
         }
+        mock_instance.is_telegram_enabled.return_value = True
+        mock_instance.is_sens_delivery_enabled.return_value = True
+        mock_instance.is_comparison_mode_enabled.return_value = False
+        mock_instance.get_telegram_throttle_seconds.return_value = 0
         mock_settings_class.return_value = mock_instance
         yield mock_instance
 
@@ -252,7 +256,15 @@ def test_lambda_handler_error_handling(
     with patch("src.main.setup_logging_redaction"):
         with patch("src.main.NaverAuthenticator", side_effect=Exception("Test error")):
             with patch("src.main.requests.post") as mock_telegram:
-                result = lambda_handler({}, MockContext())
+                with patch("src.main.SLACK_ENABLED", True):
+                    with patch(
+                        "src.main.Settings.load_slack_webhook_url",
+                        return_value="https://hooks.slack.test/webhook",
+                    ):
+                        with patch("src.main.SlackWebhookClient") as mock_slack_client_cls:
+                            slack_client_instance = Mock()
+                            mock_slack_client_cls.return_value = slack_client_instance
+                            result = lambda_handler({}, MockContext())
 
     # Assert error response
     assert result["statusCode"] == 500
@@ -265,6 +277,10 @@ def test_lambda_handler_error_handling(
 
     # Verify Telegram error notification was sent
     assert mock_telegram.called
+    # Verify Slack error notification was sent
+    slack_client_instance.send_text.assert_called_once()
+    sent_message = slack_client_instance.send_text.call_args[0][0]
+    assert "Test error" in sent_message
 
 
 def test_process_all_bookings_success():

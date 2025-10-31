@@ -8,9 +8,10 @@ and pagination semantics from original lambda_function.py.
 from datetime import datetime
 from unittest.mock import Mock, patch
 
+import pytest
 import requests
 
-from src.api.naver_booking import NaverBookingAPIClient
+from src.api.naver_booking import NaverBookingAPIClient, NaverAuthenticationError
 
 
 def _mock_response(payload):
@@ -18,6 +19,17 @@ def _mock_response(payload):
     response.json.return_value = payload
     response.raise_for_status.return_value = None
     return response
+
+
+def _mock_http_error_response(status_code: int, text: str = ""):
+    response = Mock()
+    response.status_code = status_code
+    response.text = text
+    http_error = requests.HTTPError(f"{status_code} Client Error")
+    http_error.response = response
+    mock_response = Mock()
+    mock_response.raise_for_status.side_effect = http_error
+    return mock_response
 
 
 def _build_payload():
@@ -61,12 +73,25 @@ def test_get_bookings_uses_legacy_params():
     # Count API call assertions
     count_call = session.get.call_args_list[0]
     count_params = count_call.kwargs["params"]
+    count_headers = count_call.kwargs["headers"]
     assert count_call.args[0].endswith("/bookings/count")
     assert count_params["size"] == str(NaverBookingAPIClient.PAGE_SIZE)
     assert count_params["page"] == "0"
     assert count_params["dateDropdownType"] == "ENTIRE"
     assert count_params["orderByStartDate"] == "ASC"
     assert "noCache" in count_params
+    expected_header_subset = {
+        "authority": "partner.booking.naver.com",
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        "x-booking-naver-role": "OWNER",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+    }
+    for key, value in expected_header_subset.items():
+        assert count_headers[key] == value
+    assert "Chrome/120" in count_headers["user-agent"]
+    assert "Chromium" in count_headers["sec-ch-ua"]
 
     # Bookings API call assertions
     bookings_call = session.get.call_args_list[1]
@@ -149,6 +174,30 @@ def test_normalize_naive_datetime_appends_kst_offset():
 
     normalized = client._normalize_datetime_param("2024-02-15T10:20:30")
     assert normalized == "2024-02-15T10:20:30+09:00"
+
+
+def test_get_bookings_raises_on_authentication_failure():
+    """Unauthorized responses should raise NaverAuthenticationError for alerting."""
+    session = Mock(spec=requests.Session)
+    session.get.side_effect = [_mock_http_error_response(401, "Unauthorized")]
+
+    client = NaverBookingAPIClient(session=session)
+
+    with pytest.raises(NaverAuthenticationError) as exc_info:
+        client.get_bookings("1051707", status="RC03")
+
+    assert "authentication failure" in str(exc_info.value).lower()
+
+
+def test_get_all_confirmed_bookings_propagates_authentication_error():
+    """Authentication failures should not be swallowed by aggregation helpers."""
+    session = Mock(spec=requests.Session)
+    session.get.side_effect = [_mock_http_error_response(403, "Forbidden")]
+
+    client = NaverBookingAPIClient(session=session)
+
+    with pytest.raises(NaverAuthenticationError):
+        client.get_all_confirmed_bookings(["1051707"])
 
 
 def test_completed_bookings_clamps_date_range_to_31_days():
