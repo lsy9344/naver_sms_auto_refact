@@ -685,6 +685,7 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
         - flag_not_set: True if SMS flag not sent
         - current_hour: True if current hour matches
         - booking_status: True if booking status matches code
+        - date_is_today: True if booking date equals current date (KST)
         - has_option_keyword: True if booking has option keywords
         - has_multiple_options: True if booking has minimum matching option keywords
         - date_range: True if booking falls within date range
@@ -700,6 +701,7 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     engine.register_condition("flag_not_set", flag_not_set)
     engine.register_condition("current_hour", current_hour)
     engine.register_condition("booking_status", booking_status)
+    engine.register_condition("date_is_today", date_is_today)
     engine.register_condition("has_option_keyword", has_option_keyword)
     engine.register_condition("has_multiple_options", has_multiple_options)
     engine.register_condition("date_range", date_range)
@@ -707,9 +709,9 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     engine.register_condition("sms_send_failed", sms_send_failed)
 
     logger.info(
-        "Registered 11 condition evaluators with RuleEngine: "
+        "Registered 12 condition evaluators with RuleEngine: "
         "booking_not_in_db, booking_in_db, time_before_booking, flag_not_set, "
-        "current_hour, booking_status, has_option_keyword, "
+        "current_hour, booking_status, date_is_today, has_option_keyword, "
         "has_multiple_options, date_range, has_pro_edit_option, sms_send_failed"
     )
 
@@ -743,4 +745,50 @@ def has_pro_edit_option(context: Dict[str, Any], **params) -> bool:
 
     except Exception as e:
         logger.error(f"has_pro_edit_option error: {e}", exc_info=True)
+        return False
+
+
+def date_is_today(context: Dict[str, Any], **params) -> bool:
+    """
+    Evaluate if booking.reserve_at falls on the current KST date.
+
+    Compares booking.reserve_at.date() to context['current_time'].date().
+
+    Intended for gating same-day-only actions like 20:00 review SMS.
+
+    Args:
+        context: Dictionary containing:
+            - booking: Booking object with reserve_at datetime
+            - current_time: Current datetime (timezone-aware KST)
+        **params: Additional parameters (unused)
+
+    Returns:
+        bool: True if reserve_at.date() == current_time.date(), False otherwise
+
+    Example:
+        >>> # current_time: 2025-11-01 20:15 KST
+        >>> # reserve_at:   2025-11-01 16:00 KST
+        >>> date_is_today(context) -> True
+    """
+    try:
+        booking = context.get("booking")
+        current_time = context.get("current_time")
+
+        if not booking or not current_time:
+            logger.debug("date_is_today: Missing booking or current_time")
+            return False
+
+        reserve_at = getattr(booking, "reserve_at", None)
+        if not reserve_at:
+            logger.debug("date_is_today: Booking has no reserve_at")
+            return False
+
+        result = reserve_at.date() == current_time.date()
+        logger.debug(
+            f"date_is_today: reserve_at_date={getattr(reserve_at, 'date')()}, "
+            f"current_date={current_time.date()}, result={result}"
+        )
+        return result
+    except Exception as e:
+        logger.error(f"date_is_today error: {e}", exc_info=True)
         return False

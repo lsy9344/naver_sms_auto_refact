@@ -89,25 +89,64 @@ rules:
         params:
           message: "상세안내 {{ store.alias }} {{ booking.name }} {{ booking.phone_last4 }}"
 
-  # 규칙 4: 리뷰 작성 안내 문자
+  # 규칙 4: 리뷰 작성 안내 문자 (RC08/RC03 당일)
   # 우선순위: 중간 - 리뷰 신청한 고객에게 리뷰 작성 안내 문자 발송
-  # 트리거 조건: 현재 시간이 20:00(오후 8시)이고 고객에게 옵션이 있으며 SMS가 아직 발송되지 않은 경우
+  # 트리거 조건: 현재 시간이 20:00(오후 8시)이고, 당일 예약이며, 고객에게 옵션 키워드(네이버/인스타/원본)가 있고, SMS가 아직 발송되지 않은 경우
   # 예상 동작: 이벤트 SMS 발송 + 옵션 SMS 플래그를 발송 완료로 표시 + 텔레그램으로 알림
   - name: "Evening Option SMS"
     enabled: true
-    description: "Send option-related SMS at 8 PM for customers with option selections"
-    tags: ["core", "option"]
+    description: "Send review (event) SMS at 8 PM for same-day bookings (RC08 or RC03) — RC08 variant"
+    tags: ["core", "review", "rc08", "same-day"]
     priority: "medium"
     conditions:
       - type: "current_hour"
         params:
           hour: 20
+      - type: "date_is_today"
       - type: "flag_not_set"
         params:
           flag: "option_sms"
       - type: "has_option_keyword"
         params:
           keywords: ["네이버", "인스타", "원본"]
+      - type: "booking_status"
+        params:
+          status: "RC08"
+    actions:
+      - type: "send_sms"
+        params:
+          template: "event"
+      - type: "update_flag"
+        params:
+          flag: "option_sms"
+          value: true
+      - type: "send_telegram"
+        params:
+          message: "리뷰요청 {{ store.alias }} {{ booking.name }} {{ booking.phone_last4 }}"
+
+  # 규칙 4b: 리뷰 작성 안내 문자 (확정 상태 포함)
+  # 우선순위: 중간 - 당일 예약 고객 중 상태가 RC03인 경우도 포함 (요구사항 확장)
+  # 트리거 조건: 현재 시간이 20:00, 당일 예약이며, option_sms 미발송이고, 상태가 RC03
+  # 예상 동작: 리뷰(이벤트) SMS 발송 + 옵션 SMS 플래그 True + 텔레그램 알림
+  - name: "Evening Option SMS - RC03"
+    enabled: true
+    description: "Send review (event) SMS at 8 PM for same-day bookings (RC08 or RC03) — RC03 variant"
+    tags: ["core", "review", "rc03", "same-day"]
+    priority: "medium"
+    conditions:
+      - type: "current_hour"
+        params:
+          hour: 20
+      - type: "date_is_today"
+      - type: "flag_not_set"
+        params:
+          flag: "option_sms"
+      - type: "has_option_keyword"
+        params:
+          keywords: ["네이버", "인스타", "원본"]
+      - type: "booking_status"
+        params:
+          status: "RC03"
     actions:
       - type: "send_sms"
         params:
