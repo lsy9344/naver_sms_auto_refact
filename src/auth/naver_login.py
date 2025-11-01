@@ -58,11 +58,27 @@ class NaverAuthenticator:
         else:
             logger.warning("Chrome binary not found via known paths; relying on Selenium defaults")
 
-        # Headless & stability flags
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
+        # Headless & stability flags tuned for AWS Lambda's constrained runtime
+        stability_args = [
+            "--headless=new",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--disable-software-rasterizer",
+            "--disable-background-networking",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-breakpad",
+            "--disable-extensions",
+            "--disable-sync",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--metrics-recording-only",
+            "--mute-audio",
+            "--remote-debugging-port=9222",
+        ]
+        for arg in stability_args:
+            chrome_options.add_argument(arg)
         chrome_options.add_argument("--user-data-dir=/tmp/user-data")
         chrome_options.add_argument("--data-path=/tmp/data-path")
         chrome_options.add_argument("--homedir=/tmp")
