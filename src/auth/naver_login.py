@@ -32,6 +32,14 @@ class NaverAuthenticator:
         self.session_manager = session_manager
         self.driver = None
         self._cdp_network_enabled = False
+        import os
+        # Enable stealth by default in Lambda to avoid bot-detection signals
+        is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
+        env_flag = os.getenv("NAVER_STEALTH_MODE")
+        if env_flag is None:
+            self._stealth_enabled = is_lambda
+        else:
+            self._stealth_enabled = env_flag.lower() == "true"
 
     def setup_driver(self):
         chrome_options = Options()
@@ -42,23 +50,35 @@ class NaverAuthenticator:
         else:
             logger.warning("Chrome binary not found via known paths; relying on Selenium defaults")
 
-        # Use modern headless mode; add stability flags for Lambda/CI
-        chrome_options.add_argument("--headless=new")
+        # Headless & stability flags
+        chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-dev-tools")
-        chrome_options.add_argument("--no-zygote")
-        chrome_options.add_argument("--remote-debugging-port=9222")
         chrome_options.add_argument("--user-data-dir=/tmp/user-data")
         chrome_options.add_argument("--data-path=/tmp/data-path")
         chrome_options.add_argument("--homedir=/tmp")
         chrome_options.add_argument("--disk-cache-dir=/tmp/cache-dir")
-        chrome_options.add_argument("--window-size=1280,1024")
-        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
-        chrome_options.add_argument("--disable-background-timer-throttling")
-        chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-        chrome_options.add_argument("--disable-renderer-backgrounding")
+
+        # Randomize viewport size slightly to avoid fingerprints
+        try:
+            import random
+            if self._stealth_enabled:
+                width = random.choice([1280, 1296, 1304, 1366])
+                height = random.choice([920, 1000, 1024, 1050])
+            else:
+                width, height = 1280, 1024
+            chrome_options.add_argument(f"--window-size={width},{height}")
+        except Exception:
+            chrome_options.add_argument("--window-size=1280,1024")
+
+        # Stealth options to reduce webdriver fingerprints
+        if self._stealth_enabled:
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option("useAutomationExtension", False)
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+
+        # Unified user-agent to match API requests later
         user_agent = (
             "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -88,6 +108,22 @@ class NaverAuthenticator:
             self.driver.set_script_timeout(30)
         except Exception:
             pass
+
+        # Apply stealth JS hooks to hide webdriver if enabled
+        if self._stealth_enabled:
+            try:
+                self.driver.execute_cdp_cmd(
+                    "Page.addScriptToEvaluateOnNewDocument",
+                    {
+                        "source": (
+                            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+                            "Object.defineProperty(navigator, 'languages', {get: () => ['ko-KR','ko','en-US','en']});"
+                            "Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});"
+                        )
+                    },
+                )
+            except Exception:
+                pass
 
         # Initial warm-up navigation (best-effort)
         self._safe_get("https://new.smartplace.naver.com/", timeout=30)
@@ -225,17 +261,45 @@ class NaverAuthenticator:
                 timeout=40,
             )
 
-            login_btn = driver.find_element(By.ID, "log.login")
+            # Input credentials (stealth: human-like typing)
+            try:
+                id_input = driver.find_element(By.ID, "id")
+                pw_input = driver.find_element(By.ID, "pw")
 
-            driver.execute_script(
-                f"document.querySelector('input[id=\"id\"]').setAttribute('value', '{userid}')"
-            )
-            time.sleep(uniform(delay + 0.33643, delay + 0.54354))
-            driver.execute_script(
-                f"document.querySelector('input[id=\"pw\"]').setAttribute('value', '{userpw}')"
-            )
-            time.sleep(uniform(delay + 0.33643, delay + 0.54354))
-            login_btn.click()
+                if self._stealth_enabled:
+                    for ch in str(userid):
+                        id_input.send_keys(ch)
+                        time.sleep(uniform(0.05, 0.12))
+                    time.sleep(uniform(0.15, 0.35))
+                    for ch in str(userpw):
+                        pw_input.send_keys(ch)
+                        time.sleep(uniform(0.05, 0.12))
+                    time.sleep(uniform(0.15, 0.35))
+                else:
+                    # Fallback to legacy JS injection (preserves unit tests behaviour)
+                    driver.execute_script(
+                        "document.querySelector('input[id=\\\"id\\\"]').setAttribute('value', '{}')".format(userid)
+                    )
+                    time.sleep(uniform(delay + 0.33643, delay + 0.54354))
+                    driver.execute_script(
+                        "document.querySelector('input[id=\\\"pw\\\"]').setAttribute('value', '{}')".format(userpw)
+                    )
+                    time.sleep(uniform(delay + 0.33643, delay + 0.54354))
+
+                login_btn = driver.find_element(By.ID, "log.login")
+                login_btn.click()
+            except Exception:
+                # As a last resort, use legacy JS path
+                login_btn = driver.find_element(By.ID, "log.login")
+                driver.execute_script(
+                    "document.querySelector('input[id=\\\"id\\\"]').setAttribute('value', '{}')".format(userid)
+                )
+                time.sleep(uniform(delay + 0.33643, delay + 0.54354))
+                driver.execute_script(
+                    "document.querySelector('input[id=\\\"pw\\\"]').setAttribute('value', '{}')".format(userpw)
+                )
+                time.sleep(uniform(delay + 0.33643, delay + 0.54354))
+                login_btn.click()
             time.sleep(uniform(delay + 0.63643, delay + 0.94354))
 
             time.sleep(1)
@@ -258,7 +322,13 @@ class NaverAuthenticator:
         else:
             self._apply_cached_cookies(cached_cookies)
 
-            self._safe_get("https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR", timeout=30)
+            # In Lambda/stealth mode, validate against partner domain instead of account page
+            validate_url = (
+                "https://partner.booking.naver.com/"
+                if self._stealth_enabled
+                else "https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR"
+            )
+            self._safe_get(validate_url, timeout=30)
             driver.implicitly_wait(10)
 
             logger.debug("Validating cached cookie", operation="naver_login_cached")
@@ -321,7 +391,33 @@ class NaverAuthenticator:
                     # Fallback to name/value only if anything goes wrong
                     session.cookies.set(name, value)
 
+            # Note: Avoid duplicating cookies with the same name across domains,
+            # as requests' cookie jar will raise CookieConflictError on get().
+
         return session
+
+    def ensure_partner_session_for_store(self, store_id: str, timeout: int = 45) -> None:
+        """
+        Navigate to a partner booking view to ensure service cookies are set.
+
+        This helps establish cookies scoped specifically to
+        https://partner.booking.naver.com for the target store.
+        """
+        if not self.driver:
+            self.setup_driver()
+
+        url = f"https://partner.booking.naver.com/bizes/{store_id}/booking-list-view"
+        logger.info(
+            "Ensuring partner session for store",
+            operation="naver_partner_session",
+            context={"store_id": store_id, "url": url},
+        )
+        self._safe_get(url, timeout=timeout)
+        # Give the site a brief moment to drop service cookies
+        try:
+            time.sleep(1)
+        except Exception:
+            pass
 
     def cleanup(self):
         if self.driver:

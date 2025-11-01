@@ -164,7 +164,31 @@ def lambda_handler(event, context):
 
                 refreshed_session = authenticator.get_session()
                 booking_api = _create_booking_client(refreshed_session)
-                confirmed_bookings, completed_bookings = _fetch_all_bookings(booking_api)
+                try:
+                    confirmed_bookings, completed_bookings = _fetch_all_bookings(booking_api)
+                except NaverAuthenticationError as second_err:
+                    # Final fallback: warm partner domain for the affected store and retry once
+                    fallback_store = (
+                        getattr(second_err, "store_id", None) or (store_ids[0] if store_ids else None)
+                    )
+                    if fallback_store:
+                        logger.info(
+                            "Warming partner session and retrying after second auth failure",
+                            operation="naver_auth_partner_warm",
+                            context={"store_id": fallback_store},
+                        )
+                        try:
+                            authenticator.ensure_partner_session_for_store(fallback_store)
+                        except Exception as warm_err:
+                            logger.warning(
+                                "Partner warmup encountered an error; proceeding to final retry",
+                                operation="naver_auth_partner_warm",
+                                error=str(warm_err),
+                            )
+
+                        warmed_session = authenticator.get_session()
+                        booking_api = _create_booking_client(warmed_session)
+                        confirmed_bookings, completed_bookings = _fetch_all_bookings(booking_api)
 
             # Combine all bookings
             all_bookings = confirmed_bookings + completed_bookings
