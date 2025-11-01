@@ -115,6 +115,18 @@ def lambda_handler(event, context):
             cookies = authenticator.login(cached_cookies=cached_cookies)
             logger.info(f"Authentication successful: {len(cookies)} cookies")
 
+            # Proactively warm partner session for first store to establish
+            # service-scoped cookies before API calls (reduces 401 risk)
+            try:
+                if store_ids:
+                    authenticator.ensure_partner_session_for_store(store_ids[0])
+            except Exception as warm_exc:
+                logger.warning(
+                    "Partner session warmup skipped due to error",
+                    operation="naver_auth_partner_warm",
+                    error=str(warm_exc),
+                )
+
             api_session = authenticator.get_session()
 
             # ============================================================
@@ -161,6 +173,17 @@ def lambda_handler(event, context):
                     f"Re-authentication successful: {len(cookies)} cookies",
                     operation="naver_auth_retry",
                 )
+
+                # Warm partner session again after re-auth
+                try:
+                    if store_ids:
+                        authenticator.ensure_partner_session_for_store(store_ids[0])
+                except Exception as warm_exc:
+                    logger.warning(
+                        "Partner session warmup skipped after re-auth",
+                        operation="naver_auth_partner_warm",
+                        error=str(warm_exc),
+                    )
 
                 refreshed_session = authenticator.get_session()
                 booking_api = _create_booking_client(refreshed_session)

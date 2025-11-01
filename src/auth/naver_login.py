@@ -158,6 +158,7 @@ class NaverAuthenticator:
             return False
         except WebDriverException as exc:
             msg = str(exc)
+            # Soft failures we can recover from by stopping the load
             if "Timed out receiving message from renderer" in msg:
                 logger.warning(
                     "Renderer stalled; stopping page load",
@@ -170,6 +171,34 @@ class NaverAuthenticator:
                 except Exception:
                     pass
                 return False
+            # Hard crash: attempt one browser restart and retry once
+            if "tab crashed" in msg.lower():
+                logger.warning(
+                    "Chrome tab crashed; restarting driver and retrying navigation",
+                    operation="naver_tab_crash_recover",
+                    context={"url": url},
+                    error=msg,
+                )
+                try:
+                    self.driver.quit()
+                except Exception:
+                    pass
+                self.driver = None
+                try:
+                    self.setup_driver()
+                    try:
+                        self.driver.set_page_load_timeout(timeout)
+                    except Exception:
+                        pass
+                    self.driver.get(url)
+                    return True
+                except Exception as retry_exc:
+                    logger.error(
+                        "Failed to recover from tab crash",
+                        operation="naver_tab_crash_recover",
+                        error=str(retry_exc),
+                    )
+                    raise
             raise
 
     def _resolve_chrome_binary_location(self) -> Optional[str]:
