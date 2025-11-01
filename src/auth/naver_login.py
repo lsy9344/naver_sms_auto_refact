@@ -7,7 +7,11 @@ from pathlib import Path
 from random import uniform
 from typing import Any, Dict, List, Optional
 from selenium import webdriver
-from selenium.common.exceptions import InvalidCookieDomainException, WebDriverException
+from selenium.common.exceptions import (
+    InvalidCookieDomainException,
+    WebDriverException,
+    TimeoutException,
+)
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -38,7 +42,8 @@ class NaverAuthenticator:
         else:
             logger.warning("Chrome binary not found via known paths; relying on Selenium defaults")
 
-        chrome_options.add_argument("--headless")
+        # Use modern headless mode; add stability flags for Lambda/CI
+        chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
@@ -49,11 +54,23 @@ class NaverAuthenticator:
         chrome_options.add_argument("--data-path=/tmp/data-path")
         chrome_options.add_argument("--homedir=/tmp")
         chrome_options.add_argument("--disk-cache-dir=/tmp/cache-dir")
+        chrome_options.add_argument("--window-size=1280,1024")
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+        chrome_options.add_argument("--disable-background-timer-throttling")
+        chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+        chrome_options.add_argument("--disable-renderer-backgrounding")
         user_agent = (
             "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         chrome_options.add_argument(user_agent)
+
+        # Reduce renderer wait by not waiting for all resources
+        try:
+            chrome_options.page_load_strategy = "eager"
+        except Exception:
+            # Fallback for older Selenium
+            chrome_options.set_capability("pageLoadStrategy", "eager")
 
         chromedriver_path = self._resolve_chromedriver_path()
         if chromedriver_path:
@@ -66,7 +83,58 @@ class NaverAuthenticator:
             service = Service()
 
         self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        self.driver.get("https://new.smartplace.naver.com/")
+        try:
+            self.driver.set_page_load_timeout(45)
+            self.driver.set_script_timeout(30)
+        except Exception:
+            pass
+
+        # Initial warm-up navigation (best-effort)
+        self._safe_get("https://new.smartplace.naver.com/", timeout=30)
+
+    def _safe_get(self, url: str, timeout: int = 45) -> bool:
+        """
+        Navigate with a bounded timeout and gracefully stop page load on stall.
+
+        Returns True if navigation completed; False if timed out but recovered.
+        """
+        if not self.driver:
+            return False
+
+        try:
+            try:
+                self.driver.set_page_load_timeout(timeout)
+            except Exception:
+                pass
+            self.driver.get(url)
+            return True
+        except TimeoutException as exc:
+            logger.warning(
+                "Navigation timed out; stopping page load",
+                operation="naver_navigation_timeout",
+                error=str(exc),
+                context={"url": url, "timeout": timeout},
+            )
+            try:
+                self.driver.execute_script("window.stop();")
+            except Exception:
+                pass
+            return False
+        except WebDriverException as exc:
+            msg = str(exc)
+            if "Timed out receiving message from renderer" in msg:
+                logger.warning(
+                    "Renderer stalled; stopping page load",
+                    operation="naver_renderer_stall",
+                    error=msg,
+                    context={"url": url, "timeout": timeout},
+                )
+                try:
+                    self.driver.execute_script("window.stop();")
+                except Exception:
+                    pass
+                return False
+            raise
 
     def _resolve_chrome_binary_location(self) -> Optional[str]:
         """
@@ -138,9 +206,24 @@ class NaverAuthenticator:
                 "No cached cookies, proceeding with Selenium login", operation="naver_login"
             )
 
-            driver.refresh()
+            # Refresh can stall; recover if needed
+            try:
+                driver.refresh()
+            except TimeoutException as exc:
+                logger.warning(
+                    "Refresh timed out; proceeding",
+                    operation="naver_login_refresh",
+                    error=str(exc),
+                )
+                try:
+                    driver.execute_script("window.stop();")
+                except Exception:
+                    pass
 
-            driver.get("https://nid.naver.com/nidlogin.login?mode=form&url=https://www.naver.com/")
+            self._safe_get(
+                "https://nid.naver.com/nidlogin.login?mode=form&url=https://www.naver.com/",
+                timeout=40,
+            )
 
             login_btn = driver.find_element(By.ID, "log.login")
 
@@ -157,7 +240,7 @@ class NaverAuthenticator:
 
             time.sleep(1)
 
-            WebDriverWait(driver, 10).until(EC.url_contains("naver.com"))
+            WebDriverWait(driver, 15).until(EC.url_contains("naver.com"))
 
             cookies = driver.get_cookies()
             session_cookie = json.dumps(cookies)
@@ -167,7 +250,7 @@ class NaverAuthenticator:
         else:
             self._apply_cached_cookies(cached_cookies)
 
-            driver.get("https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR")
+            self._safe_get("https://nid.naver.com/user2/help/myInfoV2?lang=ko_KR", timeout=30)
             driver.implicitly_wait(10)
 
             logger.debug("Validating cached cookie", operation="naver_login_cached")
@@ -217,7 +300,7 @@ class NaverAuthenticator:
 
             if last_loaded_domain != sanitized_domain:
                 try:
-                    driver.get(target_url)
+                    self._safe_get(target_url, timeout=20)
                     last_loaded_domain = sanitized_domain
                 except WebDriverException as exc:
                     logger.warning(
