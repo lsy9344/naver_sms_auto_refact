@@ -41,10 +41,10 @@ class NaverAuthenticator:
         self._cdp_network_enabled = False
         import os
         # Enable stealth by default in Lambda to avoid bot-detection signals
-        is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
+        self._is_lambda = os.getenv("AWS_LAMBDA_FUNCTION_NAME") is not None
         env_flag = os.getenv("NAVER_STEALTH_MODE")
         if env_flag is None:
-            self._stealth_enabled = is_lambda
+            self._stealth_enabled = self._is_lambda
         else:
             self._stealth_enabled = env_flag.lower() == "true"
 
@@ -59,8 +59,15 @@ class NaverAuthenticator:
             logger.warning("Chrome binary not found via known paths; relying on Selenium defaults")
 
         # Headless & stability flags tuned for AWS Lambda's constrained runtime
+        # Default to old headless on Lambda to avoid DevTools disconnects
+        headless_env = os.getenv("NAVER_CHROME_HEADLESS", "")
+        if headless_env.lower() in ("new", "old"):
+            headless_flag = f"--headless={headless_env.lower()}"
+        else:
+            headless_flag = "--headless" if self._is_lambda else "--headless=new"
+
         stability_args = [
-            "--headless=new",
+            headless_flag,
             "--no-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
@@ -71,11 +78,13 @@ class NaverAuthenticator:
             "--disable-breakpad",
             "--disable-extensions",
             "--disable-sync",
+            "--no-zygote",
+            "--single-process",
             "--no-first-run",
             "--no-default-browser-check",
             "--metrics-recording-only",
             "--mute-audio",
-            "--remote-debugging-port=9222",
+            # Intentionally avoid static remote debugging port to prevent port collisions
         ]
         for arg in stability_args:
             chrome_options.add_argument(arg)
@@ -240,11 +249,16 @@ class NaverAuthenticator:
                 except Exception:
                     pass
                 return False
-            # Hard crash: attempt one browser restart and retry once
-            if "tab crashed" in msg.lower():
+            # Hard crash or DevTools connection loss: attempt one browser restart and retry once
+            if (
+                "tab crashed" in msg.lower()
+                or "not connected to devtools" in msg.lower()
+                or "unable to receive message from renderer" in msg.lower()
+                or "disconnected:" in msg.lower()
+            ):
                 self._tab_crash_retries += 1
                 logger.warning(
-                    "Chrome tab crashed; restarting driver and retrying navigation",
+                    "Chrome renderer/devtools disconnected; restarting driver and retrying",
                     operation="naver_tab_crash_recover",
                     context={"url": url, "attempt": self._tab_crash_retries},
                     error=msg,

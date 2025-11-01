@@ -80,6 +80,7 @@ RUN yum update -y && \
     libXrandr \
     libXrender \
     libXss \
+    libXshmfence \
     libXtst \
     libgbm \
     libxkbcommon \
