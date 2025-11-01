@@ -285,6 +285,8 @@ class NaverBookingAPIClient:
             "accept": "*/*",
             "accept-language": "en-US,en;q=0.9",
             "referer": f"https://partner.booking.naver.com/bizes/{store_id}/booking-list-view",
+            "origin": "https://partner.booking.naver.com",
+            "x-requested-with": "XMLHttpRequest",
             "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"macOS"',
@@ -310,29 +312,79 @@ class NaverBookingAPIClient:
 
         url = f"{self.BASE_URL}/v3.1/businesses/{store_id}/bookings/count"
 
+        # Attempt with default headers, then a conservative fallback (without role)
+        header_attempts = [headers, {k: v for k, v in headers.items() if k.lower() != "x-booking-naver-role"}]
+
+        last_http_err: Optional[requests.HTTPError] = None
+        for attempt_idx, hdr in enumerate(header_attempts):
+            try:
+                response = self.session.get(url, headers=hdr, params=params, timeout=10)
+                response.raise_for_status()
+                count = response.json().get("count", 0)
+                logger.debug(
+                    f"Count API returned {count} bookings for store {store_id}",
+                    context={"attempt": attempt_idx + 1},
+                )
+                return count
+            except requests.HTTPError as http_err:
+                last_http_err = http_err
+                # Detect auth errors immediately and raise to preserve legacy behaviour
+                response_obj = getattr(http_err, "response", None)
+                status_code = getattr(response_obj, "status_code", None)
+                response_snippet = None
+                if response_obj is not None:
+                    try:
+                        response_snippet = response_obj.text[:200]
+                    except Exception:  # noqa: BLE001
+                        response_snippet = None
+                else:
+                    error_text = str(http_err)
+                    if "401" in error_text:
+                        status_code = 401
+                    elif "403" in error_text:
+                        status_code = 403
+
+                if status_code in (401, 403):
+                    logger.error(
+                        "Authentication rejected by Naver during bookings count",
+                        context={"store_id": store_id, "status": status_code},
+                        error=str(http_err),
+                    )
+                    raise NaverAuthenticationError(
+                        store_id=store_id,
+                        status_code=status_code,
+                        operation="count_bookings",
+                        response_snippet=response_snippet,
+                    ) from http_err
+
+                # Non-auth HTTP errors: exit loop and handle below
+                break
+
+        http_err = last_http_err  # type: ignore[assignment]
         try:
-            response = self.session.get(url, headers=headers, params=params, timeout=10)
-            response.raise_for_status()
-            count = response.json().get("count", 0)
-            logger.debug(f"Count API returned {count} bookings for store {store_id}")
-            return count
-        except requests.HTTPError as http_err:
-            response_obj = getattr(http_err, "response", None)
+            response_obj = getattr(http_err, "response", None)  # type: ignore[arg-type]
+        except Exception:
+            response_obj = None
+        try:
             status_code = getattr(response_obj, "status_code", None)
+        except Exception:
+            status_code = None
+        try:
+            response_snippet = response_obj.text[:200] if response_obj is not None else None
+        except Exception:
             response_snippet = None
-            if response_obj is not None:
-                try:
-                    response_snippet = response_obj.text[:200]
-                except Exception:  # noqa: BLE001
-                    response_snippet = None
-            else:
-                # Fall back to parsing well-known status codes from the error string
-                error_text = str(http_err)
+
+        try:
+            error_text = str(http_err) if http_err else ""
+            if status_code is None:
                 if "401" in error_text:
                     status_code = 401
                 elif "403" in error_text:
                     status_code = 403
+        except Exception:
+            pass
 
+        try:
             if status_code in (401, 403):
                 logger.error(
                     "Authentication rejected by Naver during bookings count",
@@ -345,13 +397,67 @@ class NaverBookingAPIClient:
                     operation="count_bookings",
                     response_snippet=response_snippet,
                 ) from http_err
+        except Exception:
+            pass
 
-            logger.error(
-                "Failed to count bookings (HTTP error)",
-                context={"store_id": store_id, "status": status_code or "unknown"},
-                error=str(http_err),
-            )
-            return 0
+        logger.error(
+            "Failed to count bookings (HTTP error)",
+            context={"store_id": store_id, "status": status_code or "unknown"},
+            error=str(http_err),
+        )
+        return 0
+        
+        # Legacy flow for completeness (should not reach here)
+        try:
+            pass
+        except Exception:
+            pass
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         except Exception as e:
             logger.error(
                 "Failed to count bookings",
@@ -398,6 +504,8 @@ class NaverBookingAPIClient:
         headers = {
             "authority": "partner.booking.naver.com",
             "referer": f"https://partner.booking.naver.com/bizes/{store_id}/booking-list-view",
+            "origin": "https://partner.booking.naver.com",
+            "x-requested-with": "XMLHttpRequest",
             "x-booking-naver-role": "OWNER",
             "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             "accept": "application/json, text/plain, */*",

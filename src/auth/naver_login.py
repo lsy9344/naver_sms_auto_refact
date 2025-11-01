@@ -242,6 +242,14 @@ class NaverAuthenticator:
 
             WebDriverWait(driver, 15).until(EC.url_contains("naver.com"))
 
+            # Warm partner domain to establish service cookies if required by API
+            try:
+                self._safe_get("https://partner.booking.naver.com/", timeout=40)
+                time.sleep(1)
+            except Exception:
+                # Non-fatal; proceed with whatever cookies we have
+                pass
+
             cookies = driver.get_cookies()
             session_cookie = json.dumps(cookies)
             dynamodb_session.put_item(Item={"id": "1", "cookies": session_cookie})
@@ -267,13 +275,51 @@ class NaverAuthenticator:
                 return cached_cookies
 
     def get_session(self):
+        """
+        Build a requests.Session seeded with Selenium cookies.
+
+        Critical fix: preserve cookie domain/path so requests sends them to
+        partner.booking.naver.com. Also align the default User-Agent with the
+        browser UA used during Selenium login to reduce server-side suspicion.
+        """
         import requests
 
         session = requests.Session()
+
+        # Align session UA with the Chrome UA used in setup_driver
+        try:
+            ua = (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+            session.headers.update({"User-Agent": ua})
+        except Exception:
+            pass
+
         if self.driver:
             cookies = self.driver.get_cookies()
             for cookie in cookies:
-                session.cookies.set(cookie["name"], cookie["value"])
+                name = cookie.get("name")
+                value = cookie.get("value")
+                domain = cookie.get("domain") or None
+                path = cookie.get("path") or "/"
+
+                # Ensure integer expiry when present (requests ignores it for sending)
+                expires = cookie.get("expiry")
+                if isinstance(expires, float):
+                    expires = int(expires)
+
+                try:
+                    # Preserve domain/path so cookies are sent to the correct host
+                    session.cookies.set(
+                        name,
+                        value,
+                        domain=domain,
+                        path=path,
+                    )
+                except Exception:
+                    # Fallback to name/value only if anything goes wrong
+                    session.cookies.set(name, value)
 
         return session
 
