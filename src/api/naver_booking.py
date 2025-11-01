@@ -269,7 +269,7 @@ class NaverBookingAPIClient:
         """
         Count total bookings matching criteria.
 
-        Implements lambda_function.py:303-326 (count_items).
+        Implements lambda_function.py:303-326 (count_items)..
 
         Args:
             store_id: Business ID

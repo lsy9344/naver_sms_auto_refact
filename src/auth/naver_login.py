@@ -31,6 +31,13 @@ class NaverAuthenticator:
         self.password = password
         self.session_manager = session_manager
         self.driver = None
+        self._chrome_profile_paths = [
+            Path("/tmp/user-data"),
+            Path("/tmp/data-path"),
+            Path("/tmp/cache-dir"),
+        ]
+        self._tab_crash_retries = 0
+        self._max_tab_crash_retries = 1
         self._cdp_network_enabled = False
         import os
         # Enable stealth by default in Lambda to avoid bot-detection signals
@@ -41,7 +48,8 @@ class NaverAuthenticator:
         else:
             self._stealth_enabled = env_flag.lower() == "true"
 
-    def setup_driver(self):
+    def setup_driver(self, skip_warmup: bool = False):
+        self._prepare_chrome_profile_dirs()
         chrome_options = Options()
         chrome_binary = self._resolve_chrome_binary_location()
         if chrome_binary:
@@ -108,6 +116,7 @@ class NaverAuthenticator:
             self.driver.set_script_timeout(30)
         except Exception:
             pass
+        self._tab_crash_retries = 0
 
         # Apply stealth JS hooks to hide webdriver if enabled
         if self._stealth_enabled:
@@ -126,7 +135,50 @@ class NaverAuthenticator:
                 pass
 
         # Initial warm-up navigation (best-effort)
-        self._safe_get("https://new.smartplace.naver.com/", timeout=30)
+        if not skip_warmup:
+            self._safe_get("https://new.smartplace.naver.com/", timeout=30)
+
+    def _prepare_chrome_profile_dirs(self) -> None:
+        """
+        Ensure Chrome profile directories are clean before launching a new browser.
+
+        Lambda containers reuse /tmp between invocations. Stale profile data from
+        previous Chrome sessions can corrupt the next launch and trigger tab
+        crashes. Removing the directories pre-launch keeps the profile pristine.
+        """
+        for path in self._chrome_profile_paths:
+            try:
+                if path.exists():
+                    shutil.rmtree(path)
+            except FileNotFoundError:
+                pass
+            except Exception as exc:
+                logger.warning(
+                    "Failed to remove Chrome profile directory",
+                    operation="naver_chrome_profile_prepare",
+                    error=str(exc),
+                    context={"path": str(path)},
+                )
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to prepare Chrome profile directory",
+                    operation="naver_chrome_profile_prepare",
+                    error=str(exc),
+                    context={"path": str(path)},
+                )
+
+    def _cleanup_driver_process(self) -> None:
+        """Shut down the current driver process if it is still running."""
+        if not self.driver:
+            return
+        try:
+            self.driver.quit()
+        except Exception:
+            pass
+        finally:
+            self.driver = None
 
     def _safe_get(self, url: str, timeout: int = 45) -> bool:
         """
@@ -143,6 +195,7 @@ class NaverAuthenticator:
             except Exception:
                 pass
             self.driver.get(url)
+            self._tab_crash_retries = 0
             return True
         except TimeoutException as exc:
             logger.warning(
@@ -173,30 +226,37 @@ class NaverAuthenticator:
                 return False
             # Hard crash: attempt one browser restart and retry once
             if "tab crashed" in msg.lower():
+                self._tab_crash_retries += 1
                 logger.warning(
                     "Chrome tab crashed; restarting driver and retrying navigation",
                     operation="naver_tab_crash_recover",
-                    context={"url": url},
+                    context={"url": url, "attempt": self._tab_crash_retries},
                     error=msg,
                 )
+                self._cleanup_driver_process()
+                if self._tab_crash_retries > self._max_tab_crash_retries:
+                    logger.error(
+                        "Exceeded maximum tab crash recovery attempts",
+                        operation="naver_tab_crash_recover",
+                        context={"url": url, "attempt": self._tab_crash_retries},
+                        error=msg,
+                    )
+                    raise
                 try:
-                    self.driver.quit()
-                except Exception:
-                    pass
-                self.driver = None
-                try:
-                    self.setup_driver()
+                    self.setup_driver(skip_warmup=True)
                     try:
                         self.driver.set_page_load_timeout(timeout)
                     except Exception:
                         pass
                     self.driver.get(url)
+                    self._tab_crash_retries = 0
                     return True
                 except Exception as retry_exc:
                     logger.error(
                         "Failed to recover from tab crash",
                         operation="naver_tab_crash_recover",
                         error=str(retry_exc),
+                        context={"url": url, "attempt": self._tab_crash_retries},
                     )
                     raise
             raise
@@ -449,8 +509,7 @@ class NaverAuthenticator:
             pass
 
     def cleanup(self):
-        if self.driver:
-            self.driver.quit()
+        self._cleanup_driver_process()
 
     def _apply_cached_cookies(self, cached_cookies: List[Dict[str, Any]]) -> None:
         """Rehydrate Selenium session by aligning domains before adding cookies."""
