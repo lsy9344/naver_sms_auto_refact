@@ -300,6 +300,47 @@ def booking_status(context: Dict[str, Any], status: str, **params) -> bool:
         return False
 
 
+def booking_status_any(context: Dict[str, Any], statuses: List[str], **params) -> bool:
+    """
+    Evaluate if booking status matches ANY of the provided status codes.
+
+    Args:
+        context: Dict containing 'booking' with a 'status' attribute
+        statuses: List of allowed status codes (e.g., ["RC03", "RC08"]) 
+
+    Returns:
+        bool: True if booking.status is in statuses, False otherwise
+
+    Example:
+        >>> booking = Mock(status='RC08')
+        >>> booking_status_any({'booking': booking}, statuses=['RC03', 'RC08'])
+        True
+    """
+    try:
+        booking = context.get("booking")
+        if not booking:
+            logger.debug("booking_status_any: Missing booking")
+            return False
+
+        booking_status_code = getattr(booking, "status", None)
+        if booking_status_code is None:
+            logger.debug("booking_status_any: Booking has no status attribute")
+            return False
+
+        if not isinstance(statuses, list) or not statuses:
+            logger.debug("booking_status_any: Invalid or empty statuses parameter")
+            return False
+
+        result = booking_status_code in statuses
+        logger.debug(
+            f"booking_status_any({statuses}): booking.status={booking_status_code}, result={result}"
+        )
+        return result
+    except Exception as e:
+        logger.error(f"booking_status_any error: {e}", exc_info=True)
+        return False
+
+
 def has_option_keyword(context: Dict[str, Any], **params) -> bool:
     """
     Evaluate if booking has option keywords.
@@ -701,6 +742,8 @@ def register_conditions(engine: Any, settings: Optional[Any] = None) -> None:
     engine.register_condition("flag_not_set", flag_not_set)
     engine.register_condition("current_hour", current_hour)
     engine.register_condition("booking_status", booking_status)
+    # New: allow multiple statuses in a single condition (e.g., RC03 or RC08)
+    engine.register_condition("booking_status_any", booking_status_any)
     engine.register_condition("date_is_today", date_is_today)
     engine.register_condition("has_option_keyword", has_option_keyword)
     engine.register_condition("has_multiple_options", has_multiple_options)

@@ -109,9 +109,9 @@ rules:
       - type: "has_option_keyword"
         params:
           keywords: ["네이버", "인스타", "원본"]
-      - type: "booking_status"
+      - type: "booking_status_any"
         params:
-          status: "RC08"
+          statuses: ["RC08", "RC03"]
     actions:
       - type: "send_sms"
         params:
@@ -128,36 +128,7 @@ rules:
   # 우선순위: 중간 - 당일 예약 고객 중 상태가 RC03인 경우도 포함 (요구사항 확장)
   # 트리거 조건: 현재 시간이 20:00, 당일 예약이며, option_sms 미발송이고, 상태가 RC03
   # 예상 동작: 리뷰(이벤트) SMS 발송 + 옵션 SMS 플래그 True + 텔레그램 알림
-  - name: "Evening Option SMS - RC03"
-    enabled: true
-    description: "Send review (event) SMS at 8 PM for same-day bookings (RC08 or RC03) — RC03 variant"
-    tags: ["core", "review", "rc03", "same-day"]
-    priority: "medium"
-    conditions:
-      - type: "current_hour"
-        params:
-          hour: 20
-      - type: "date_is_today"
-      - type: "flag_not_set"
-        params:
-          flag: "option_sms"
-      - type: "has_option_keyword"
-        params:
-          keywords: ["네이버", "인스타", "원본"]
-      - type: "booking_status"
-        params:
-          status: "RC03"
-    actions:
-      - type: "send_sms"
-        params:
-          template: "event"
-      - type: "update_flag"
-        params:
-          flag: "option_sms"
-          value: true
-      - type: "send_telegram"
-        params:
-          message: "리뷰요청 {{ store.alias }} {{ booking.name }} {{ booking.phone_last4 }}"
+  # Note: RC03 variant merged via booking_status_any, keeping rules count stable
 
   # 규칙 5: 날짜 범위 프로모션 (스토리 6.3) - 템플릿 /// 미사용
   # 우선순위: 중간 - 기간 한정 프로모션 캠페인

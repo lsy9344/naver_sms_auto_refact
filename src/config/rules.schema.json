@@ -105,11 +105,13 @@
             "flag_not_set",
             "current_hour",
             "booking_status",
+            "booking_status_any",
             "has_option_keyword",
             "has_multiple_options",
             "store_id_matches",
             "date_range",
-            "has_pro_edit_option"
+            "has_pro_edit_option",
+            "date_is_today"
           ]
         },
         "params": {
@@ -392,6 +394,49 @@
                     "type": "string",
                     "description": "End date (YYYY-MM-DD)",
                     "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "date_is_today"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "booking_status_any"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "type": "object",
+                "required": ["statuses"],
+                "properties": {
+                  "statuses": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "minItems": 1
                   }
                 },
                 "additionalProperties": false
